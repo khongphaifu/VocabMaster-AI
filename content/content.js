@@ -105,13 +105,16 @@ function hideFloatTrigger() {
   }
 }
 
+let activeTypewriterTimer = null;
+
 async function doTranslate(text, x, y) {
   if (isProcessing) return;
   isProcessing = true;
 
   const isWord = !text.includes(' ') && text.length < 35;
 
-  showLoadingTooltip(x, y);
+  // Instant Shell (0ms): render card shell immediately with word header and AI shimmer skeleton
+  showStreamingTooltip(text, isWord, x, y);
 
   try {
     const sendPromise = chrome.runtime.sendMessage({
@@ -154,6 +157,10 @@ chrome.runtime.onMessage.addListener((msg) => {
 });
 
 function hideTooltip() {
+  if (activeTypewriterTimer) {
+    clearInterval(activeTypewriterTimer);
+    activeTypewriterTimer = null;
+  }
   if (tooltip) {
     tooltip.remove();
     tooltip = null;
@@ -168,15 +175,113 @@ function createTooltipBase(x, y) {
   return el;
 }
 
-function showLoadingTooltip(x, y) {
+/**
+ * Instant Shell (0ms): Renders popup card immediately with word header and AI shimmer skeleton
+ */
+function showStreamingTooltip(text, isWord, x, y) {
   hideTooltip();
   tooltip = createTooltipBase(x, y);
+
+  const cleanText = (text || '').trim();
+  const cambridgeUrl = `https://dictionary.cambridge.org/dictionary/english-vietnamese/${encodeURIComponent(cleanText.toLowerCase())}`;
+
   tooltip.innerHTML = `
-    <div class="vm-loading">
-      <div class="vm-spinner"></div>
-      <span>Đang phân tích bằng AI...</span>
-    </div>`;
+    <div class="vm-card">
+      <!-- Header Row: Word & Instant Actions -->
+      <div class="vm-header">
+        <div class="vm-word-wrap">
+          <span class="vm-word">${escHtml(cleanText)}</span>
+          <span class="vm-source-tag" style="animation: vm-stream-in 0.2s ease;">
+            <span class="vm-stream-sparkle">✨</span> AI Thinking...
+          </span>
+        </div>
+        <div class="vm-header-tools">
+          <button type="button" class="vm-tool-btn vm-copy-btn" title="Sao chép từ">${ICONS.copy}</button>
+          <a href="${cambridgeUrl}" target="_blank" rel="noopener noreferrer" class="vm-tool-btn" title="Xem trên Cambridge Dictionary Online" style="text-decoration:none;display:flex;align-items:center;justify-content:center;color:#89b4fa;font-size:12px;">📖</a>
+          <button type="button" class="vm-tool-btn vm-close-btn" title="Đóng">${ICONS.close}</button>
+        </div>
+      </div>
+
+      <!-- AI Shimmer Skeleton -->
+      <div class="vm-stream-skeleton">
+        ${isWord ? `
+          <div class="vm-skeleton-pills">
+            <div class="vm-skeleton-pill" style="width: 78px;"></div>
+            <div class="vm-skeleton-pill" style="width: 78px;"></div>
+            <div class="vm-skeleton-pill" style="width: 48px;"></div>
+          </div>
+          <div class="vm-skeleton-meaning"></div>
+          <div class="vm-skeleton-line" style="width: 90%;"></div>
+          <div class="vm-skeleton-line" style="width: 65%;"></div>
+        ` : `
+          <div class="vm-skeleton-meaning" style="height: 52px;"></div>
+          <div class="vm-skeleton-line" style="width: 92%;"></div>
+          <div class="vm-skeleton-line" style="width: 70%;"></div>
+        `}
+        <div class="vm-stream-status">
+          <span class="vm-stream-sparkle">✨</span>
+          <span>Đang phân tích & dịch từ chuẩn Cambridge...</span>
+        </div>
+      </div>
+    </div>
+  `;
+
   document.body.appendChild(tooltip);
+
+  // Hook close button
+  tooltip.querySelector('.vm-close-btn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    hideTooltip();
+  });
+
+  // Hook copy button
+  tooltip.querySelector('.vm-copy-btn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const btn = e.currentTarget;
+    navigator.clipboard.writeText(cleanText).then(() => {
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = ICONS.check;
+      btn.classList.add('vm-copied');
+      setTimeout(() => {
+        btn.innerHTML = origHtml;
+        btn.classList.remove('vm-copied');
+      }, 1500);
+    });
+  });
+}
+
+/**
+ * Progressive Typewriter Streaming for Core Meaning / Translation
+ */
+function streamTypewriter(element, fullText, speed = 20) {
+  if (!element || !fullText) return;
+  if (activeTypewriterTimer) {
+    clearInterval(activeTypewriterTimer);
+    activeTypewriterTimer = null;
+  }
+
+  const cleanStr = String(fullText).trim();
+  const words = cleanStr.split(' ');
+  let idx = 0;
+  let currentText = '';
+
+  element.innerHTML = '';
+  const cursor = document.createElement('span');
+  cursor.className = 'vm-stream-cursor';
+  element.appendChild(cursor);
+
+  activeTypewriterTimer = setInterval(() => {
+    if (idx < words.length) {
+      currentText += (idx > 0 ? ' ' : '') + words[idx];
+      element.innerHTML = escHtml(currentText);
+      element.appendChild(cursor);
+      idx++;
+    } else {
+      clearInterval(activeTypewriterTimer);
+      activeTypewriterTimer = null;
+      cursor.remove();
+    }
+  }, speed);
 }
 
 function showErrorTooltip(msg, x, y, retryFn = null) {
@@ -230,6 +335,13 @@ function showResultTooltip(data, x, y) {
   }
 
   tooltip.innerHTML = data.type === 'word' ? buildWordHTML(data) : buildPhraseHTML(data);
+
+  // Trigger typewriter streaming on core meaning / translation
+  const streamEl = tooltip.querySelector('[data-stream-text]');
+  if (streamEl) {
+    const rawText = streamEl.getAttribute('data-stream-text') || '';
+    streamTypewriter(streamEl, rawText, 18);
+  }
 
   // Close button
   tooltip.querySelector('.vm-close-btn')?.addEventListener('click', (e) => {
@@ -419,8 +531,8 @@ function buildWordHTML(data) {
       <div class="vm-header">
         <div class="vm-word-wrap">
           <span class="vm-word">${escHtml(orig)}</span>
-          ${rootWord ? `<span class="vm-root-tag" title="Từ nguyên thể">➔ ${escHtml(rootWord)}</span>` : ''}
-          ${data.source === 'cambridge' ? `<span class="vm-source-tag" title="Bản dịch trực tiếp từ Cambridge Dictionary Online">📚 Cambridge</span>` : ''}
+          ${rootWord ? `<span class="vm-root-tag vm-cascade-item vm-cascade-delay-1" title="Từ nguyên thể">➔ ${escHtml(rootWord)}</span>` : ''}
+          ${data.source === 'cambridge' ? `<span class="vm-source-tag vm-cascade-item vm-cascade-delay-1" title="Bản dịch trực tiếp từ Cambridge Dictionary Online">📚 Cambridge</span>` : ''}
         </div>
         <div class="vm-header-tools">
           <button type="button" class="vm-tool-btn vm-copy-btn" title="Sao chép từ & nghĩa">${ICONS.copy}</button>
@@ -430,7 +542,7 @@ function buildWordHTML(data) {
       </div>
 
       <!-- Meta Row: Pronunciation Pills, POS, Level -->
-      <div class="vm-meta-row">
+      <div class="vm-meta-row vm-cascade-item vm-cascade-delay-1">
         ${cleanIpaUk ? `
           <div class="vm-pron-pill vm-pron-uk" data-speak="${escHtml(rootWord || orig)}" data-lang="en-GB" title="Phát âm Anh (UK)">
             <span class="vm-region-tag uk">UK</span>
@@ -449,21 +561,21 @@ function buildWordHTML(data) {
         ${cleanLevel ? `<span class="vm-level" style="background:${lvlStyle.bg};color:${lvlStyle.fg};">${escHtml(cleanLevel)}</span>` : ''}
       </div>
 
-      <!-- Core Meaning (Pure Vietnamese) -->
-      <div class="vm-meaning-vi">
+      <!-- Core Meaning (Pure Vietnamese) with streaming typewriter reveal -->
+      <div class="vm-meaning-vi vm-cascade-item vm-cascade-delay-2">
         <span class="vm-flag-tag vi">VN</span>
-        <span class="vm-meaning-text">${escHtml(cleanMeaning)}</span>
+        <span class="vm-meaning-text" data-stream-text="${escHtml(cleanMeaning)}">${escHtml(cleanMeaning)}</span>
       </div>
 
       ${cleanDefVi ? `
-        <div class="vm-def-vi">
+        <div class="vm-def-vi vm-cascade-item vm-cascade-delay-3">
           <span class="vm-bullet-icon">📖</span>
           <span>${escHtml(cleanDefVi)}</span>
         </div>
       ` : ''}
 
       ${cleanDefEn ? `
-        <div class="vm-def-en">
+        <div class="vm-def-en vm-cascade-item vm-cascade-delay-3">
           <span class="vm-flag-tag en">EN</span>
           <span>${escHtml(cleanDefEn)}</span>
         </div>
@@ -471,7 +583,7 @@ function buildWordHTML(data) {
 
       <!-- 📝 Ví dụ (Examples) -->
       ${(w.examples && w.examples.length) ? `
-        <div class="vm-section">
+        <div class="vm-section vm-cascade-item vm-cascade-delay-4">
           <div class="vm-section-title">📝 Ví dụ</div>
           <div class="vm-examples-list">
             ${w.examples.filter(ex => !isPlaceholder(ex) && !ex.includes('Example sentence')).slice(0, 3).map(ex =>
@@ -495,7 +607,7 @@ function buildWordHTML(data) {
           return true;
         });
         return validFamily.length ? `
-          <div class="vm-section">
+          <div class="vm-section vm-cascade-item vm-cascade-delay-5">
             <div class="vm-section-title">🌱 Các dạng từ liên quan (Word Family)</div>
             <div class="vm-family-list">
               ${validFamily.map(f => `
@@ -514,7 +626,7 @@ function buildWordHTML(data) {
       ${(w.other_meanings && w.other_meanings.length) ? (() => {
         const validOther = w.other_meanings.filter(m => m && m.meaning_vi && !isPlaceholder(m.meaning_vi));
         return validOther.length ? `
-          <div class="vm-section">
+          <div class="vm-section vm-cascade-item vm-cascade-delay-5">
             <div class="vm-section-title">💡 Các cách dịch khác</div>
             <div class="vm-other-list">
               ${validOther.map(m => `
@@ -532,7 +644,7 @@ function buildWordHTML(data) {
       ${(w.collocations && w.collocations.length) ? (() => {
         const validColloc = w.collocations.filter(c => c && c.phrase && !isPlaceholder(c.phrase) && !isPlaceholder(c.meaning_vi));
         return validColloc.length ? `
-          <div class="vm-section">
+          <div class="vm-section vm-cascade-item vm-cascade-delay-5">
             <div class="vm-section-title">🔗 Cụm từ thông dụng (Collocations)</div>
             <div class="vm-colloc-list">
               ${validColloc.map(c => `
@@ -563,7 +675,7 @@ function buildWordHTML(data) {
           })
           .slice(0, 4);
         return validSynonyms.length ? `
-          <div class="vm-synonyms-row">
+          <div class="vm-synonyms-row vm-cascade-item vm-cascade-delay-6">
             <span class="vm-syn-label">Đồng nghĩa:</span>
             ${validSynonyms.map(s => `<span class="vm-syn-tag">${escHtml(s)}</span>`).join('')}
           </div>
@@ -571,7 +683,7 @@ function buildWordHTML(data) {
       })() : ''}
 
       <!-- Action Buttons -->
-      <div class="vm-actions">
+      <div class="vm-actions vm-cascade-item vm-cascade-delay-6">
         <button type="button" class="vm-add-btn" title="Lưu vào sổ từ vựng">
           ${ICONS.plus}
           <span>Thêm từ</span>
@@ -600,10 +712,10 @@ function buildPhraseHTML(data) {
           <button type="button" class="vm-tool-btn vm-close-btn" title="Đóng">${ICONS.close}</button>
         </div>
       </div>
-      <div class="vm-phrase-original">"${escHtml(preview)}"</div>
-      <div class="vm-phrase-translation">${escHtml(data.translation || '')}</div>
-      ${data.explanation ? `<div class="vm-phrase-explain">💡 <b>Phân tích:</b> ${escHtml(data.explanation)}</div>` : ''}
-      <div class="vm-actions">
+      <div class="vm-phrase-original vm-cascade-item vm-cascade-delay-1">"${escHtml(preview)}"</div>
+      <div class="vm-phrase-translation vm-cascade-item vm-cascade-delay-2" data-stream-text="${escHtml(data.translation || '')}">${escHtml(data.translation || '')}</div>
+      ${data.explanation ? `<div class="vm-phrase-explain vm-cascade-item vm-cascade-delay-3">💡 <b>Phân tích:</b> ${escHtml(data.explanation)}</div>` : ''}
+      <div class="vm-actions vm-cascade-item vm-cascade-delay-4">
         <button type="button" class="vm-add-btn" title="Lưu câu vào sổ">
           ${ICONS.plus}
           <span>Lưu câu</span>
