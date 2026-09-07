@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>VocabMaster — Thư viện</title>
+<link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+<div class="header">
+  <div class="header-top">
+    <span class="logo">📚 VocabMaster AI</span>
+    <a class="settings-link" id="btn-settings" title="Cài đặt">⚙️</a>
+  </div>
+  <nav class="tabs">
+    <button class="tab active" data-tab="library">📖 Thư viện</button>
+    <button class="tab" data-tab="flashcard">🃏 Flashcard</button>
+    <button class="tab" data-tab="quiz">🎯 Quiz</button>
+    <button class="tab" data-tab="typing">⌨️ Typing</button>
+    <button class="tab" data-tab="stats">📊 Tiến độ</button>
+  </nav>
+</div>
+
+<main>
+  <!-- LIBRARY TAB -->
+  <div class="pane active" id="pane-library">
+    <div class="search-row">
+      <input type="text" id="search" placeholder="🔍 Tìm từ...">
+      <select id="filter">
+        <option value="all">Tất cả</option>
+        <option value="new">Từ mới</option>
+        <option value="learning">Đang học</option>
+        <option value="learned">Đã thuộc</option>
+      </select>
+    </div>
+    <div id="vocab-list"></div>
+  </div>
+
+  <!-- FLASHCARD TAB -->
+  <div class="pane" id="pane-flashcard">
+    <div id="fc-wrap"></div>
+  </div>
+
+  <!-- QUIZ TAB -->
+  <div class="pane" id="pane-quiz">
+    <div id="qz-wrap"></div>
+  </div>
+
+  <!-- TYPING TAB -->
+  <div class="pane" id="pane-typing">
+    <div id="ty-wrap"></div>
+  </div>
+
+  <!-- STATS TAB -->
+  <div class="pane" id="pane-stats">
+    <div id="st-wrap"></div>
+  </div>
+</main>
+
+<script src="sidepanel.js"></script>
+</body>
+</html>

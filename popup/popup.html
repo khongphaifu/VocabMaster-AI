@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>VocabMaster AI</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 380px;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  padding: 14px;
+  font-size: 13px;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo-icon { font-size: 24px; line-height: 1; }
+.logo-text { font-size: 16px; font-weight: 700; color: #cba6f7; }
+.badge {
+  background: #89b4fa;
+  color: #1e1e2e;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.icon-btn {
+  background: #313244;
+  color: #cdd6f4;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.15s;
+}
+.icon-btn:hover { background: #45475a; }
+
+/* Alert / Warning */
+.warn {
+  background: rgba(243, 139, 168, 0.12);
+  border: 1px solid rgba(243, 139, 168, 0.35);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #f38ba8;
+  margin-bottom: 10px;
+  display: none;
+}
+.warn a { color: #f38ba8; text-decoration: underline; cursor: pointer; font-weight: 600; }
+
+/* Language Selector */
+.lang-selector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #28293d;
+  border: 1px solid #363a4f;
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin-bottom: 10px;
+}
+.lang-pill {
+  font-size: 12px;
+  font-weight: 600;
+  color: #89b4fa;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+}
+.lang-pill.active {
+  background: #313244;
+  color: #cba6f7;
+}
+.btn-swap {
+  background: #313244;
+  color: #fab387;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: transform 0.2s;
+}
+.btn-swap:hover {
+  transform: rotate(180deg);
+  background: #45475a;
+}
+
+/* Input Area */
+.input-wrap {
+  position: relative;
+  margin-bottom: 8px;
+}
+.trans-textarea {
+  width: 100%;
+  min-height: 68px;
+  max-height: 140px;
+  background: #181825;
+  border: 1px solid #313244;
+  border-radius: 8px;
+  color: #cdd6f4;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 30px 8px 10px;
+  resize: vertical;
+  line-height: 1.4;
+  outline: none;
+  box-sizing: border-box;
+}
+.trans-textarea:focus {
+  border-color: #89b4fa;
+  box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.15);
+}
+.btn-clear-input {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: #6c7086;
+  font-size: 14px;
+  cursor: pointer;
+  display: none;
+}
+.btn-clear-input:hover { color: #f38ba8; }
+
+/* Action row */
+.action-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.btn-translate {
+  flex: 1;
+  background: #89b4fa;
+  color: #11111b;
+  font-weight: 700;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background 0.15s;
+}
+.btn-translate:hover { background: #b4befe; }
+.btn-translate:disabled {
+  background: #45475a;
+  color: #6c7086;
+  cursor: not-allowed;
+}
+
+/* Result Area */
+.result-box {
+  background: #181825;
+  border: 1px solid #313244;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+  display: none;
+  animation: vm-fadein 0.15s ease;
+}
+@keyframes vm-fadein {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Cambridge Dictionary Layout in Result */
+.dict-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.dict-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(250, 179, 135, 0.25);
+}
+
+.cambridge-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cambridge-crest {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.cambridge-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  color: #fab387;
+  text-transform: uppercase;
+}
+
+.dict-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.headword-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.headword-text {
+  font-size: 20px;
+  font-weight: 700;
+  color: #cba6f7;
+  line-height: 1.15;
+}
+
+.root-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: #89b4fa;
+  background: rgba(137, 180, 250, 0.12);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.grammar-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pos-badge {
+  font-size: 11px;
+  font-style: italic;
+  font-weight: 600;
+  color: #89dceb;
+  background: #313244;
+  padding: 2px 7px;
+  border-radius: 12px;
+}
+
+.level-badge {
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+/* Pronunciation Bar */
+.prons-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.pron-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #181825;
+  border: 1px solid #313244;
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+.region-tag {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+}
+.region-tag.uk {
+  background: #1e3a5f;
+  color: #89b4fa;
+  border: 1px solid rgba(137, 180, 250, 0.3);
+}
+.region-tag.us {
+  background: #4b2234;
+  color: #f38ba8;
+  border: 1px solid rgba(243, 139, 168, 0.3);
+}
+
+.pron-audio-btn {
+  padding: 2px 4px !important;
+  font-size: 12px !important;
+  cursor: pointer;
+}
+
+.pron-ipa {
+  font-size: 12px;
+  font-style: italic;
+  color: #bac2de;
+  font-family: 'Lucida Console', Monaco, 'Courier New', monospace;
+}
+
+/* Sense Box */
+.sense-box {
+  background: rgba(166, 227, 161, 0.08);
+  border: 1px solid rgba(166, 227, 161, 0.2);
+  border-left: 4px solid #a6e3a1;
+  border-radius: 8px;
+  padding: 9px 11px;
+  margin-bottom: 8px;
+}
+
+.badge-lang {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  line-height: 1;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.badge-lang.vi {
+  background: rgba(166, 227, 161, 0.18);
+  color: #a6e3a1;
+  border: 1px solid rgba(166, 227, 161, 0.4);
+}
+.badge-lang.en {
+  background: rgba(137, 180, 250, 0.18);
+  color: #89b4fa;
+  border: 1px solid rgba(137, 180, 250, 0.4);
+}
+
+.meaning-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.meaning-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: #a6e3a1;
+  line-height: 1.35;
+}
+
+.def-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 5px;
+}
+
+.def-text {
+  font-size: 12.5px;
+  color: #cdd6f4;
+  font-style: italic;
+  line-height: 1.45;
+}
+
+.explain-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 5px;
+  padding-left: 2px;
+}
+
+.explain-dot {
+  color: #f9e2af;
+  font-weight: 700;
+}
+
+.explain-text {
+  font-size: 12px;
+  color: #f9e2af;
+  line-height: 1.4;
+}
+
+/* Dict Sections */
+.dict-section {
+  margin-bottom: 6px;
+  background: rgba(49, 50, 68, 0.35);
+  border: 1px solid #313244;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.section-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #89b4fa;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.examples-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.example-item {
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  color: #bac2de;
+  line-height: 1.35;
+}
+
+.colloc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.colloc-item {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.family-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.family-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.family-pos {
+  font-size: 10px;
+  font-weight: 700;
+  color: #89b4fa;
+  background: rgba(137, 180, 250, 0.12);
+  border: 1px solid rgba(137, 180, 250, 0.25);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.family-word {
+  color: #cba6f7;
+  font-weight: 600;
+}
+
+.family-meaning {
+  color: #a6e3a1;
+}
+
+.other-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.other-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.other-pos {
+  font-size: 10px;
+  font-weight: 700;
+  color: #f9e2af;
+  background: rgba(249, 226, 175, 0.12);
+  border: 1px solid rgba(249, 226, 175, 0.25);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.other-meaning {
+  color: #cdd6f4;
+}
+
+.synonyms-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+  margin-top: 4px;
+}
+
+.word-tag {
+  background: #313244;
+  color: #cba6f7;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+/* Phrase View in Result */
+.phrase-trans {
+  color: #a6e3a1;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.5;
+  background: rgba(166, 227, 161, 0.08);
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(166, 227, 161, 0.2);
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.phrase-explain {
+  color: #f9e2af;
+  font-size: 12px;
+  background: rgba(249, 226, 175, 0.06);
+  border-left: 3px solid #f9e2af;
+  padding: 6px 10px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Tools bar in result */
+.result-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #313244;
+  padding-top: 8px;
+}
+.btn-save-word {
+  background: #89b4fa;
+  color: #11111b;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.btn-save-word:hover { background: #a6e3a1; }
+
+/* Stats Bar */
+.stats-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.stat-card {
+  background: #313244;
+  border-radius: 8px;
+  padding: 6px 4px;
+  text-align: center;
+}
+.stat-val { font-size: 16px; font-weight: 700; line-height: 1.2; }
+.stat-lbl { font-size: 10px; color: #6c7086; margin-top: 2px; }
+
+/* Footer Buttons */
+.footer-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.btn-nav {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #313244;
+  color: #cdd6f4;
+  transition: all 0.15s;
+}
+.btn-nav:hover { background: #45475a; }
+.btn-nav-primary {
+  background: rgba(137, 180, 250, 0.15);
+  color: #89b4fa;
+  border: 1px solid rgba(137, 180, 250, 0.3);
+}
+.btn-nav-primary:hover {
+  background: rgba(137, 180, 250, 0.25);
+}
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(17, 17, 27, 0.3);
+  border-radius: 50%;
+  border-top-color: #11111b;
+  animation: spin 0.6s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">
+    <span class="logo-icon">📚</span>
+    <div>
+      <div class="logo-text">VocabMaster AI</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <span class="badge" id="ai-badge">Groq</span>
+    <button class="icon-btn" id="btn-settings" title="Cài đặt AI">⚙️</button>
+  </div>
+</div>
+
+<!-- Warning if no API Key -->
+<div id="warn" class="warn">
+  ⚠️ Chưa cài API Key! <a id="go-settings">Cài đặt ngay →</a>
+</div>
+
+<!-- Language Selector -->
+<div class="lang-selector">
+  <button class="lang-pill active" id="lang-mode-btn" data-mode="auto">🌐 Tự động (Auto)</button>
+  <button class="btn-swap" id="btn-swap-lang" title="Đổi hướng dịch">⇄</button>
+  <div style="font-size:11px; color:#6c7086;" id="lang-desc">EN ➔ VI / VI ➔ EN</div>
+</div>
+
+<!-- Input Box -->
+<div class="input-wrap">
+  <textarea id="input-text" class="trans-textarea" placeholder="Nhập từ hoặc câu cần dịch (Nhấn Enter hoặc Ctrl+Enter để dịch)..."></textarea>
+  <button id="btn-clear" class="btn-clear-input" title="Xóa">✕</button>
+</div>
+
+<!-- Translate Action Button -->
+<div class="action-row">
+  <button class="btn-translate" id="btn-translate">
+    <span id="trans-btn-icon">✨</span>
+    <span id="trans-btn-text">Dịch ngay (Enter)</span>
+  </button>
+</div>
+
+<!-- Result Container -->
+<div id="result-box" class="result-box"></div>
+
+<!-- Stats Bar -->
+<div class="stats-bar">
+  <div class="stat-card">
+    <div class="stat-val" id="s-total" style="color:#89b4fa">0</div>
+    <div class="stat-lbl">Tổng từ</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-val" id="s-learned" style="color:#a6e3a1">0</div>
+    <div class="stat-lbl">Đã thuộc</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-val" id="s-learning" style="color:#f9e2af">0</div>
+    <div class="stat-lbl">Đang học</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-val" id="s-new" style="color:#cba6f7">0</div>
+    <div class="stat-lbl">Từ mới</div>
+  </div>
+</div>
+
+<!-- Footer Nav -->
+<div class="footer-nav">
+  <button class="btn-nav btn-nav-primary" id="btn-panel">
+    <span>📖</span> Mở Thư viện từ vựng &amp; Luyện tập (Side Panel)
+  </button>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>VocabMaster — Cài đặt</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  min-height: 100vh;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+.wrap { max-width: 640px; margin: 0 auto; padding: 32px 24px; }
+h1 { font-size: 24px; color: #cba6f7; margin-bottom: 6px; }
+.sub { color: #6c7086; font-size: 14px; margin-bottom: 28px; }
+.sec {
+  background: #181825;
+  border-radius: 14px;
+  padding: 22px;
+  margin-bottom: 20px;
+  border: 1px solid #313244;
+}
+.sec h2 { font-size: 15px; color: #89b4fa; margin-bottom: 14px; }
+label { display: block; font-size: 13px; color: #bac2de; margin-bottom: 5px; margin-top: 12px; }
+input[type="text"],
+input[type="password"] {
+  width: 100%;
+  background: #313244;
+  border: 1px solid #45475a;
+  border-radius: 8px;
+  color: #cdd6f4;
+  padding: 10px 13px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+input:focus { border-color: #89b4fa; }
+.provider-card {
+  border: 2px solid #313244;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+}
+.provider-card:hover { border-color: #45475a; background: #1e1e2e; }
+.provider-card.selected { border-color: #89b4fa; background: #89b4fa0d; }
+.provider-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+.provider-card p { font-size: 12px; color: #6c7086; }
+.api-grp { display: none; margin-top: 4px; }
+.api-grp.active { display: block; }
+.key-row { position: relative; }
+.key-row input { padding-right: 72px; }
+.toggle-pw {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #89b4fa;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+}
+a.help { color: #89b4fa; font-size: 12px; text-decoration: none; }
+a.help:hover { text-decoration: underline; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+.btn-save { background: #89b4fa; color: #1e1e2e; margin-top: 16px; }
+.btn-save:hover { background: #74c7ec; }
+.btn-google { background: #4285f4; color: #fff; }
+.btn-google:hover { background: #357ae8; }
+.btn-exp { background: #313244; color: #cdd6f4; }
+.btn-exp:hover { background: #45475a; }
+.btn-danger { background: #f38ba815; color: #f38ba8; border: 1px solid #f38ba840; }
+.btn-danger:hover { background: #f38ba8; color: #1e1e2e; }
+.btn-row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.msg {
+  padding: 9px 13px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-top: 10px;
+  display: none;
+}
+.msg-ok { background: #a6e3a120; color: #a6e3a1; border: 1px solid #a6e3a130; }
+.msg-err { background: #f38ba820; color: #f38ba8; border: 1px solid #f38ba830; }
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.scard { background: #313244; border-radius: 10px; padding: 12px; text-align: center; }
+.scard-n { font-size: 22px; font-weight: 700; }
+.scard-l { font-size: 11px; color: #6c7086; margin-top: 2px; }
+.sheets-info { font-size: 13px; color: #6c7086; margin-top: 10px; min-height: 20px; }
+.danger-sec { border-color: #f38ba840; }
+.danger-sec h2 { color: #f38ba8; }
+hr { border: none; border-top: 1px solid #313244; margin: 4px 0 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>⚙️ Cài đặt VocabMaster AI</h1>
+  <p class="sub">Cấu hình AI provider, API keys, lưu trữ và xuất/nhập dữ liệu</p>
+
+  <!-- AI Provider Section -->
+  <div class="sec">
+    <h2>🤖 Chọn AI Provider</h2>
+    <div class="provider-card" data-p="gemini" id="card-gemini">
+      <h3>✨ Google Gemini 2.0 Flash</h3>
+      <p>Tốc độ nhanh, chính xác cao. Cần Google AI API key.</p>
+    </div>
+    <div class="provider-card" data-p="groq" id="card-groq">
+      <h3>⚡ Groq AI (Llama 3.3 / Miễn phí 100%, Siêu tốc) <span style="background:#a6e3a1;color:#1e1e2e;padding:1px 6px;border-radius:10px;font-size:10px;margin-left:4px">Khuyên dùng</span></h3>
+      <p>Lấy key trong 5 giây, miễn phí 100% không cần thẻ, không cần cấu hình Google Cloud.</p>
+    </div>
+    <div class="provider-card" data-p="openai" id="card-openai">
+      <h3>🧠 OpenAI GPT-4o Mini</h3>
+      <p>Chất lượng phân tích cao, cần tài khoản OpenAI có credit</p>
+    </div>
+    <div class="provider-card" data-p="claude" id="card-claude">
+      <h3>🎭 Anthropic Claude 3.5 Haiku</h3>
+      <p>Phân tích ngôn ngữ sâu, cần Anthropic API key</p>
+    </div>
+
+    <div class="api-grp" id="api-gemini">
+      <label>Google Gemini API Key <a href="https://aistudio.google.com/app/apikey" target="_blank" class="help">Lấy key →</a></label>
+      <div class="key-row">
+        <input type="password" id="key-gemini" placeholder="AIza... hoặc AQ...">
+        <button class="toggle-pw" data-t="key-gemini">👁 Hiện</button>
+      </div>
+    </div>
+    <div class="api-grp" id="api-groq">
+      <label>Groq API Key <a href="https://console.groq.com/keys" target="_blank" class="help">Lấy key miễn phí trong 5 giây (Không cần thẻ) →</a></label>
+      <div class="key-row">
+        <input type="password" id="key-groq" placeholder="gsk_...">
+        <button class="toggle-pw" data-t="key-groq">👁 Hiện</button>
+      </div>
+    </div>
+    <div class="api-grp" id="api-openai">
+      <label>OpenAI API Key <a href="https://platform.openai.com/api-keys" target="_blank" class="help">Lấy key →</a></label>
+      <div class="key-row">
+        <input type="password" id="key-openai" placeholder="sk-...">
+        <button class="toggle-pw" data-t="key-openai">👁 Hiện</button>
+      </div>
+    </div>
+    <div class="api-grp" id="api-claude">
+      <label>Anthropic API Key <a href="https://console.anthropic.com/settings/keys" target="_blank" class="help">Lấy key →</a></label>
+      <div class="key-row">
+        <input type="password" id="key-claude" placeholder="sk-ant-...">
+        <button class="toggle-pw" data-t="key-claude">👁 Hiện</button>
+      </div>
+    </div>
+
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn btn-save" id="btn-save-ai">💾 Lưu cài đặt AI</button>
+      <button class="btn btn-exp" id="btn-test-ai">🧪 Kiểm tra kết nối AI</button>
+    </div>
+    <div class="msg" id="msg-ai"></div>
+  </div>
+
+  <!-- Google Sheets Section -->
+  <div class="sec">
+    <h2>📊 Đồng bộ Google Sheets</h2>
+    <p style="font-size:13px;color:#6c7086;margin-bottom:14px;line-height:1.5">
+      Tự động tạo Google Sheet và đồng bộ từ vựng lên cloud để truy cập từ mọi thiết bị.
+    </p>
+
+    <!-- Step 1: Redirect URI (always shown) -->
+    <div id="redirect-uri-row" style="margin-bottom:14px;background:#313244;border-radius:10px;padding:12px;border:1px solid #45475a">
+      <div style="font-size:12px;color:#f9e2af;margin-bottom:6px;font-weight:600">
+        ⚠️ HƯỚNG DẪN THIẾT LẬP GOOGLE OAUTH:
+      </div>
+      <div style="font-size:11px;color:#bac2de;margin-bottom:8px;line-height:1.6">
+        <b>1. Thêm Authorized Redirect URI:</b> Copy URI bên dưới và dán vào mục <i>Authorized redirect URIs</i> của Client ID (loại Web Application) tại <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:#89b4fa">Google Cloud Credentials</a>:
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">
+        <code id="redirect-uri-val" style="flex:1;background:#1e1e2e;padding:8px 10px;border-radius:6px;font-size:11px;color:#a6e3a1;word-break:break-all">Đang lấy Redirect URI...</code>
+        <button id="btn-copy-uri" class="btn" style="padding:6px 12px;font-size:11px;background:#45475a;white-space:nowrap">📋 Copy</button>
+      </div>
+      <div style="font-size:11px;color:#bac2de;line-height:1.6;border-top:1px solid #45475a;padding-top:8px">
+        <b>2. Thêm Test User (để tránh lỗi Access Blocked 403):</b><br>
+        Vào <a href="https://console.cloud.google.com/apis/credentials/consent" target="_blank" style="color:#89b4fa">OAuth consent screen</a> ➔ Phần <b>Test users</b> ➔ Bấm <b>+ ADD USERS</b> ➔ Nhập email Google của bạn ➔ Bấm <b>Save</b>.
+      </div>
+    </div>
+
+    <!-- Step 2: Client ID input -->
+    <label>
+      OAuth 2.0 Client ID
+      <a href="https://console.cloud.google.com/apis/credentials" target="_blank" class="help">Lấy Client ID →</a>
+    </label>
+    <input type="text" id="sheets-client-id" placeholder="xxxxxx.apps.googleusercontent.com" style="margin-bottom:4px">
+    <div style="font-size:11px;color:#6c7086;margin-bottom:14px;line-height:1.6">
+      💡 Tạo OAuth 2.0 Client ID loại <b>Web application</b> tại Google Cloud Console (bật Google Sheets API trước)
+    </div>
+
+    <div class="btn-row" style="margin-top:0">
+      <button class="btn btn-google" id="btn-connect-sheets">🔗 Kết nối Google Sheets</button>
+      <button class="btn btn-exp" id="btn-sync" style="display:none">🔄 Đồng bộ ngay</button>
+    </div>
+    <div class="sheets-info" id="sheets-info"></div>
+    <div class="msg" id="msg-sheets"></div>
+  </div>
+
+  <!-- Data Management Section -->
+  <div class="sec">
+    <h2>📦 Quản lý dữ liệu từ vựng</h2>
+    <div class="stats-grid">
+      <div class="scard">
+        <div class="scard-n" id="s-total" style="color:#89b4fa">0</div>
+        <div class="scard-l">Tổng từ</div>
+      </div>
+      <div class="scard">
+        <div class="scard-n" id="s-new" style="color:#cba6f7">0</div>
+        <div class="scard-l">Từ mới</div>
+      </div>
+      <div class="scard">
+        <div class="scard-n" id="s-learning" style="color:#f9e2af">0</div>
+        <div class="scard-l">Đang học</div>
+      </div>
+      <div class="scard">
+        <div class="scard-n" id="s-learned" style="color:#a6e3a1">0</div>
+        <div class="scard-l">Đã thuộc</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-exp" id="btn-csv">⬇️ Xuất CSV</button>
+      <button class="btn btn-exp" id="btn-excel">📊 Xuất Excel (.xlsx)</button>
+      <button class="btn btn-exp" id="btn-import">⬆️ Nhập CSV</button>
+      <input type="file" id="import-file" accept=".csv" style="display:none">
+    </div>
+    <div class="msg" id="msg-export"></div>
+  </div>
+
+  <!-- Danger Zone -->
+  <div class="sec danger-sec">
+    <h2>⚠️ Vùng nguy hiểm</h2>
+    <p style="font-size:13px;color:#6c7086;margin-bottom:12px">Thao tác này không thể hoàn tác!</p>
+    <button class="btn btn-danger" id="btn-clear">🗑️ Xóa toàn bộ từ vựng</button>
+  </div>
+</div>
+<script src="settings.js"></script>
+</body>
+</html>

@@ -1,0 +1,401 @@
+/* d:/extension/sidepanel/sidepanel.css
+   Catppuccin Mocha theme for VocabMaster side panel */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #1e1e2e;
+  color: #cdd6f4;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-size: 14px;
+}
+
+/* ── Header ── */
+.header {
+  background: #181825;
+  border-bottom: 1px solid #313244;
+  padding: 10px 12px 0;
+  flex-shrink: 0;
+}
+
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.logo { font-size: 14px; font-weight: 700; color: #cba6f7; }
+
+.settings-link {
+  font-size: 16px;
+  cursor: pointer;
+  text-decoration: none;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+.settings-link:hover { opacity: 1; }
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+  background: none;
+  border: none;
+  color: #6c7086;
+  padding: 7px 9px;
+  cursor: pointer;
+  font-size: 12px;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: all 0.2s;
+  border-radius: 4px 4px 0 0;
+  font-family: inherit;
+}
+.tab:hover { color: #bac2de; background: #31324420; }
+.tab.active { color: #89b4fa; border-bottom-color: #89b4fa; }
+
+/* ── Main content ── */
+main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  position: relative;
+}
+
+.pane {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px;
+  flex-direction: column;
+  gap: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: #45475a #1e1e2e;
+}
+.pane::-webkit-scrollbar { width: 4px; }
+.pane::-webkit-scrollbar-thumb { background: #45475a; border-radius: 2px; }
+.pane.active { display: flex; }
+
+/* ── Library ── */
+.search-row {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.search-row input {
+  flex: 1;
+  background: #313244;
+  border: 1px solid #45475a;
+  border-radius: 8px;
+  color: #cdd6f4;
+  padding: 8px 10px;
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+.search-row input:focus { border-color: #89b4fa; }
+
+.search-row select {
+  background: #313244;
+  border: 1px solid #45475a;
+  border-radius: 8px;
+  color: #cdd6f4;
+  padding: 8px;
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+#vocab-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vcard {
+  background: #181825;
+  border: 1px solid #313244;
+  border-radius: 10px;
+  padding: 10px 12px;
+  transition: border-color 0.2s;
+}
+.vcard:hover { border-color: #45475a; }
+
+.vh {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+  flex-wrap: wrap;
+}
+.vw { font-weight: 700; color: #cba6f7; font-size: 15px; }
+.vipa { color: #89b4fa; font-size: 11px; font-style: italic; }
+.vpos {
+  background: #313244;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  color: #a6e3a1;
+}
+.vstatus {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.s-new { background: #89b4fa20; color: #89b4fa; }
+.s-learning { background: #f9e2af20; color: #f9e2af; }
+.s-learned { background: #a6e3a120; color: #a6e3a1; }
+
+.vdef { font-size: 12px; color: #bac2de; line-height: 1.4; }
+
+.vacts {
+  display: flex;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.sbtn {
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.sbtn-audio { background: #313244; color: #cdd6f4; }
+.sbtn-audio:hover { background: #45475a; }
+.sbtn-del { background: #f38ba820; color: #f38ba8; }
+.sbtn-del:hover { background: #f38ba8; color: #1e1e2e; }
+
+.empty {
+  text-align: center;
+  color: #6c7086;
+  padding: 48px 16px;
+  line-height: 1.7;
+  font-size: 13px;
+}
+
+/* ── Game base ── */
+.gcard {
+  background: #181825;
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+}
+
+.prog-bar {
+  height: 5px;
+  background: #313244;
+  border-radius: 3px;
+  margin-bottom: 14px;
+}
+.prog-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(to right, #89b4fa, #cba6f7);
+  transition: width 0.4s ease;
+}
+
+.gctr {
+  font-size: 12px;
+  color: #6c7086;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gword { font-size: 26px; font-weight: 700; color: #cba6f7; margin-bottom: 5px; }
+.gipa { color: #89b4fa; font-size: 13px; font-style: italic; margin-bottom: 14px; }
+
+.gbtn {
+  padding: 10px 22px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.gb-reveal { background: #89b4fa; color: #1e1e2e; }
+.gb-reveal:hover { background: #74c7ec; }
+.gb-correct { background: #a6e3a1; color: #1e1e2e; }
+.gb-correct:hover { background: #94e2b0; }
+.gb-wrong { background: #f38ba8; color: #1e1e2e; }
+.gb-wrong:hover { background: #e87090; }
+.gb-skip { background: #45475a; color: #bac2de; font-size: 12px; padding: 7px 14px; }
+
+/* Flashcard */
+.fc-acts {
+  display: none;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.fc-back {
+  background: #313244;
+  border-radius: 12px;
+  padding: 14px;
+  text-align: left;
+  margin-bottom: 14px;
+}
+
+/* Quiz */
+.quiz-opts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.qopt {
+  background: #313244;
+  border: 2px solid #45475a;
+  border-radius: 10px;
+  padding: 12px;
+  color: #cdd6f4;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.qopt:hover:not(:disabled) { border-color: #89b4fa; background: #89b4fa10; }
+.qopt:disabled { cursor: default; }
+
+.qfeedback {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  margin-top: 10px;
+}
+
+/* Typing */
+.ty-input-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.ty-input-row input {
+  flex: 1;
+  background: #313244;
+  border: 2px solid #45475a;
+  border-radius: 8px;
+  color: #cdd6f4;
+  padding: 10px 12px;
+  font-size: 15px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+.ty-input-row input:focus { border-color: #89b4fa; }
+
+.ty-hint {
+  letter-spacing: 6px;
+  font-size: 18px;
+  color: #6c7086;
+  font-family: 'Courier New', monospace;
+  margin: 12px 0;
+  min-height: 28px;
+}
+
+.ty-btns {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.tyfeedback {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+/* Stats */
+.st-streak {
+  background: linear-gradient(135deg, #f9e2af, #fab387);
+  color: #1e1e2e;
+  border-radius: 14px;
+  padding: 18px;
+  text-align: center;
+  margin-bottom: 0;
+}
+.st-streak-label { font-size: 12px; margin-bottom: 4px; font-weight: 600; }
+.st-streak-n { font-size: 44px; font-weight: 900; line-height: 1; }
+.st-streak-sub { font-size: 11px; margin-top: 4px; opacity: 0.8; }
+
+.st-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.st-c {
+  background: #181825;
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+}
+
+.st-n { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+.st-l { font-size: 11px; color: #6c7086; }
+
+.acc-bar {
+  background: #313244;
+  border-radius: 4px;
+  height: 10px;
+  margin: 8px 0 6px;
+  overflow: hidden;
+}
+.acc-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(to right, #89b4fa, #a6e3a1);
+  transition: width 0.6s ease;
+}
+
+.level-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+.level-bar-bg {
+  flex: 1;
+  background: #313244;
+  border-radius: 3px;
+  height: 7px;
+  overflow: hidden;
+}
+.level-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: #89b4fa;
+}
