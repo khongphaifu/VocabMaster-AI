@@ -4,61 +4,194 @@
 
 const VIETNAMESE_REGEX = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
 
+export const PLACEHOLDER_STRINGS = new Set([
+  'nghĩa tiếng việt',
+  'nghĩa tiếng việt chuẩn xác',
+  'nghĩa thuần việt',
+  'nghĩa thuần việt chuẩn xác',
+  'nghĩa của từ',
+  'nghĩa khác',
+  'nghĩa',
+  'bản dịch',
+  'từ liên quan',
+  'từ loại',
+  'từ nguyên thể',
+  'cụm từ 1',
+  'cụm từ 2',
+  'đồng nghĩa 1',
+  'đồng nghĩa 2',
+  'bàn điệt',
+  'giải thích chi tiết bằng tiếng việt',
+  'giải thích chi tiết',
+  'example sentence 1',
+  'example sentence 2'
+]);
+
+export function isPlaceholderText(str) {
+  if (!str || typeof str !== 'string') return true;
+  const s = str.trim().toLowerCase();
+  if (s.length === 0 || s === '...' || s === '-') return true;
+  if (PLACEHOLDER_STRINGS.has(s)) return true;
+  if (s.startsWith('<') && s.endsWith('>')) return true;
+  if (s.includes('nghĩa thuần việt') || s.includes('nghĩa tiếng việt') || s.includes('từ liên quan') || s.includes('bàn điệt')) return true;
+  return false;
+}
+
+export const COMMON_WORD_FALLBACKS = {
+  table: {
+    word_root: 'table',
+    ipa_uk: '/ˈteɪ.bəl/',
+    ipa_us: '/ˈteɪ.bəl/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'cái bàn, bảng biểu',
+    definition_vi: 'đồ nội thất có mặt phẳng dùng để đặt đồ vật hoặc bảng danh sách dữ liệu/con số',
+    definition_en: 'a flat surface usually supported by legs, or an arrangement of facts and figures',
+    examples: [
+      'They sat around the kitchen table eating breakfast.',
+      'Table 1 shows the population growth over five years.'
+    ],
+    word_family: [],
+    other_meanings: [
+      { pos: 'verb', meaning_vi: 'hoãn lại (dự luật, kế hoạch) để thảo luận sau' }
+    ],
+    collocations: [
+      { phrase: 'at the table', meaning_vi: 'ở bàn ăn / trên bàn đàm phán' },
+      { phrase: 'round table', meaning_vi: 'bàn tròn' },
+      { phrase: 'times table', meaning_vi: 'bảng cửu chương' }
+    ],
+    synonyms: ['desk', 'counter', 'board', 'chart'],
+    antonyms: []
+  },
+  become: {
+    word_root: 'become',
+    ipa_uk: '/bɪˈkʌm/',
+    ipa_us: '/bɪˈkʌm/',
+    partOfSpeech: 'verb',
+    level: 'A1',
+    meaning_vi: 'trở thành, trở nên',
+    definition_vi: 'bắt đầu là hoặc biến đổi thành một trạng thái hay nghề nghiệp khác',
+    definition_en: 'to start to be something or change into a particular state',
+    examples: [
+      'He became a doctor after graduating from university.',
+      'It was becoming cold as the sun went down.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'become of', meaning_vi: 'xảy ra với ai / cái gì' },
+      { phrase: 'become aware of', meaning_vi: 'nhận thức được điều gì' }
+    ],
+    synonyms: ['turn into', 'transform', 'grow', 'get'],
+    antonyms: []
+  },
+  book: {
+    word_root: 'book',
+    ipa_uk: '/bʊk/',
+    ipa_us: '/bʊk/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'cuốn sách, quyển sách',
+    definition_vi: 'tập hợp các trang giấy có chữ hoặc tranh ảnh được đóng lại với nhau',
+    definition_en: 'a written text that can be published in printed or electronic form',
+    examples: [
+      'She is reading an interesting book.',
+      'I need to book a flight to London.'
+    ],
+    word_family: [
+      { pos: 'noun', word: 'booking', meaning_vi: 'việc đặt chỗ, sự đăng ký' }
+    ],
+    other_meanings: [
+      { pos: 'verb', meaning_vi: 'đặt trước (phòng, vé)' }
+    ],
+    collocations: [
+      { phrase: 'book a ticket', meaning_vi: 'đặt vé' },
+      { phrase: 'by the book', meaning_vi: 'theo đúng quy tắc, luật lệ' }
+    ],
+    synonyms: ['novel', 'volume', 'publication', 'reserve'],
+    antonyms: []
+  },
+  apple: {
+    word_root: 'apple',
+    ipa_uk: '/ˈæp.əl/',
+    ipa_us: '/ˈæp.əl/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'quả táo',
+    definition_vi: 'một loại trái cây tròn có vỏ đỏ, vàng hoặc xanh và thịt màu trắng',
+    definition_en: 'a round fruit with firm, white flesh and a green, red, or yellow skin',
+    examples: [
+      'She took a bite of the juicy red apple.',
+      'An apple a day keeps the doctor away.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'apple pie', meaning_vi: 'bánh táo' },
+      { phrase: 'the apple of one\'s eye', meaning_vi: 'người được yêu quý nhất' }
+    ],
+    synonyms: [],
+    antonyms: []
+  }
+};
+
 const WORD_PROMPT_EN_VI = (word) => {
   return `Bạn là hệ thống từ điển Anh - Việt theo chuẩn Từ điển Cambridge (Cambridge Advanced Learner's Dictionary & Cambridge English-Vietnamese Dictionary).
 Hãy tra cứu và trả về mục từ điển đầy đủ, chi tiết cho từ tiếng Anh sau:
 "${word}"
 
-TIÊU CHUẨN MỤC TỪ ĐIỂN (BẮT BUỘC ĐẦY ĐỦ CÁC TRƯỜNG):
-1. "word_root": Dạng từ nguyên thể/lemma (ví dụ: "sauces" ➔ "sauce", "running" ➔ "run").
-2. "ipa_uk": Phiên âm chuẩn Anh-Anh (UK), ví dụ: "/sɔːs/".
-3. "ipa_us": Phiên âm chuẩn Anh-Mỹ (US), ví dụ: "/sɑːs/".
-4. "partOfSpeech": Từ loại chuẩn (ví dụ: "noun [C or U]", "verb [T]", "adjective", "adverb").
+TIÊU CHUẨN MỤC TỪ ĐIỂN:
+1. "word_root": Dạng từ nguyên thể (lemma) của từ "${word}".
+2. "ipa_uk": Phiên âm chuẩn Anh-Anh (UK), ví dụ "/teɪ.bəl/".
+3. "ipa_us": Phiên âm chuẩn Anh-Mỹ (US), ví dụ "/teɪ.bəl/".
+4. "partOfSpeech": Từ loại chuẩn Cambridge (ví dụ "noun [C]", "verb [T]", "adjective", "adverb").
 5. "level": Cấp độ CEFR theo chuẩn Cambridge (A1, A2, B1, B2, C1, C2).
-6. "meaning_vi": BẮT BUỘC là NGHĨA THUẦN VIỆT cốt lõi, chính xác và thông dụng nhất của từ (Ví dụ: "sauce" ➔ "nước xốt, nước chấm"; "umbrella" ➔ "cây dù, cái ô"; "abandon" ➔ "từ bỏ, ruồng bỏ"). TUYỆT ĐỐI KHÔNG lặp lại từ tiếng Anh "${word}".
+6. "meaning_vi": BẮT BUỘC là NGHĨA TIẾNG VIỆT THẬT SỰ của từ "${word}" (Ví dụ nếu từ là "table" thì meaning_vi phải là "cái bàn, bảng biểu"; nếu "become" thì là "trở thành, trở nên"). TUYỆT ĐỐI KHÔNG trả về chữ "nghĩa tiếng Việt" hay văn bản khuôn mẫu!
 7. "definition_vi": Giải thích chi tiết ý nghĩa và ngữ cảnh bằng tiếng Việt.
 8. "definition_en": Định nghĩa tiếng Anh chuẩn mực, ngắn gọn theo Cambridge Dictionary.
-9. "examples": BẮT BUỘC ít nhất 2 câu ví dụ tiếng Anh tự nhiên có chứa từ "${word}".
-10. "word_family": BẮT BUỘC các dạng từ liên quan cùng gốc (noun, verb, adjective, adverb...). Cấu trúc: [{"pos": "verb", "word": "...", "meaning_vi": "..."}, {"pos": "adj", "word": "...", "meaning_vi": "..."}].
+9. "examples": Ít nhất 2 câu ví dụ tiếng Anh tự nhiên chứa từ "${word}".
+10. "word_family": Mảng các từ họ hàng cùng gốc thực tế (noun, verb, adjective, adverb...). Nếu từ là danh từ đơn giản không có dạng phái sinh phổ biến thì để mảng rỗng []. TUYỆT ĐỐI KHÔNG tự chế từ vô nghĩa (như "bàn điệt") và KHÔNG lặp lại chính từ "${word}".
 11. "other_meanings": Các nghĩa hoặc cách dùng khác nếu có (ví dụ khi từ là động từ hoặc danh từ nghĩa bóng). Cấu trúc: [{"pos": "...", "meaning_vi": "..."}].
-12. "collocations": BẮT BUỘC 2-3 cụm từ thông dụng nhất. Cấu trúc: [{"phrase": "...", "meaning_vi": "..."}].
-13. "synonyms": 2-4 từ đồng nghĩa tiếng Anh phổ biến.
+12. "collocations": 2-3 cụm từ tiếng Anh thông dụng nhất kèm nghĩa tiếng Việt. Cấu trúc: [{"phrase": "cụm từ tiếng Anh", "meaning_vi": "nghĩa tiếng Việt"}].
+13. "synonyms": 2-4 từ đồng nghĩa BẰNG TIẾNG ANH (Ví dụ với "table" là ["desk", "counter", "board", "chart"]). TUYỆT ĐỐI KHÔNG dùng tiếng Việt trong synonyms.
 
-QUY TẮC:
-- Trả về DUY NHẤT một JSON hợp lệ (không kèm văn bản nào ngoài JSON).
-- Tuyệt đối KHÔNG để trống mảng "examples", "word_family", "collocations".
-- Tuyệt đối KHÔNG điền dấu ba chấm (...).
-
-Trả về theo đúng cấu trúc:
+MỤC TỪ MẪU THAM KHẢO (với từ "decision"):
 {
   "type": "word",
   "word": {
-    "word_root": "từ nguyên thể",
-    "ipa_uk": "/phiên âm UK/",
-    "ipa_us": "/phiên âm US/",
+    "word_root": "decision",
+    "ipa_uk": "/dɪˈsɪʒ.ən/",
+    "ipa_us": "/dɪˈsɪʒ.ən/",
     "partOfSpeech": "noun [C or U]",
     "level": "B1",
-    "meaning_vi": "nghĩa thuần Việt chuẩn xác",
-    "definition_vi": "giải thích chi tiết bằng tiếng Việt",
-    "definition_en": "concise English definition following Cambridge Dictionary",
+    "meaning_vi": "sự quyết định, phán quyết",
+    "definition_vi": "sự lựa chọn hoặc phán xét sau khi đã suy nghĩ kỹ",
+    "definition_en": "a choice that you make about something after thinking about several possibilities",
     "examples": [
-      "Example sentence 1 with ${word}",
-      "Example sentence 2 with ${word}"
+      "She made a decision to study abroad.",
+      "It was a difficult decision to make."
     ],
     "word_family": [
-      {"pos": "từ loại", "word": "từ liên quan", "meaning_vi": "nghĩa tiếng Việt"}
+      {"pos": "verb", "word": "decide", "meaning_vi": "quyết định"},
+      {"pos": "adj", "word": "decisive", "meaning_vi": "kiên quyết, dứt khoát"}
     ],
     "other_meanings": [
-      {"pos": "từ loại", "meaning_vi": "nghĩa khác"}
+      {"pos": "noun", "meaning_vi": "sự dứt khoát, tính quyết đoán"}
     ],
     "collocations": [
-      {"phrase": "cụm từ 1", "meaning_vi": "nghĩa tiếng Việt 1"},
-      {"phrase": "cụm từ 2", "meaning_vi": "nghĩa tiếng Việt 2"}
+      {"phrase": "make a decision", "meaning_vi": "đưa ra quyết định"}
     ],
-    "synonyms": ["đồng nghĩa 1", "đồng nghĩa 2"],
-    "antonyms": []
+    "synonyms": ["choice", "judgment", "resolution"],
+    "antonyms": ["indecision"]
   }
-}`;
+}
+
+QUY TẮC BẮT BUỘC:
+- Trả về DUY NHẤT một JSON hợp lệ (không kèm bất kỳ văn bản nào ngoài JSON).
+- Không điền dấu ba chấm (...).
+- Mọi nội dung phải là dữ liệu thật của từ "${word}".
+
+Bây giờ hãy phân tích từ "${word}" và trả về JSON chuẩn xác:`;
 };
 
 const WORD_PROMPT_VI_EN = (word) => {
@@ -208,7 +341,7 @@ function repairAndParseJSON(rawStr) {
   return null;
 }
 
-function safeParseJSON(rawText, isWord, originalText) {
+export function safeParseJSON(rawText, isWord, originalText) {
   if (!rawText || !rawText.trim()) {
     throw new Error('AI không phản hồi dữ liệu. Vui lòng thử lại.');
   }
@@ -311,90 +444,170 @@ function safeParseJSON(rawText, isWord, originalText) {
       parsed.word = w;
     }
 
-    const isMeaningBad = !w.meaning_vi ||
-      typeof w.meaning_vi !== 'string' ||
-      w.meaning_vi.includes('...') ||
-      w.meaning_vi.includes('<nghĩa') ||
+    const cleanRoot = (w.word_root || originalText).trim().toLowerCase();
+    const fallbackData = COMMON_WORD_FALLBACKS[cleanRoot] || COMMON_WORD_FALLBACKS[originalText.trim().toLowerCase()];
+
+    // 1. Sanitize meaning_vi
+    let isMeaningBad = isPlaceholderText(w.meaning_vi) ||
       w.meaning_vi.trim().toLowerCase() === originalText.trim().toLowerCase() ||
-      w.meaning_vi.trim().toLowerCase() === (w.word_root || '').trim().toLowerCase();
+      w.meaning_vi.trim().toLowerCase() === cleanRoot;
 
     if (isMeaningBad) {
-      if (w.definition_vi && typeof w.definition_vi === 'string' && !w.definition_vi.includes('...') && !w.definition_vi.includes('<') && w.definition_vi.trim().toLowerCase() !== originalText.trim().toLowerCase()) {
+      if (fallbackData?.meaning_vi) {
+        w.meaning_vi = fallbackData.meaning_vi;
+      } else if (w.definition_vi && !isPlaceholderText(w.definition_vi) && w.definition_vi.trim().toLowerCase() !== originalText.trim().toLowerCase()) {
         w.meaning_vi = w.definition_vi.split(/[:;]/)[0].trim();
+      } else if (Array.isArray(w.other_meanings) && w.other_meanings.length > 0) {
+        const validOther = w.other_meanings.find(m => m && !isPlaceholderText(m.meaning_vi));
+        if (validOther) w.meaning_vi = validOther.meaning_vi;
       } else {
         w.meaning_vi = originalText;
       }
     }
 
-    if (!w.definition_vi || typeof w.definition_vi !== 'string' || w.definition_vi.includes('...') || w.definition_vi.includes('<')) {
-      w.definition_vi = (w.meaning_vi && w.meaning_vi !== originalText)
-        ? w.meaning_vi
-        : (w.definition_en || originalText);
+    // 2. Sanitize definition_vi
+    if (isPlaceholderText(w.definition_vi)) {
+      w.definition_vi = fallbackData?.definition_vi ||
+        (w.meaning_vi && w.meaning_vi !== originalText ? w.meaning_vi : (w.definition_en || originalText));
     }
 
-    if (!w.ipa_uk || typeof w.ipa_uk !== 'string' || w.ipa_uk.includes('...') || w.ipa_uk.includes('<')) {
-      w.ipa_uk = (w.ipa && !w.ipa.includes('...')) ? w.ipa : '';
+    // 3. Fallback enrichment if available
+    if (fallbackData) {
+      if (!w.ipa_uk || isPlaceholderText(w.ipa_uk)) w.ipa_uk = fallbackData.ipa_uk;
+      if (!w.ipa_us || isPlaceholderText(w.ipa_us)) w.ipa_us = fallbackData.ipa_us;
+      if (!w.definition_en || isPlaceholderText(w.definition_en)) w.definition_en = fallbackData.definition_en;
+      if (!w.partOfSpeech || isPlaceholderText(w.partOfSpeech)) w.partOfSpeech = fallbackData.partOfSpeech;
+      if ((!w.examples || w.examples.length === 0) && fallbackData.examples) w.examples = [...fallbackData.examples];
+      if ((!w.collocations || w.collocations.length === 0) && fallbackData.collocations) w.collocations = [...fallbackData.collocations];
+      if ((!w.synonyms || w.synonyms.length === 0) && fallbackData.synonyms) w.synonyms = [...fallbackData.synonyms];
     }
-    if (!w.ipa_us || typeof w.ipa_us !== 'string' || w.ipa_us.includes('...') || w.ipa_us.includes('<')) {
-      w.ipa_us = (w.ipa && !w.ipa.includes('...')) ? w.ipa : (w.ipa_uk || '');
+
+    if (!w.ipa_uk || isPlaceholderText(w.ipa_uk)) {
+      w.ipa_uk = (w.ipa && !isPlaceholderText(w.ipa)) ? w.ipa : '';
+    }
+    if (!w.ipa_us || isPlaceholderText(w.ipa_us)) {
+      w.ipa_us = (w.ipa && !isPlaceholderText(w.ipa)) ? w.ipa : (w.ipa_uk || '');
     }
     if (!w.ipa) {
       w.ipa = w.ipa_uk || w.ipa_us || '';
     }
 
-    if (!w.word_root || typeof w.word_root !== 'string' || w.word_root.includes('...') || w.word_root.includes('<')) {
+    if (!w.word_root || isPlaceholderText(w.word_root)) {
       w.word_root = originalText;
     }
 
-    if (!w.partOfSpeech || typeof w.partOfSpeech !== 'string' || w.partOfSpeech.includes('...') || w.partOfSpeech.includes('<')) {
+    if (!w.partOfSpeech || isPlaceholderText(w.partOfSpeech)) {
       w.partOfSpeech = 'noun';
     }
 
-    if (!w.definition_en || typeof w.definition_en !== 'string' || w.definition_en.includes('...') || w.definition_en.includes('<')) {
+    if (!w.definition_en || isPlaceholderText(w.definition_en)) {
       w.definition_en = '';
     }
 
+    // 4. Sanitize collocations
     if (Array.isArray(w.collocations)) {
+      const seenColloc = new Set();
       w.collocations = w.collocations.map(c => {
         if (typeof c === 'string') return { phrase: c, meaning_vi: '' };
         return c;
-      }).filter(c => c && c.phrase && !String(c.phrase).includes('...') && !String(c.phrase).includes('<'));
+      }).filter(c => {
+        if (!c || !c.phrase) return false;
+        const phrase = String(c.phrase).trim();
+        const meaning = String(c.meaning_vi || '').trim();
+        if (isPlaceholderText(phrase) || isPlaceholderText(meaning)) return false;
+        const key = phrase.toLowerCase();
+        if (seenColloc.has(key)) return false;
+        seenColloc.add(key);
+        return true;
+      });
     } else {
       w.collocations = [];
     }
 
+    // 5. Sanitize word_family (NO placeholders, NO self-reference, NO nonsense words)
     if (Array.isArray(w.word_family)) {
+      const seenFamily = new Set();
       w.word_family = w.word_family.map(f => {
         if (typeof f === 'string') return { pos: '', word: f, meaning_vi: '' };
         return f;
-      }).filter(f => f && f.word && !String(f.word).includes('...') && !String(f.word).includes('<'));
+      }).filter(f => {
+        if (!f || !f.word) return false;
+        const fw = String(f.word).trim();
+        const fMeaning = String(f.meaning_vi || '').trim();
+        if (isPlaceholderText(fw) || isPlaceholderText(fMeaning)) return false;
+        const fwLower = fw.toLowerCase();
+        if (fwLower === originalText.trim().toLowerCase() || fwLower === cleanRoot) return false;
+        if (seenFamily.has(fwLower)) return false;
+        seenFamily.add(fwLower);
+        return true;
+      });
     } else {
       w.word_family = [];
     }
 
+    // 6. Sanitize synonyms (English only, NO placeholders, NO duplicates)
+    if (Array.isArray(w.synonyms)) {
+      const seenSyn = new Set();
+      w.synonyms = w.synonyms
+        .map(s => String(s || '').trim())
+        .filter(s => {
+          if (!s || s.length < 2) return false;
+          if (isPlaceholderText(s)) return false;
+          if (VIETNAMESE_REGEX.test(s)) return false; // Must be English!
+          const lower = s.toLowerCase();
+          if (lower === originalText.trim().toLowerCase() || lower === cleanRoot) return false;
+          if (seenSyn.has(lower)) return false;
+          seenSyn.add(lower);
+          return true;
+        })
+        .slice(0, 4);
+    } else {
+      w.synonyms = [];
+    }
+
+    // 7. Sanitize other_meanings
     if (Array.isArray(w.other_meanings)) {
+      const seenOther = new Set();
       w.other_meanings = w.other_meanings.map(m => {
         if (typeof m === 'string') return { pos: '', meaning_vi: m };
         return m;
-      }).filter(m => m && m.meaning_vi && !String(m.meaning_vi).includes('...') && !String(m.meaning_vi).includes('<'));
+      }).filter(m => {
+        if (!m || !m.meaning_vi) return false;
+        const meaning = String(m.meaning_vi).trim();
+        if (isPlaceholderText(meaning)) return false;
+        const key = meaning.toLowerCase();
+        if (seenOther.has(key)) return false;
+        seenOther.add(key);
+        return true;
+      });
     } else {
       w.other_meanings = [];
     }
 
+    // 8. Sanitize examples
     if (Array.isArray(w.examples)) {
-      w.examples = w.examples.filter(ex => typeof ex === 'string' && !ex.includes('...') && !ex.includes('<'));
+      w.examples = w.examples.filter(ex => {
+        if (typeof ex !== 'string') return false;
+        if (isPlaceholderText(ex)) return false;
+        if (ex.includes('Example sentence') || ex.includes('Ví dụ')) return false;
+        return true;
+      });
     } else {
       w.examples = [];
     }
 
-    if (!w.level || typeof w.level !== 'string' || w.level.includes('...')) {
-      w.level = 'B1';
+    if (!w.level || typeof w.level !== 'string' || isPlaceholderText(w.level)) {
+      w.level = fallbackData?.level || 'B1';
     }
 
     return parsed;
   }
 
   // Fallback regex extraction for word
+  const rootMatch = cleanRaw.match(/"word_root"\s*:\s*"([^"]+)"/);
+  const cleanWordRoot = (rootMatch ? rootMatch[1] : originalText).trim().toLowerCase();
+  const fbData = COMMON_WORD_FALLBACKS[cleanWordRoot] || COMMON_WORD_FALLBACKS[originalText.trim().toLowerCase()];
+
   const meaningViMatch = cleanRaw.match(/"meaning_vi"\s*:\s*"([^"]+)"/);
   const defViMatch = cleanRaw.match(/"definition_vi"\s*:\s*"([^"]+)"/) || cleanRaw.match(/định nghĩa.*?:\s*([^\n\r"]+)/i);
   const defEnMatch = cleanRaw.match(/"definition_en"\s*:\s*"([^"]+)"/);
@@ -402,32 +615,35 @@ function safeParseJSON(rawText, isWord, originalText) {
   const ipaUsMatch = cleanRaw.match(/"ipa_us"\s*:\s*"([^"]+)"/);
   const ipaMatch = cleanRaw.match(/"ipa"\s*:\s*"([^"]+)"/);
   const posMatch = cleanRaw.match(/"partOfSpeech"\s*:\s*"([^"]+)"/);
-  const rootMatch = cleanRaw.match(/"word_root"\s*:\s*"([^"]+)"/);
 
-  if (defViMatch || meaningViMatch) {
-    let meaning = meaningViMatch ? meaningViMatch[1] : (defViMatch ? defViMatch[1] : originalText);
+  if (defViMatch || meaningViMatch || fbData) {
+    let meaning = meaningViMatch ? meaningViMatch[1] : (defViMatch ? defViMatch[1] : '');
     let defVi = defViMatch ? defViMatch[1] : meaning;
 
-    if (meaning.includes('...') || meaning.includes('<') || meaning.toLowerCase() === originalText.toLowerCase()) {
-      meaning = (defVi && defVi.toLowerCase() !== originalText.toLowerCase()) ? defVi.split(/[:;]/)[0].trim() : originalText;
+    if (isPlaceholderText(meaning) || meaning.toLowerCase() === originalText.toLowerCase() || meaning.toLowerCase() === cleanWordRoot) {
+      meaning = fbData?.meaning_vi || ((defVi && !isPlaceholderText(defVi) && defVi.toLowerCase() !== originalText.toLowerCase()) ? defVi.split(/[:;]/)[0].trim() : originalText);
     }
-    if (defVi.includes('...') || defVi.includes('<')) defVi = meaning;
+    if (isPlaceholderText(defVi)) {
+      defVi = fbData?.definition_vi || meaning;
+    }
 
-    const ipaUk = ipaUkMatch && !ipaUkMatch[1].includes('...') ? ipaUkMatch[1] : (ipaMatch && !ipaMatch[1].includes('...') ? ipaMatch[1] : '');
-    const ipaUs = ipaUsMatch && !ipaUsMatch[1].includes('...') ? ipaUsMatch[1] : ipaUk;
+    const ipaUk = ipaUkMatch && !isPlaceholderText(ipaUkMatch[1]) ? ipaUkMatch[1] : (ipaMatch && !isPlaceholderText(ipaMatch[1]) ? ipaMatch[1] : (fbData?.ipa_uk || ''));
+    const ipaUs = ipaUsMatch && !isPlaceholderText(ipaUsMatch[1]) ? ipaUsMatch[1] : (fbData?.ipa_us || ipaUk);
 
     // Extract examples via regex if any
     const examples = [];
-    const exRegex = /"(?:Example sentence[^"]*|[^"]*${originalText}[^"]*)"/gi;
     const rawExMatches = cleanRaw.match(/"examples"\s*:\s*\[([\s\S]*?)\]/);
     if (rawExMatches) {
       const exItems = rawExMatches[1].match(/"([^"]+)"/g);
       if (exItems) {
         exItems.forEach(item => {
           const val = item.replace(/^"|"$/g, '').trim();
-          if (val && !val.includes('...') && !val.includes('Example sentence')) examples.push(val);
+          if (val && !isPlaceholderText(val) && !val.includes('Example sentence')) examples.push(val);
         });
       }
+    }
+    if (examples.length === 0 && fbData?.examples) {
+      examples.push(...fbData.examples);
     }
 
     // Extract collocations via regex if any
@@ -435,9 +651,12 @@ function safeParseJSON(rawText, isWord, originalText) {
     const collocRegex = /\{\s*"phrase"\s*:\s*"([^"]+)"\s*,\s*"meaning_vi"\s*:\s*"([^"]+)"\s*\}/g;
     let cMatch;
     while ((cMatch = collocRegex.exec(cleanRaw)) !== null) {
-      if (!cMatch[1].includes('...') && !cMatch[1].includes('cụm từ')) {
+      if (!isPlaceholderText(cMatch[1]) && !isPlaceholderText(cMatch[2])) {
         collocations.push({ phrase: cMatch[1], meaning_vi: cMatch[2] });
       }
+    }
+    if (collocations.length === 0 && fbData?.collocations) {
+      collocations.push(...fbData.collocations);
     }
 
     // Extract word family via regex if any
@@ -445,7 +664,8 @@ function safeParseJSON(rawText, isWord, originalText) {
     const famRegex = /\{\s*"pos"\s*:\s*"([^"]+)"\s*,\s*"word"\s*:\s*"([^"]+)"\s*,\s*"meaning_vi"\s*:\s*"([^"]+)"\s*\}/g;
     let fMatch;
     while ((fMatch = famRegex.exec(cleanRaw)) !== null) {
-      if (!fMatch[2].includes('...') && !fMatch[2].includes('từ liên quan')) {
+      const wFam = fMatch[2].trim().toLowerCase();
+      if (!isPlaceholderText(fMatch[2]) && !isPlaceholderText(fMatch[3]) && wFam !== originalText.toLowerCase() && wFam !== cleanWordRoot) {
         word_family.push({ pos: fMatch[1], word: fMatch[2], meaning_vi: fMatch[3] });
       }
     }
@@ -454,21 +674,21 @@ function safeParseJSON(rawText, isWord, originalText) {
       type: 'word',
       original: originalText,
       word: {
-        word_root: rootMatch && !rootMatch[1].includes('...') ? rootMatch[1] : originalText,
+        word_root: rootMatch && !isPlaceholderText(rootMatch[1]) ? rootMatch[1] : (fbData?.word_root || originalText),
         ipa_uk: ipaUk,
         ipa_us: ipaUs,
         ipa: ipaUk || ipaUs,
-        partOfSpeech: posMatch && !posMatch[1].includes('...') && !posMatch[1].includes('<') ? posMatch[1] : 'noun',
+        partOfSpeech: posMatch && !isPlaceholderText(posMatch[1]) ? posMatch[1] : (fbData?.partOfSpeech || 'noun'),
         meaning_vi: meaning,
         definition_vi: defVi,
-        definition_en: defEnMatch && !defEnMatch[1].includes('...') && !defEnMatch[1].includes('<') ? defEnMatch[1] : '',
+        definition_en: defEnMatch && !isPlaceholderText(defEnMatch[1]) ? defEnMatch[1] : (fbData?.definition_en || ''),
         collocations,
         word_family,
-        other_meanings: [],
+        other_meanings: fbData?.other_meanings ? [...fbData.other_meanings] : [],
         examples,
-        synonyms: [],
+        synonyms: fbData?.synonyms ? [...fbData.synonyms] : [],
         antonyms: [],
-        level: 'B1'
+        level: fbData?.level || 'B1'
       }
     };
   }

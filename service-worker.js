@@ -2,10 +2,28 @@
 // Service Worker (MV3) - routes messages, calls AI, manages vocabulary storage
 // Static import is required - dynamic import() is NOT allowed in service workers
 
-import { callAI } from './utils/ai-client.js';
+import { callAI, isPlaceholderText } from './utils/ai-client.js';
 import { fetchFromCambridge } from './utils/cambridge-client.js';
 
 chrome.runtime.onInstalled.addListener(() => {
+  // Cleanup corrupted cache entries (e.g. placeholder texts like "nghĩa tiếng Việt")
+  (async () => {
+    try {
+      const { dict_cache = {} } = await chrome.storage.local.get('dict_cache');
+      let modified = false;
+      for (const k of Object.keys(dict_cache)) {
+        const item = dict_cache[k];
+        if (item?.word?.meaning_vi && isPlaceholderText(item.word.meaning_vi)) {
+          delete dict_cache[k];
+          modified = true;
+        }
+      }
+      if (modified) {
+        await chrome.storage.local.set({ dict_cache });
+      }
+    } catch (_) {}
+  })();
+
   // Setup context menus
   chrome.contextMenus.create({
     id: 'vm-translate',
@@ -116,7 +134,7 @@ async function getCachedTranslation(key, cleanText) {
     // Validate entry integrity
     if (cached.type === 'word') {
       const w = cached.word;
-      if (!w || typeof w !== 'object' || w.meaning_vi === cleanText || !w.meaning_vi) {
+      if (!w || typeof w !== 'object' || w.meaning_vi === cleanText || !w.meaning_vi || isPlaceholderText(w.meaning_vi)) {
         memoryCache.delete(key);
         try {
           const { dict_cache = {} } = await chrome.storage.local.get('dict_cache');

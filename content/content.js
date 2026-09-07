@@ -1,6 +1,8 @@
 // d:/extension/content/content.js
 // Intercepts text selection, shows floating action trigger, performs AI translation
 
+const VIETNAMESE_REGEX = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
+
 let tooltip = null;
 let floatTrigger = null;
 let activeLibraryModal = null;
@@ -378,18 +380,38 @@ function buildWordHTML(data) {
   const cleanPos = (w.partOfSpeech && !w.partOfSpeech.includes('...')) ? w.partOfSpeech : 'noun';
   const cleanLevel = (w.level && !w.level.includes('...')) ? w.level.toUpperCase() : '';
 
-  let cleanMeaning = (w.meaning_vi && !w.meaning_vi.includes('...') && w.meaning_vi.trim().toLowerCase() !== orig.toLowerCase())
+  const isPlaceholder = (str) => {
+    if (!str || typeof str !== 'string') return true;
+    const s = str.trim().toLowerCase();
+    if (s.length === 0 || s === '...' || s === '-') return true;
+    return s === 'nghĩa tiếng việt' ||
+           s === 'nghĩa tiếng việt chuẩn xác' ||
+           s === 'nghĩa thuần việt' ||
+           s === 'nghĩa thuần việt chuẩn xác' ||
+           s.includes('nghĩa thuần việt') ||
+           s.includes('nghĩa tiếng việt') ||
+           s === 'bàn điệt' ||
+           s.includes('bàn điệt') ||
+           s === 'từ liên quan' ||
+           s === 'từ loại';
+  };
+
+  let cleanMeaning = (w.meaning_vi && !isPlaceholder(w.meaning_vi) && w.meaning_vi.trim().toLowerCase() !== orig.toLowerCase())
     ? w.meaning_vi
     : '';
-  if (!cleanMeaning && w.definition_vi && !w.definition_vi.includes('...') && w.definition_vi.trim().toLowerCase() !== orig.toLowerCase()) {
+  if (!cleanMeaning && w.definition_vi && !isPlaceholder(w.definition_vi) && w.definition_vi.trim().toLowerCase() !== orig.toLowerCase()) {
     cleanMeaning = w.definition_vi.split(/[:;]/)[0].trim();
   }
+  if (!cleanMeaning && Array.isArray(w.other_meanings) && w.other_meanings.length > 0) {
+    const validOther = w.other_meanings.find(m => m && !isPlaceholder(m.meaning_vi));
+    if (validOther) cleanMeaning = validOther.meaning_vi;
+  }
   if (!cleanMeaning) {
-    cleanMeaning = w.definition_vi || w.definition_en || orig;
+    cleanMeaning = (!isPlaceholder(w.definition_vi) && w.definition_vi) || (!isPlaceholder(w.definition_en) && w.definition_en) || orig;
   }
 
-  const cleanDefVi = (w.definition_vi && !w.definition_vi.includes('...') && w.definition_vi !== cleanMeaning) ? w.definition_vi : '';
-  const cleanDefEn = (w.definition_en && !w.definition_en.includes('...')) ? w.definition_en : '';
+  const cleanDefVi = (w.definition_vi && !isPlaceholder(w.definition_vi) && w.definition_vi !== cleanMeaning) ? w.definition_vi : '';
+  const cleanDefEn = (w.definition_en && !isPlaceholder(w.definition_en)) ? w.definition_en : '';
 
   return `
     <div class="vm-card">
@@ -452,7 +474,7 @@ function buildWordHTML(data) {
         <div class="vm-section">
           <div class="vm-section-title">📝 Ví dụ</div>
           <div class="vm-examples-list">
-            ${w.examples.slice(0, 3).map(ex =>
+            ${w.examples.filter(ex => !isPlaceholder(ex) && !ex.includes('Example sentence')).slice(0, 3).map(ex =>
               `<div class="vm-example-item">
                 <span class="vm-example-bullet">•</span>
                 <span class="vm-example-text">${highlightWord(escHtml(ex), orig)}</span>
@@ -463,64 +485,96 @@ function buildWordHTML(data) {
       ` : ''}
 
       <!-- 🌱 Các dạng từ liên quan (Word Family) -->
-      ${(w.word_family && w.word_family.length) ? `
-        <div class="vm-section">
-          <div class="vm-section-title">🌱 Các dạng từ liên quan (Word Family)</div>
-          <div class="vm-family-list">
-            ${w.word_family.map(f => `
-              <div class="vm-family-item">
-                <span class="vm-family-pos">${escHtml(f.pos || '')}</span>
-                <span class="vm-family-word">${escHtml(f.word || '')}:</span>
-                <span class="vm-family-meaning">${escHtml(f.meaning_vi || '')}</span>
-              </div>
-            `).join('')}
+      ${(w.word_family && w.word_family.length) ? (() => {
+        const validFamily = w.word_family.filter(f => {
+          if (!f || !f.word) return false;
+          const fw = String(f.word).trim();
+          const fm = String(f.meaning_vi || '').trim();
+          if (isPlaceholder(fw) || isPlaceholder(fm)) return false;
+          if (fw.toLowerCase() === orig.toLowerCase() || fw.toLowerCase() === (rootWord || '').toLowerCase()) return false;
+          return true;
+        });
+        return validFamily.length ? `
+          <div class="vm-section">
+            <div class="vm-section-title">🌱 Các dạng từ liên quan (Word Family)</div>
+            <div class="vm-family-list">
+              ${validFamily.map(f => `
+                <div class="vm-family-item">
+                  <span class="vm-family-pos">${escHtml(f.pos || '')}</span>
+                  <span class="vm-family-word">${escHtml(f.word || '')}:</span>
+                  <span class="vm-family-meaning">${escHtml(f.meaning_vi || '')}</span>
+                </div>
+              `).join('')}
+            </div>
           </div>
-        </div>
-      ` : ''}
+        ` : '';
+      })() : ''}
 
       <!-- 💡 Các cách dịch khác (Other Meanings) -->
-      ${(w.other_meanings && w.other_meanings.length) ? `
-        <div class="vm-section">
-          <div class="vm-section-title">💡 Các cách dịch khác</div>
-          <div class="vm-other-list">
-            ${w.other_meanings.map(m => `
-              <div class="vm-other-item">
-                <span class="vm-family-pos">${escHtml(m.pos || '')}</span>
-                <span class="vm-other-meaning">${escHtml(m.meaning_vi || '')}</span>
-              </div>
-            `).join('')}
+      ${(w.other_meanings && w.other_meanings.length) ? (() => {
+        const validOther = w.other_meanings.filter(m => m && m.meaning_vi && !isPlaceholder(m.meaning_vi));
+        return validOther.length ? `
+          <div class="vm-section">
+            <div class="vm-section-title">💡 Các cách dịch khác</div>
+            <div class="vm-other-list">
+              ${validOther.map(m => `
+                <div class="vm-other-item">
+                  <span class="vm-family-pos">${escHtml(m.pos || '')}</span>
+                  <span class="vm-other-meaning">${escHtml(m.meaning_vi || '')}</span>
+                </div>
+              `).join('')}
+            </div>
           </div>
-        </div>
-      ` : ''}
+        ` : '';
+      })() : ''}
 
       <!-- 🔗 Cụm từ thông dụng (Collocations) -->
-      ${(w.collocations && w.collocations.length) ? `
-        <div class="vm-section">
-          <div class="vm-section-title">🔗 Cụm từ thông dụng (Collocations)</div>
-          <div class="vm-colloc-list">
-            ${w.collocations.map(c => `
-              <div class="vm-colloc-item">
-                <b class="vm-colloc-phrase">${escHtml(c.phrase || '')}</b>
-                ${c.meaning_vi ? `<span class="vm-colloc-meaning">: ${escHtml(c.meaning_vi)}</span>` : ''}
-              </div>
-            `).join('')}
+      ${(w.collocations && w.collocations.length) ? (() => {
+        const validColloc = w.collocations.filter(c => c && c.phrase && !isPlaceholder(c.phrase) && !isPlaceholder(c.meaning_vi));
+        return validColloc.length ? `
+          <div class="vm-section">
+            <div class="vm-section-title">🔗 Cụm từ thông dụng (Collocations)</div>
+            <div class="vm-colloc-list">
+              ${validColloc.map(c => `
+                <div class="vm-colloc-item">
+                  <b class="vm-colloc-phrase">${escHtml(c.phrase || '')}</b>
+                  ${c.meaning_vi ? `<span class="vm-colloc-meaning">: ${escHtml(c.meaning_vi)}</span>` : ''}
+                </div>
+              `).join('')}
+            </div>
           </div>
-        </div>
-      ` : ''}
+        ` : '';
+      })() : ''}
 
       <!-- Đồng nghĩa -->
-      ${(w.synonyms && w.synonyms.length) ? `
-        <div class="vm-synonyms-row">
-          <span class="vm-syn-label">Đồng nghĩa:</span>
-          ${w.synonyms.slice(0, 4).map(s => `<span class="vm-syn-tag">${escHtml(s)}</span>`).join('')}
-        </div>
-      ` : ''}
+      ${(w.synonyms && w.synonyms.length) ? (() => {
+        const seenSyn = new Set();
+        const validSynonyms = w.synonyms
+          .map(s => String(s || '').trim())
+          .filter(s => {
+            if (!s || s.length < 2) return false;
+            if (isPlaceholder(s)) return false;
+            if (VIETNAMESE_REGEX.test(s)) return false; // Must be English
+            const lower = s.toLowerCase();
+            if (lower === orig.toLowerCase() || lower === (rootWord || '').toLowerCase()) return false;
+            if (seenSyn.has(lower)) return false;
+            seenSyn.add(lower);
+            return true;
+          })
+          .slice(0, 4);
+        return validSynonyms.length ? `
+          <div class="vm-synonyms-row">
+            <span class="vm-syn-label">Đồng nghĩa:</span>
+            ${validSynonyms.map(s => `<span class="vm-syn-tag">${escHtml(s)}</span>`).join('')}
+          </div>
+        ` : '';
+      })() : ''}
 
       <!-- Action Buttons -->
       <div class="vm-actions">
         <button type="button" class="vm-add-btn" title="Lưu vào sổ từ vựng">
           ${ICONS.plus}
-          <span>+ Thêm từ</span>
+          <span>Thêm từ</span>
         </button>
         <button type="button" class="vm-panel-btn" title="Mở thư viện từ vựng">
           ${ICONS.book}
@@ -681,7 +735,7 @@ async function openLibraryModal() {
       modalBody.innerHTML = `
         <div class="vm-lib-empty">
           <span class="vm-lib-empty-icon">📖</span>
-          <div>${vocabList.length === 0 ? 'Bạn chưa lưu từ vựng nào.<br>Hãy bôi đen từ trên trang web và bấm <b>"+ Thêm từ"</b>!' : 'Không tìm thấy từ vựng phù hợp với tìm kiếm.'}</div>
+          <div>${vocabList.length === 0 ? 'Bạn chưa lưu từ vựng nào.<br>Hãy bôi đen từ trên trang web và bấm <b>"Thêm từ"</b>!' : 'Không tìm thấy từ vựng phù hợp với tìm kiếm.'}</div>
         </div>
       `;
       return;
@@ -692,8 +746,11 @@ async function openLibraryModal() {
       const ipa = w.ipa || w.ipa_uk || w.ipa_us || '';
       const pos = w.partOfSpeech || '';
       const level = (w.level && !w.level.includes('...')) ? w.level.toUpperCase() : '';
-      const meaning = w.meaning_vi || w.definition_vi || '';
-      const defVi = (w.definition_vi && w.definition_vi !== meaning) ? w.definition_vi : '';
+      let meaning = w.meaning_vi || w.definition_vi || '';
+      if (meaning && (meaning.toLowerCase() === 'nghĩa tiếng việt' || meaning.toLowerCase().includes('nghĩa thuần việt') || meaning.toLowerCase() === 'bàn điệt')) {
+        meaning = (w.definition_vi && w.definition_vi.toLowerCase() !== 'nghĩa tiếng việt' ? w.definition_vi : '') || w.definition_en || word;
+      }
+      const defVi = (w.definition_vi && w.definition_vi !== meaning && w.definition_vi.toLowerCase() !== 'nghĩa tiếng việt') ? w.definition_vi : '';
       const defEn = w.definition_en || '';
       const ex = (w.examples && w.examples.length) ? w.examples[0] : (w.example || '');
 
@@ -750,7 +807,7 @@ async function openLibraryModal() {
               const currentWordEl = tooltip.querySelector('.vm-word');
               if (currentWordEl && currentWordEl.textContent.trim().toLowerCase() === wordName.toLowerCase()) {
                 addBtn.classList.remove('vm-btn-saved');
-                addBtn.innerHTML = `${ICONS.plus}<span>+ Thêm từ</span>`;
+                addBtn.innerHTML = `${ICONS.plus}<span>Thêm từ</span>`;
                 addBtn.title = 'Lưu vào sổ từ vựng';
               }
             }

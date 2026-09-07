@@ -78,28 +78,35 @@ async function renderLibrary() {
   const el = document.getElementById('vocab-list');
   if (!list.length) {
     const msg = vocab.length === 0
-      ? '📭 Chưa có từ nào.<br><br>Bôi đen text tiếng Anh trên web<br>và nhấn <b>"+ Thêm từ"</b> để bắt đầu!'
+      ? '📭 Chưa có từ nào.<br><br>Bôi đen text tiếng Anh trên web<br>và nhấn <b>"Thêm từ"</b> để bắt đầu!'
       : '🔍 Không tìm thấy từ phù hợp';
     el.innerHTML = `<div class="empty">${msg}</div>`;
     return;
   }
 
   const labels = { new: 'Mới', learning: 'Học', learned: 'Thuộc' };
-  el.innerHTML = list.map(w => `
+  el.innerHTML = list.map(w => {
+    let m = w.meaning_vi || w.definition_vi || '';
+    if (m && (m.toLowerCase() === 'nghĩa tiếng việt' || m.toLowerCase().includes('nghĩa thuần việt') || m.toLowerCase() === 'bàn điệt')) {
+      m = (w.definition_vi && w.definition_vi.toLowerCase() !== 'nghĩa tiếng việt' ? w.definition_vi : '') || w.definition_en || w.word;
+    }
+    const defVi = (w.definition_vi && w.definition_vi !== m && w.definition_vi.toLowerCase() !== 'nghĩa tiếng việt') ? w.definition_vi : '';
+    return `
     <div class="vcard">
       <div class="vh">
         <span class="vw">${esc(w.word)}</span>
         ${w.ipa ? `<span class="vipa">${esc(w.ipa)}</span>` : ''}
         ${w.partOfSpeech ? `<span class="vpos">${esc(w.partOfSpeech)}</span>` : ''}
       <div class="vdef">
-        <div style="color:#a6e3a1;font-weight:700;font-size:13.5px;margin-bottom:2px">🇻🇳 ${esc(w.meaning_vi || w.definition_vi || '')}</div>
-        ${w.meaning_vi && w.definition_vi && w.meaning_vi !== w.definition_vi ? `<div style="font-size:12px;color:#bac2de;line-height:1.4">${esc(w.definition_vi)}</div>` : ''}
+        <div style="color:#a6e3a1;font-weight:700;font-size:13.5px;margin-bottom:2px">🇻🇳 ${esc(m)}</div>
+        ${defVi ? `<div style="font-size:12px;color:#bac2de;line-height:1.4">${esc(defVi)}</div>` : ''}
       </div>
       <div class="vacts">
         <button class="sbtn sbtn-audio" data-word="${esc(w.word)}">🔊 Phát âm</button>
         <button class="sbtn sbtn-del" data-id="${w.id}" data-word="${esc(w.word)}">🗑️ Xóa</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   el.querySelectorAll('.sbtn-audio').forEach(b =>
     b.addEventListener('click', () => speak(b.dataset.word))
