@@ -98,36 +98,74 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true; // Keep message channel open for async response
 });
 
-const translationCache = new Map();
+const memoryCache = new Map();
+
+async function getCachedTranslation(key, cleanText) {
+  let cached = memoryCache.get(key);
+  if (!cached) {
+    try {
+      const { dict_cache = {} } = await chrome.storage.local.get('dict_cache');
+      if (dict_cache && dict_cache[key]) {
+        cached = dict_cache[key];
+        memoryCache.set(key, cached);
+      }
+    } catch (_) {}
+  }
+
+  if (cached) {
+    // Validate entry integrity
+    if (cached.type === 'word') {
+      const w = cached.word;
+      if (!w || typeof w !== 'object' || w.meaning_vi === cleanText || !w.meaning_vi) {
+        memoryCache.delete(key);
+        try {
+          const { dict_cache = {} } = await chrome.storage.local.get('dict_cache');
+          delete dict_cache[key];
+          await chrome.storage.local.set({ dict_cache });
+        } catch (_) {}
+        return null;
+      }
+    }
+    return cached;
+  }
+  return null;
+}
+
+async function setCachedTranslation(key, result) {
+  if (!result) return;
+  if (memoryCache.size > 200) {
+    const firstKey = memoryCache.keys().next().value;
+    memoryCache.delete(firstKey);
+  }
+  memoryCache.set(key, result);
+
+  try {
+    const { dict_cache = {} } = await chrome.storage.local.get('dict_cache');
+    dict_cache[key] = result;
+    const keys = Object.keys(dict_cache);
+    if (keys.length > 200) {
+      delete dict_cache[keys[0]];
+    }
+    await chrome.storage.local.set({ dict_cache });
+  } catch (_) {}
+}
 
 async function handleTranslate(text, isWord, direction = 'auto') {
   const cleanText = (text || '').trim();
   const cacheKey = `${cleanText.toLowerCase()}_${isWord}_${direction}`;
-  if (translationCache.has(cacheKey)) {
-    const cached = translationCache.get(cacheKey);
-    // Don't return corrupted cached entries where meaning_vi is identical to text or word has no examples
-    if (cached?.type === 'word') {
-      const w = cached.word;
-      if (w && (w.meaning_vi === cleanText || (!w.examples || w.examples.length === 0))) {
-        translationCache.delete(cacheKey);
-      } else {
-        return cached;
-      }
-    } else {
-      return cached;
-    }
+
+  // 1. FAST PERSISTENT CACHE CHECK (0ms)
+  const cached = await getCachedTranslation(cacheKey, cleanText);
+  if (cached) {
+    return cached;
   }
 
-  // 1. PRIORITIZE CAMBRIDGE DICTIONARY ONLINE for English words / compounds
+  // 2. PRIORITIZE CAMBRIDGE DICTIONARY ONLINE (fast 1.8s timeout + lemmatization)
   if (isWord && (direction === 'auto' || direction === 'en-vi')) {
     try {
       const cambridgeResult = await fetchFromCambridge(cleanText);
       if (cambridgeResult && cambridgeResult.word?.meaning_vi) {
-        if (translationCache.size > 150) {
-          const firstKey = translationCache.keys().next().value;
-          translationCache.delete(firstKey);
-        }
-        translationCache.set(cacheKey, cambridgeResult);
+        await setCachedTranslation(cacheKey, cambridgeResult);
         return cambridgeResult;
       }
     } catch (e) {
@@ -135,7 +173,7 @@ async function handleTranslate(text, isWord, direction = 'auto') {
     }
   }
 
-  // 2. FALLBACK TO AI (Configured with Cambridge CALD standards)
+  // 3. FALLBACK TO AI (Optimized prompt & token limits for speed)
   const { aiProvider = 'gemini', apiKey = '' } =
     await chrome.storage.sync.get(['aiProvider', 'apiKey']);
   if (!apiKey) {
@@ -144,11 +182,7 @@ async function handleTranslate(text, isWord, direction = 'auto') {
 
   const result = await callAI(aiProvider, apiKey, cleanText, isWord, direction);
   if (result) {
-    if (translationCache.size > 150) {
-      const firstKey = translationCache.keys().next().value;
-      translationCache.delete(firstKey);
-    }
-    translationCache.set(cacheKey, result);
+    await setCachedTranslation(cacheKey, result);
   }
   return result;
 }

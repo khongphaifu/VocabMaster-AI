@@ -22,18 +22,64 @@ function cleanText(html) {
 }
 
 /**
+ * Generate candidate base words (lemmas) for inflected forms
+ * e.g. "becomes" -> ["becomes", "become"]
+ *      "running" -> ["running", "run"]
+ */
+export function getCandidateLemmas(word) {
+  const w = (word || '').trim().toLowerCase();
+  const candidates = [w];
+
+  if (w.endsWith('ies') && w.length > 4) {
+    candidates.push(w.slice(0, -3) + 'y'); // flies -> fly
+  } else if (w.endsWith('es') && w.length > 3) {
+    const root2 = w.slice(0, -2);
+    if (/(?:s|sh|ch|x|z)$/.test(root2)) {
+      candidates.push(root2); // watches -> watch, boxes -> box
+    } else {
+      candidates.push(w.slice(0, -1)); // becomes -> become, takes -> take
+      candidates.push(root2);
+    }
+  } else if (w.endsWith('s') && !w.endsWith('ss') && w.length > 3) {
+    candidates.push(w.slice(0, -1)); // dogs -> dog
+  }
+
+  if (w.endsWith('ied') && w.length > 4) {
+    candidates.push(w.slice(0, -3) + 'y'); // studied -> study
+  } else if (w.endsWith('ed') && w.length > 3) {
+    candidates.push(w.slice(0, -2)); // played -> play
+    candidates.push(w.slice(0, -1)); // baked -> bake
+  }
+
+  if (w.endsWith('ing') && w.length > 4) {
+    candidates.push(w.slice(0, -3)); // watching -> watch
+    candidates.push(w.slice(0, -3) + 'e'); // making -> make
+    if (w.length > 5 && w[w.length - 4] === w[w.length - 5]) {
+      candidates.push(w.slice(0, -4)); // running -> run
+    }
+  }
+
+  return [...new Set(candidates)];
+}
+
+/**
  * Parses raw HTML from Cambridge English-Vietnamese dictionary page
  */
 export function parseCambridgeHTML(html, originalWord) {
   if (!html) return null;
 
   // Check if blocked by Cloudflare or not an entry page
-  if (html.includes('challenge-error-text') || html.includes('_cf_chl_opt') || html.includes('<title>Just a moment...</title>')) {
+  if (
+    html.includes('challenge-error-text') ||
+    html.includes('_cf_chl_opt') ||
+    html.includes('<title>Just a moment...</title>') ||
+    html.includes('Performing security verification')
+  ) {
     return null;
   }
 
   // Check if word entry exists
-  const hasEntry = html.includes('entry-body') || html.includes('di-body') || html.includes('pos-header');
+  const hasEntry = html.includes('entry-body') || html.includes('di-body') || html.includes('pos-header') || html.includes('dhw');
   if (!hasEntry) return null;
 
   // 1. Headword
@@ -158,7 +204,7 @@ export function parseCambridgeHTML(html, originalWord) {
     type: 'word',
     source: 'cambridge',
     original: originalWord,
-    cambridgeUrl: `${CAMBRIDGE_BASE}/dictionary/english-vietnamese/${encodeURIComponent(originalWord.toLowerCase())}`,
+    cambridgeUrl: `${CAMBRIDGE_BASE}/dictionary/english-vietnamese/${encodeURIComponent(headword.toLowerCase())}`,
     audioUk,
     audioUs,
     word: {
@@ -180,8 +226,8 @@ export function parseCambridgeHTML(html, originalWord) {
 }
 
 /**
- * Fetch word from Cambridge Dictionary Online
- * Prioritizes English-Vietnamese dictionary, falls back to English dictionary
+ * Fetch word from Cambridge Dictionary Online with fast timeout (1800ms)
+ * Tests candidate lemmas if the exact form is not found (e.g. "becomes" -> "become")
  */
 export async function fetchFromCambridge(word) {
   const cleanWord = (word || '').trim().toLowerCase();
@@ -189,36 +235,43 @@ export async function fetchFromCambridge(word) {
     return null; // Only query single words / compounds
   }
 
-  const urls = [
-    `${CAMBRIDGE_BASE}/dictionary/english-vietnamese/${encodeURIComponent(cleanWord)}`,
-    `${CAMBRIDGE_BASE}/dictionary/english/${encodeURIComponent(cleanWord)}`
-  ];
+  const lemmas = getCandidateLemmas(cleanWord);
 
-  for (const url of urls) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
+  for (const lemma of lemmas) {
+    const urls = [
+      `${CAMBRIDGE_BASE}/dictionary/english-vietnamese/${encodeURIComponent(lemma)}`,
+      `${CAMBRIDGE_BASE}/dictionary/english/${encodeURIComponent(lemma)}`
+    ];
 
-      const resp = await fetch(url, {
-        signal: controller.signal,
-        credentials: 'include',
-        headers: {
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-          'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8',
-          'Cache-Control': 'no-cache'
+    for (const url of urls) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1800); // 1.8s timeout for maximum speed
+
+        const resp = await fetch(url, {
+          signal: controller.signal,
+          credentials: 'include',
+          headers: {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8',
+            'Cache-Control': 'no-cache'
+          }
+        });
+        clearTimeout(timeoutId);
+
+        if (!resp.ok) continue;
+
+        const html = await resp.text();
+        const parsed = parseCambridgeHTML(html, cleanWord);
+        if (parsed && (parsed.word?.meaning_vi || parsed.word?.definition_en)) {
+          if (lemma !== cleanWord && !parsed.word.word_root) {
+            parsed.word.word_root = lemma;
+          }
+          return parsed;
         }
-      });
-      clearTimeout(timeoutId);
-
-      if (!resp.ok) continue;
-
-      const html = await resp.text();
-      const parsed = parseCambridgeHTML(html, cleanWord);
-      if (parsed && (parsed.word?.meaning_vi || parsed.word?.definition_en)) {
-        return parsed;
+      } catch (_) {
+        // Fast timeout, proceed to next or fallback to AI
       }
-    } catch (_) {
-      // Continue to next URL or fallback
     }
   }
 

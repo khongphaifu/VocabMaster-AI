@@ -283,77 +283,111 @@ function safeParseJSON(rawText, isWord, originalText) {
   }
 
   // 3. Validate and handle word translation
-  if (parsed && parsed.type === 'word' && parsed.word) {
+  if (parsed && (parsed.type === 'word' || parsed.word || parsed.meaning_vi || isWord)) {
+    parsed.type = 'word';
     parsed.original = originalText;
-    const w = parsed.word;
+
+    // CRITICAL FIX: Ensure parsed.word is ALWAYS a valid object, never a string or null!
+    let w = parsed.word;
+    if (!w || typeof w !== 'object' || Array.isArray(w)) {
+      const rootCandidate = typeof w === 'string' ? w : (parsed.word_root || originalText);
+      w = {
+        word_root: rootCandidate,
+        meaning_vi: parsed.meaning_vi || parsed.definition_vi || '',
+        definition_vi: parsed.definition_vi || '',
+        definition_en: parsed.definition_en || '',
+        ipa_uk: parsed.ipa_uk || parsed.ipa || '',
+        ipa_us: parsed.ipa_us || parsed.ipa || '',
+        ipa: parsed.ipa || parsed.ipa_uk || parsed.ipa_us || '',
+        partOfSpeech: parsed.partOfSpeech || parsed.pos || 'noun',
+        level: parsed.level || 'B1',
+        examples: Array.isArray(parsed.examples) ? parsed.examples : [],
+        word_family: Array.isArray(parsed.word_family) ? parsed.word_family : [],
+        other_meanings: Array.isArray(parsed.other_meanings) ? parsed.other_meanings : [],
+        collocations: Array.isArray(parsed.collocations) ? parsed.collocations : [],
+        synonyms: Array.isArray(parsed.synonyms) ? parsed.synonyms : [],
+        antonyms: Array.isArray(parsed.antonyms) ? parsed.antonyms : []
+      };
+      parsed.word = w;
+    }
 
     const isMeaningBad = !w.meaning_vi ||
+      typeof w.meaning_vi !== 'string' ||
       w.meaning_vi.includes('...') ||
       w.meaning_vi.includes('<nghĩa') ||
       w.meaning_vi.trim().toLowerCase() === originalText.trim().toLowerCase() ||
       w.meaning_vi.trim().toLowerCase() === (w.word_root || '').trim().toLowerCase();
 
     if (isMeaningBad) {
-      if (w.definition_vi && !w.definition_vi.includes('...') && !w.definition_vi.includes('<') && w.definition_vi.trim().toLowerCase() !== originalText.trim().toLowerCase()) {
+      if (w.definition_vi && typeof w.definition_vi === 'string' && !w.definition_vi.includes('...') && !w.definition_vi.includes('<') && w.definition_vi.trim().toLowerCase() !== originalText.trim().toLowerCase()) {
         w.meaning_vi = w.definition_vi.split(/[:;]/)[0].trim();
       } else {
         w.meaning_vi = originalText;
       }
     }
 
-    if (!w.definition_vi || w.definition_vi.includes('...') || w.definition_vi.includes('<')) {
+    if (!w.definition_vi || typeof w.definition_vi !== 'string' || w.definition_vi.includes('...') || w.definition_vi.includes('<')) {
       w.definition_vi = (w.meaning_vi && w.meaning_vi !== originalText)
         ? w.meaning_vi
         : (w.definition_en || originalText);
     }
 
-    if (!w.ipa_uk || w.ipa_uk.includes('...') || w.ipa_uk.includes('<')) {
+    if (!w.ipa_uk || typeof w.ipa_uk !== 'string' || w.ipa_uk.includes('...') || w.ipa_uk.includes('<')) {
       w.ipa_uk = (w.ipa && !w.ipa.includes('...')) ? w.ipa : '';
     }
-    if (!w.ipa_us || w.ipa_us.includes('...') || w.ipa_us.includes('<')) {
+    if (!w.ipa_us || typeof w.ipa_us !== 'string' || w.ipa_us.includes('...') || w.ipa_us.includes('<')) {
       w.ipa_us = (w.ipa && !w.ipa.includes('...')) ? w.ipa : (w.ipa_uk || '');
     }
     if (!w.ipa) {
       w.ipa = w.ipa_uk || w.ipa_us || '';
     }
 
-    if (!w.word_root || w.word_root.includes('...') || w.word_root.includes('<')) {
+    if (!w.word_root || typeof w.word_root !== 'string' || w.word_root.includes('...') || w.word_root.includes('<')) {
       w.word_root = originalText;
     }
 
-    if (!w.partOfSpeech || w.partOfSpeech.includes('...') || w.partOfSpeech.includes('<')) {
+    if (!w.partOfSpeech || typeof w.partOfSpeech !== 'string' || w.partOfSpeech.includes('...') || w.partOfSpeech.includes('<')) {
       w.partOfSpeech = 'noun';
     }
 
-    if (!w.definition_en || w.definition_en.includes('...') || w.definition_en.includes('<')) {
+    if (!w.definition_en || typeof w.definition_en !== 'string' || w.definition_en.includes('...') || w.definition_en.includes('<')) {
       w.definition_en = '';
     }
 
     if (Array.isArray(w.collocations)) {
-      w.collocations = w.collocations.filter(c => c && c.phrase && !c.phrase.includes('...') && !c.phrase.includes('<'));
+      w.collocations = w.collocations.map(c => {
+        if (typeof c === 'string') return { phrase: c, meaning_vi: '' };
+        return c;
+      }).filter(c => c && c.phrase && !String(c.phrase).includes('...') && !String(c.phrase).includes('<'));
     } else {
       w.collocations = [];
     }
 
     if (Array.isArray(w.word_family)) {
-      w.word_family = w.word_family.filter(f => f && f.word && !f.word.includes('...') && !f.word.includes('<'));
+      w.word_family = w.word_family.map(f => {
+        if (typeof f === 'string') return { pos: '', word: f, meaning_vi: '' };
+        return f;
+      }).filter(f => f && f.word && !String(f.word).includes('...') && !String(f.word).includes('<'));
     } else {
       w.word_family = [];
     }
 
     if (Array.isArray(w.other_meanings)) {
-      w.other_meanings = w.other_meanings.filter(m => m && m.meaning_vi && !m.meaning_vi.includes('...') && !m.meaning_vi.includes('<'));
+      w.other_meanings = w.other_meanings.map(m => {
+        if (typeof m === 'string') return { pos: '', meaning_vi: m };
+        return m;
+      }).filter(m => m && m.meaning_vi && !String(m.meaning_vi).includes('...') && !String(m.meaning_vi).includes('<'));
     } else {
       w.other_meanings = [];
     }
 
     if (Array.isArray(w.examples)) {
-      w.examples = w.examples.filter(ex => ex && !ex.includes('...') && !ex.includes('<'));
+      w.examples = w.examples.filter(ex => typeof ex === 'string' && !ex.includes('...') && !ex.includes('<'));
     } else {
       w.examples = [];
     }
 
-    if (!w.level || w.level.includes('...')) {
+    if (!w.level || typeof w.level !== 'string' || w.level.includes('...')) {
       w.level = 'B1';
     }
 
@@ -506,7 +540,7 @@ async function executeGeminiGeneration(apiKey, modelName, prompt, isWord) {
       signal: controller.signal,
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: isWord ? 1800 : 2048 }
+        generationConfig: { temperature: 0.1, maxOutputTokens: isWord ? 700 : 1200 }
       })
     });
 
@@ -662,8 +696,8 @@ async function executeGroqGeneration(apiKey, model, prompt, isWord) {
           { role: 'system', content: 'You are a professional English-Vietnamese dictionary and translator adhering strictly to Cambridge Dictionary standards (Cambridge Advanced Learner\'s Dictionary & Cambridge English-Vietnamese Dictionary). Output ONLY a valid JSON object matching the requested schema.' },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.2,
-        max_tokens: isWord ? 1800 : 2048
+        temperature: 0.1,
+        max_tokens: isWord ? 700 : 1200
       })
     });
 
@@ -705,8 +739,8 @@ async function callOpenAI(apiKey, prompt, isWord) {
           { role: 'system', content: 'You are an English-Vietnamese dictionary and translator adhering to Cambridge Dictionary standards. Output ONLY a valid JSON object.' },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.2,
-        max_tokens: isWord ? 1800 : 2048
+        temperature: 0.1,
+        max_tokens: isWord ? 700 : 1200
       })
     });
 
@@ -738,13 +772,16 @@ async function callClaude(apiKey, prompt, isWord) {
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': apiKey.trim(),
-        'anthropic-version': '2023-06-01'
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
       },
       signal: controller.signal,
       body: JSON.stringify({
         model: 'claude-3-5-haiku-20241022',
-        max_tokens: isWord ? 800 : 1500,
-        messages: [{ role: 'user', content: prompt }]
+        system: 'You are an English-Vietnamese dictionary adhering strictly to Cambridge Dictionary standards. Output ONLY valid JSON matching the schema.',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.1,
+        max_tokens: isWord ? 700 : 1200
       })
     });
 

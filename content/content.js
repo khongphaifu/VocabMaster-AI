@@ -126,13 +126,13 @@ async function doTranslate(text, x, y) {
     if (response?.success) {
       showResultTooltip(response.data, x, y);
     } else {
-      showErrorTooltip(response?.error || 'Lỗi không xác định', x, y);
+      showErrorTooltip(response?.error || 'Lỗi không xác định', x, y, () => doTranslate(text, x, y));
     }
   } catch (err) {
     const msg = err.message.includes('Extension context invalidated')
       ? 'Extension vừa được reload. Vui lòng F5 (tải lại) trang web này.'
       : err.message;
-    showErrorTooltip(msg, x, y);
+    showErrorTooltip(msg, x, y, () => doTranslate(text, x, y));
   } finally {
     isProcessing = false;
   }
@@ -177,12 +177,39 @@ function showLoadingTooltip(x, y) {
   document.body.appendChild(tooltip);
 }
 
-function showErrorTooltip(msg, x, y) {
+function showErrorTooltip(msg, x, y, retryFn = null) {
   if (!tooltip) {
     tooltip = createTooltipBase(x, y);
     document.body.appendChild(tooltip);
   }
-  tooltip.innerHTML = `<div class="vm-error">❌ ${escHtml(msg)}</div>`;
+  tooltip.innerHTML = `
+    <div class="vm-card" style="padding: 10px 14px; min-width: 220px; max-width: 340px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 6px;">
+        <span style="color:#f38ba8; font-weight:700; font-size:12.5px;">⚠️ Thông báo</span>
+        <button type="button" class="vm-tool-btn vm-close-btn" title="Đóng">${ICONS.close}</button>
+      </div>
+      <div class="vm-error" style="margin-bottom: ${retryFn ? '8px' : '0'}; line-height: 1.4; font-size: 12.5px;">
+        ${escHtml(msg)}
+      </div>
+      ${retryFn ? `
+        <button type="button" class="vm-retry-btn" style="appearance:none; -webkit-appearance:none; border:none; background:#89b4fa; color:#11111b; font-weight:700; font-size:12px; padding:6px 12px; border-radius:6px; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:6px; transition:0.15s;">
+          🔄 Thử lại ngay
+        </button>
+      ` : ''}
+    </div>
+  `;
+
+  tooltip.querySelector('.vm-close-btn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    hideTooltip();
+  });
+
+  if (retryFn) {
+    tooltip.querySelector('.vm-retry-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      retryFn();
+    });
+  }
 }
 
 const ICONS = {
