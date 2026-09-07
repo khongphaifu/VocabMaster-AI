@@ -34,14 +34,10 @@ export function getCandidateLemmas(word) {
     candidates.push(w.slice(0, -3) + 'y'); // flies -> fly
   } else if (w.endsWith('es') && w.length > 3) {
     const root2 = w.slice(0, -2);
-    if (/(?:s|sh|ch|x|z)$/.test(root2)) {
-      candidates.push(root2); // watches -> watch, boxes -> box
-    } else {
-      candidates.push(w.slice(0, -1)); // becomes -> become, takes -> take
-      candidates.push(root2);
-    }
+    candidates.push(w.slice(0, -1)); // houses -> house, becomes -> become
+    candidates.push(root2); // watches -> watch, boxes -> box, buses -> bus
   } else if (w.endsWith('s') && !w.endsWith('ss') && w.length > 3) {
-    candidates.push(w.slice(0, -1)); // dogs -> dog
+    candidates.push(w.slice(0, -1)); // dogs -> dog, gardens -> garden
   }
 
   if (w.endsWith('ied') && w.length > 4) {

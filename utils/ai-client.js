@@ -2,6 +2,8 @@
 // Supports Google Gemini, Groq, OpenAI GPT-4o Mini, Claude 3.5 Haiku
 // Configured to follow Cambridge Dictionary standards (CALD & Cambridge English-Vietnamese)
 
+import { getCandidateLemmas } from './cambridge-client.js';
+
 const VIETNAMESE_REGEX = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
 
 export const PLACEHOLDER_STRINGS = new Set([
@@ -38,6 +40,34 @@ export function isPlaceholderText(str) {
 }
 
 export const COMMON_WORD_FALLBACKS = {
+  garden: {
+    word_root: 'garden',
+    ipa_uk: '/ˈɡɑː.dən/',
+    ipa_us: '/ˈɡɑːr.dən/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'khu vườn, vườn',
+    definition_vi: 'khu đất có cây cối, hoa hoặc rau củ trồng xung quanh nhà hoặc nơi công cộng',
+    definition_en: 'a piece of land next to or around a house, where flowers and other plants are grown',
+    examples: [
+      'The children were playing in the garden.',
+      'They sat in the back garden enjoying the afternoon sunshine.'
+    ],
+    word_family: [
+      { pos: 'noun', word: 'gardener', meaning_vi: 'người làm vườn' },
+      { pos: 'noun', word: 'gardening', meaning_vi: 'công việc làm vườn' }
+    ],
+    other_meanings: [
+      { pos: 'verb', meaning_vi: 'làm vườn, chăm sóc cây cối' }
+    ],
+    collocations: [
+      { phrase: 'botanical garden', meaning_vi: 'vườn bách thảo' },
+      { phrase: 'flower garden', meaning_vi: 'vườn hoa' },
+      { phrase: 'front/back garden', meaning_vi: 'vườn trước / vườn sau' }
+    ],
+    synonyms: ['yard', 'park', 'plot', 'orchard'],
+    antonyms: []
+  },
   table: {
     word_root: 'table',
     ipa_uk: '/ˈteɪ.bəl/',
@@ -132,8 +162,201 @@ export const COMMON_WORD_FALLBACKS = {
     ],
     synonyms: [],
     antonyms: []
+  },
+  house: {
+    word_root: 'house',
+    ipa_uk: '/haʊs/',
+    ipa_us: '/haʊs/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'ngôi nhà, căn nhà',
+    definition_vi: 'tòa nhà được xây dựng cho một gia đình hoặc một nhóm người sinh sống',
+    definition_en: 'a building that people, usually one family, live in',
+    examples: [
+      'They bought a new house near the beach.',
+      'Let us go inside the house.'
+    ],
+    word_family: [
+      { pos: 'noun', word: 'housing', meaning_vi: 'nhà ở, việc cấp nhà' }
+    ],
+    other_meanings: [
+      { pos: 'verb', meaning_vi: 'chứa chấp, cung cấp chỗ ở' }
+    ],
+    collocations: [
+      { phrase: 'at someone\'s house', meaning_vi: 'ở nhà ai' },
+      { phrase: 'move house', meaning_vi: 'chuyển nhà' }
+    ],
+    synonyms: ['home', 'residence', 'dwelling'],
+    antonyms: []
+  },
+  car: {
+    word_root: 'car',
+    ipa_uk: '/kɑːr/',
+    ipa_us: '/kɑːr/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'xe hơi, ô tô',
+    definition_vi: 'phương tiện giao thông bốn bánh chạy bằng động cơ dùng để chở người',
+    definition_en: 'a road vehicle with four wheels and an engine that can carry a small number of passengers',
+    examples: [
+      'He parked his car in the garage.',
+      'She goes to work by car every morning.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'by car', meaning_vi: 'bằng ô tô' },
+      { phrase: 'drive a car', meaning_vi: 'lái xe ô tô' }
+    ],
+    synonyms: ['automobile', 'vehicle'],
+    antonyms: []
+  },
+  water: {
+    word_root: 'water',
+    ipa_uk: '/ˈwɔː.tər/',
+    ipa_us: '/ˈwɑː.t̬ɚ/',
+    partOfSpeech: 'noun [U]',
+    level: 'A1',
+    meaning_vi: 'nước',
+    definition_vi: 'chất lỏng trong suốt không màu không mùi cần thiết cho sự sống',
+    definition_en: 'a clear liquid, without colour or taste, that falls from the sky as rain',
+    examples: [
+      'Drink plenty of water every day.',
+      'The water in the lake is crystal clear.'
+    ],
+    word_family: [],
+    other_meanings: [
+      { pos: 'verb', meaning_vi: 'tưới nước' }
+    ],
+    collocations: [
+      { phrase: 'mineral water', meaning_vi: 'nước khoáng' },
+      { phrase: 'tap water', meaning_vi: 'nước máy' }
+    ],
+    synonyms: ['liquid', 'aqua'],
+    antonyms: []
+  },
+  work: {
+    word_root: 'work',
+    ipa_uk: '/wɜːk/',
+    ipa_us: '/wɝːk/',
+    partOfSpeech: 'verb',
+    level: 'A1',
+    meaning_vi: 'làm việc, hoạt động, tác phẩm',
+    definition_vi: 'thực hiện công việc để kiếm sống hoặc vận hành hiệu quả',
+    definition_en: 'to do something that involves physical or mental effort, especially as part of a job',
+    examples: [
+      'She works as a software engineer.',
+      'Does this machine work properly?'
+    ],
+    word_family: [
+      { pos: 'noun', word: 'worker', meaning_vi: 'người lao động' },
+      { pos: 'noun', word: 'workplace', meaning_vi: 'nơi làm việc' }
+    ],
+    other_meanings: [
+      { pos: 'noun', meaning_vi: 'công việc, tác phẩm' }
+    ],
+    collocations: [
+      { phrase: 'at work', meaning_vi: 'ở nơi làm việc' },
+      { phrase: 'hard work', meaning_vi: 'công việc vất vả' }
+    ],
+    synonyms: ['labor', 'operate', 'function'],
+    antonyms: []
+  },
+  friend: {
+    word_root: 'friend',
+    ipa_uk: '/frend/',
+    ipa_us: '/frend/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'người bạn, bạn bè',
+    definition_vi: 'người mà bạn biết rõ, quý mến và tin tưởng',
+    definition_en: 'a person who you know well and who you like a lot, but who is not a member of your family',
+    examples: [
+      'She is my best friend.',
+      'We have been close friends for ten years.'
+    ],
+    word_family: [
+      { pos: 'adj', word: 'friendly', meaning_vi: 'thân thiện' },
+      { pos: 'noun', word: 'friendship', meaning_vi: 'tình bạn' }
+    ],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'make friends', meaning_vi: 'kết bạn' },
+      { phrase: 'close friend', meaning_vi: 'bạn thân' }
+    ],
+    synonyms: ['companion', 'pal', 'buddy'],
+    antonyms: ['enemy']
+  },
+  decision: {
+    word_root: 'decision',
+    ipa_uk: '/dɪˈsɪʒ.ən/',
+    ipa_us: '/dɪˈsɪʒ.ən/',
+    partOfSpeech: 'noun [C or U]',
+    level: 'B1',
+    meaning_vi: 'sự quyết định, phán quyết',
+    definition_vi: 'sự lựa chọn hoặc phán xét sau khi đã suy nghĩ kỹ',
+    definition_en: 'a choice that you make about something after thinking about several possibilities',
+    examples: [
+      'She made a decision to study abroad.',
+      'It was a difficult decision to make.'
+    ],
+    word_family: [
+      { pos: 'verb', word: 'decide', meaning_vi: 'quyết định' },
+      { pos: 'adj', word: 'decisive', meaning_vi: 'kiên quyết, dứt khoát' }
+    ],
+    other_meanings: [
+      { pos: 'noun', meaning_vi: 'sự dứt khoát, tính quyết đoán' }
+    ],
+    collocations: [
+      { phrase: 'make a decision', meaning_vi: 'đưa ra quyết định' }
+    ],
+    synonyms: ['choice', 'judgment', 'resolution'],
+    antonyms: ['indecision']
   }
 };
+
+/**
+ * Resolve word against candidate lemmas in COMMON_WORD_FALLBACKS
+ */
+export function findFallbackData(word) {
+  if (!word || typeof word !== 'string') return null;
+  const clean = word.trim().toLowerCase();
+  const candidates = getCandidateLemmas(clean);
+  for (const cand of candidates) {
+    if (COMMON_WORD_FALLBACKS[cand]) {
+      return COMMON_WORD_FALLBACKS[cand];
+    }
+  }
+  return null;
+}
+
+/**
+ * Build a complete dictionary response from fallback data
+ */
+export function buildFallbackWordResponse(originalText, fbData) {
+  return {
+    type: 'word',
+    source: 'fallback',
+    original: originalText,
+    word: {
+      word_root: fbData.word_root || originalText,
+      ipa_uk: fbData.ipa_uk || '',
+      ipa_us: fbData.ipa_us || fbData.ipa_uk || '',
+      ipa: fbData.ipa_uk || fbData.ipa_us || '',
+      partOfSpeech: fbData.partOfSpeech || 'noun',
+      level: fbData.level || 'A1',
+      meaning_vi: fbData.meaning_vi,
+      definition_vi: fbData.definition_vi || fbData.meaning_vi,
+      definition_en: fbData.definition_en || '',
+      collocations: fbData.collocations ? [...fbData.collocations] : [],
+      word_family: fbData.word_family ? [...fbData.word_family] : [],
+      other_meanings: fbData.other_meanings ? [...fbData.other_meanings] : [],
+      examples: fbData.examples ? [...fbData.examples] : [],
+      synonyms: fbData.synonyms ? [...fbData.synonyms] : [],
+      antonyms: fbData.antonyms ? [...fbData.antonyms] : []
+    }
+  };
+}
 
 const WORD_PROMPT_EN_VI = (word) => {
   return `Bạn là hệ thống từ điển Anh - Việt theo chuẩn Từ điển Cambridge (Cambridge Advanced Learner's Dictionary & Cambridge English-Vietnamese Dictionary).
@@ -342,7 +565,12 @@ function repairAndParseJSON(rawStr) {
 }
 
 export function safeParseJSON(rawText, isWord, originalText) {
+  const initialFallback = findFallbackData(originalText);
+
   if (!rawText || !rawText.trim()) {
+    if (isWord && initialFallback) {
+      return buildFallbackWordResponse(originalText, initialFallback);
+    }
     throw new Error('AI không phản hồi dữ liệu. Vui lòng thử lại.');
   }
 
@@ -445,7 +673,7 @@ export function safeParseJSON(rawText, isWord, originalText) {
     }
 
     const cleanRoot = (w.word_root || originalText).trim().toLowerCase();
-    const fallbackData = COMMON_WORD_FALLBACKS[cleanRoot] || COMMON_WORD_FALLBACKS[originalText.trim().toLowerCase()];
+    const fallbackData = findFallbackData(cleanRoot) || initialFallback;
 
     // 1. Sanitize meaning_vi
     let isMeaningBad = isPlaceholderText(w.meaning_vi) ||
@@ -606,7 +834,7 @@ export function safeParseJSON(rawText, isWord, originalText) {
   // Fallback regex extraction for word
   const rootMatch = cleanRaw.match(/"word_root"\s*:\s*"([^"]+)"/);
   const cleanWordRoot = (rootMatch ? rootMatch[1] : originalText).trim().toLowerCase();
-  const fbData = COMMON_WORD_FALLBACKS[cleanWordRoot] || COMMON_WORD_FALLBACKS[originalText.trim().toLowerCase()];
+  const fbData = findFallbackData(cleanWordRoot) || initialFallback;
 
   const meaningViMatch = cleanRaw.match(/"meaning_vi"\s*:\s*"([^"]+)"/);
   const defViMatch = cleanRaw.match(/"definition_vi"\s*:\s*"([^"]+)"/) || cleanRaw.match(/định nghĩa.*?:\s*([^\n\r"]+)/i);
@@ -693,6 +921,10 @@ export function safeParseJSON(rawText, isWord, originalText) {
     };
   }
 
+  if (isWord && fbData) {
+    return buildFallbackWordResponse(originalText, fbData);
+  }
+
   return {
     type: 'phrase',
     original: originalText,
@@ -706,31 +938,35 @@ let cachedGeminiModel = null;
 async function callGemini(apiKey, prompt, isWord) {
   if (cachedGeminiModel) {
     try {
-      return await executeGeminiGeneration(apiKey, cachedGeminiModel, prompt, isWord);
+      const res = await executeGeminiGeneration(apiKey, cachedGeminiModel, prompt, isWord);
+      if (res && res.trim()) return res;
     } catch (err) {
-      if (err.status !== 404) throw err;
       cachedGeminiModel = null;
     }
   }
 
   const candidateModels = [
-    'gemini-1.5-flash',
-    'gemini-1.5-flash-latest',
-    'gemini-2.0-flash-lite'
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-1.5-flash'
   ];
 
   let lastErr = null;
   for (const model of candidateModels) {
     try {
       const result = await executeGeminiGeneration(apiKey, model, prompt, isWord);
-      cachedGeminiModel = model;
-      return result;
-    } catch (err) {
-      if (err.status === 404) {
-        lastErr = err;
-        continue;
+      if (result && result.trim()) {
+        cachedGeminiModel = model;
+        return result;
       }
-      throw err;
+    } catch (err) {
+      lastErr = err;
+      if (err.status === 401 || err.message?.includes('API_KEY_SERVICE_BLOCKED') || err.message?.includes('API Key không hợp lệ')) {
+        throw err;
+      }
+      // On 404, 429, 503, empty response, or timeouts, continue to next model
+      continue;
     }
   }
 
@@ -751,7 +987,7 @@ async function executeGeminiGeneration(apiKey, modelName, prompt, isWord) {
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 12000);
+  const timeoutId = setTimeout(() => controller.abort(), 14000);
 
   try {
     const res = await fetch(url, {
@@ -760,7 +996,10 @@ async function executeGeminiGeneration(apiKey, modelName, prompt, isWord) {
       signal: controller.signal,
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: isWord ? 700 : 1200 }
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: isWord ? 2048 : 3000
+        }
       })
     });
 
@@ -795,11 +1034,26 @@ async function executeGeminiGeneration(apiKey, modelName, prompt, isWord) {
     }
 
     const data = await res.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const candidate = data.candidates?.[0];
+    const parts = candidate?.content?.parts || [];
+
+    // Filter out internal thinking parts (e.g. Gemini 2.5 Flash thinking)
+    const textParts = parts.filter(p => !p.thought && typeof p.text === 'string');
+    let text = textParts.map(p => p.text).join('').trim();
+    if (!text && parts.length > 0) {
+      text = parts.map(p => p.text || '').join('').trim();
+    }
+
+    if (!text) {
+      const reason = candidate?.finishReason || 'EMPTY';
+      throw new Error(`Gemini không trả về nội dung (${reason})`);
+    }
+
+    return text;
   } catch (e) {
     clearTimeout(timeoutId);
     if (e.name === 'AbortError') {
-      throw new Error('Yêu cầu Gemini API bị quá thời gian chờ (Timeout 12s).');
+      throw new Error('Yêu cầu Gemini API bị quá thời gian chờ (Timeout 14s).');
     }
     throw e;
   }
@@ -867,7 +1121,8 @@ async function callGroq(apiKey, prompt, isWord) {
 
   if (cachedGroqModel) {
     try {
-      return await executeGroqGeneration(cleanKey, cachedGroqModel, prompt, isWord);
+      const res = await executeGroqGeneration(cleanKey, cachedGroqModel, prompt, isWord);
+      if (res && res.trim()) return res;
     } catch (err) {
       cachedGroqModel = null;
     }
@@ -879,14 +1134,17 @@ async function callGroq(apiKey, prompt, isWord) {
   for (const model of modelsToTry) {
     try {
       const result = await executeGroqGeneration(cleanKey, model, prompt, isWord);
-      cachedGroqModel = model;
-      return result;
+      if (result && result.trim()) {
+        cachedGroqModel = model;
+        return result;
+      }
     } catch (err) {
       lastErr = err;
       if (
         err.status === 404 ||
         err.status === 429 ||
         err.status === 413 ||
+        err.message?.includes('rỗng') ||
         (err.status === 400 && (err.message?.toLowerCase().includes('model') || err.message?.toLowerCase().includes('decommissioned') || err.message?.toLowerCase().includes('rate limit') || err.message?.toLowerCase().includes('too large')))
       ) {
         continue;
@@ -917,7 +1175,7 @@ async function executeGroqGeneration(apiKey, model, prompt, isWord) {
           { role: 'user', content: prompt }
         ],
         temperature: 0.1,
-        max_tokens: isWord ? 700 : 1200
+        max_tokens: isWord ? 2048 : 3000
       })
     });
 
@@ -931,7 +1189,11 @@ async function executeGroqGeneration(apiKey, model, prompt, isWord) {
     }
 
     const data = await res.json();
-    return data.choices?.[0]?.message?.content || '';
+    const content = data.choices?.[0]?.message?.content || '';
+    if (!content.trim()) {
+      throw new Error('Groq trả về phản hồi rỗng.');
+    }
+    return content;
   } catch (e) {
     clearTimeout(timeoutId);
     if (e.name === 'AbortError') {
@@ -960,7 +1222,7 @@ async function callOpenAI(apiKey, prompt, isWord) {
           { role: 'user', content: prompt }
         ],
         temperature: 0.1,
-        max_tokens: isWord ? 700 : 1200
+        max_tokens: isWord ? 2048 : 3000
       })
     });
 
@@ -972,7 +1234,9 @@ async function callOpenAI(apiKey, prompt, isWord) {
     }
 
     const data = await res.json();
-    return data.choices?.[0]?.message?.content || '';
+    const content = data.choices?.[0]?.message?.content || '';
+    if (!content.trim()) throw new Error('OpenAI trả về phản hồi rỗng.');
+    return content;
   } catch (e) {
     clearTimeout(timeoutId);
     if (e.name === 'AbortError') {
@@ -1001,7 +1265,7 @@ async function callClaude(apiKey, prompt, isWord) {
         system: 'You are an English-Vietnamese dictionary adhering strictly to Cambridge Dictionary standards. Output ONLY valid JSON matching the schema.',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.1,
-        max_tokens: isWord ? 700 : 1200
+        max_tokens: isWord ? 2048 : 3000
       })
     });
 
@@ -1013,7 +1277,9 @@ async function callClaude(apiKey, prompt, isWord) {
     }
 
     const data = await res.json();
-    return data.content?.[0]?.text || '';
+    const content = data.content?.[0]?.text || '';
+    if (!content.trim()) throw new Error('Claude trả về phản hồi rỗng.');
+    return content;
   } catch (e) {
     clearTimeout(timeoutId);
     if (e.name === 'AbortError') {

@@ -2,7 +2,7 @@
 // Service Worker (MV3) - routes messages, calls AI, manages vocabulary storage
 // Static import is required - dynamic import() is NOT allowed in service workers
 
-import { callAI, isPlaceholderText } from './utils/ai-client.js';
+import { callAI, isPlaceholderText, findFallbackData, buildFallbackWordResponse } from './utils/ai-client.js';
 import { fetchFromCambridge } from './utils/cambridge-client.js';
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -194,15 +194,36 @@ async function handleTranslate(text, isWord, direction = 'auto') {
   // 3. FALLBACK TO AI (Optimized prompt & token limits for speed)
   const { aiProvider = 'gemini', apiKey = '' } =
     await chrome.storage.sync.get(['aiProvider', 'apiKey']);
+
   if (!apiKey) {
+    if (isWord) {
+      const fb = findFallbackData(cleanText);
+      if (fb) {
+        const resp = buildFallbackWordResponse(cleanText, fb);
+        await setCachedTranslation(cacheKey, resp);
+        return resp;
+      }
+    }
     throw new Error('Chưa cài API key. Mở Settings (biểu tượng extension → ⚙️) để cài đặt.');
   }
 
-  const result = await callAI(aiProvider, apiKey, cleanText, isWord, direction);
-  if (result) {
-    await setCachedTranslation(cacheKey, result);
+  try {
+    const result = await callAI(aiProvider, apiKey, cleanText, isWord, direction);
+    if (result) {
+      await setCachedTranslation(cacheKey, result);
+    }
+    return result;
+  } catch (aiErr) {
+    if (isWord) {
+      const fb = findFallbackData(cleanText);
+      if (fb) {
+        const resp = buildFallbackWordResponse(cleanText, fb);
+        await setCachedTranslation(cacheKey, resp);
+        return resp;
+      }
+    }
+    throw aiErr;
   }
-  return result;
 }
 
 async function handleAddWord(wordData) {
