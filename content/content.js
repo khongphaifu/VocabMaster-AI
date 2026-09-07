@@ -7,6 +7,7 @@ let tooltip = null;
 let floatTrigger = null;
 let activeLibraryModal = null;
 let currentSelectionText = '';
+let currentAnchorRect = null;
 let isProcessing = false;
 
 // Listen for mouseup on page to detect text selection
@@ -35,6 +36,14 @@ document.addEventListener('mouseup', (e) => {
         const range = selection.getRangeAt(0);
         const rect = range.getBoundingClientRect();
         if (rect && (rect.width > 0 || rect.height > 0)) {
+          currentAnchorRect = {
+            left: rect.left,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom,
+            width: rect.width,
+            height: rect.height,
+          };
           triggerX = window.scrollX + rect.right + 4;
           triggerY = window.scrollY + rect.top - 36;
           if (triggerY < window.scrollY + 5) {
@@ -46,6 +55,17 @@ document.addEventListener('mouseup', (e) => {
         }
       }
     } catch (_) {}
+
+    if (!currentAnchorRect) {
+      currentAnchorRect = {
+        left: e.clientX,
+        top: Math.max(0, e.clientY - 20),
+        right: e.clientX,
+        bottom: e.clientY,
+        width: 0,
+        height: 20
+      };
+    }
 
     showFloatTrigger(triggerX, triggerY, selectedText);
   }, 20);
@@ -88,11 +108,17 @@ function showFloatTrigger(x, y, text) {
     e.preventDefault();
 
     const triggerRect = floatTrigger.getBoundingClientRect();
-    const tooltipX = Math.min(window.scrollX + triggerRect.left, window.scrollX + window.innerWidth - 360);
-    const tooltipY = window.scrollY + triggerRect.bottom + 8;
+    const anchor = currentAnchorRect || {
+      left: triggerRect.left,
+      top: triggerRect.top,
+      right: triggerRect.right,
+      bottom: triggerRect.bottom,
+      width: triggerRect.width,
+      height: triggerRect.height
+    };
 
     hideFloatTrigger();
-    await doTranslate(text, tooltipX, tooltipY);
+    await doTranslate(text, anchor);
   });
 
   document.body.appendChild(floatTrigger);
@@ -107,14 +133,16 @@ function hideFloatTrigger() {
 
 let activeTypewriterTimer = null;
 
-async function doTranslate(text, x, y) {
+async function doTranslate(text, anchorRect) {
   if (isProcessing) return;
   isProcessing = true;
 
   const isWord = !text.includes(' ') && text.length < 35;
+  const anchor = anchorRect || currentAnchorRect;
+  if (anchor) currentAnchorRect = anchor;
 
   // Instant Shell (0ms): render card shell immediately with word header and AI shimmer skeleton
-  showStreamingTooltip(text, isWord, x, y);
+  showStreamingTooltip(text, isWord, anchor);
 
   try {
     const sendPromise = chrome.runtime.sendMessage({
@@ -129,15 +157,15 @@ async function doTranslate(text, x, y) {
 
     const response = await Promise.race([sendPromise, timeoutPromise]);
     if (response?.success) {
-      showResultTooltip(response.data, x, y);
+      showResultTooltip(response.data, anchor);
     } else {
-      showErrorTooltip(response?.error || 'Lỗi không xác định', x, y, () => doTranslate(text, x, y));
+      showErrorTooltip(response?.error || 'Lỗi không xác định', anchor, () => doTranslate(text, anchor));
     }
   } catch (err) {
     const msg = err.message.includes('Extension context invalidated')
       ? 'Extension vừa được reload. Vui lòng F5 (tải lại) trang web này.'
       : err.message;
-    showErrorTooltip(msg, x, y, () => doTranslate(text, x, y));
+    showErrorTooltip(msg, anchor, () => doTranslate(text, anchor));
   } finally {
     isProcessing = false;
   }
@@ -146,11 +174,9 @@ async function doTranslate(text, x, y) {
 // Listen for messages from background (context menu results or open library)
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.type === 'SHOW_RESULT') {
-    const x = window.scrollX + 100;
-    const y = window.scrollY + 100;
-    showResultTooltip(msg.data, x, y);
+    showResultTooltip(msg.data, currentAnchorRect);
   } else if (msg.type === 'SHOW_ERROR') {
-    showErrorTooltip(msg.error, window.scrollX + 100, window.scrollY + 100);
+    showErrorTooltip(msg.error, currentAnchorRect);
   } else if (msg.type === 'OPEN_LIBRARY_MODAL') {
     openLibraryModal();
   }
@@ -167,20 +193,94 @@ function hideTooltip() {
   }
 }
 
-function createTooltipBase(x, y) {
+function createTooltipBase() {
   const el = document.createElement('div');
   el.className = 'vm-tooltip';
-  el.style.left = `${Math.max(10, x)}px`;
-  el.style.top = `${Math.max(10, y)}px`;
+  el.style.visibility = 'hidden';
+  el.style.left = '0px';
+  el.style.top = '0px';
   return el;
+}
+
+/**
+ * Smart Tooltip Positioning:
+ * - Automatically checks available space above and below the anchor.
+ * - If space below is insufficient, flips tooltip ABOVE the selected word.
+ * - Clamps coordinates to keep the tooltip fully visible within the viewport (no screen cutoff).
+ */
+function smartPositionTooltip(anchorRect) {
+  if (!tooltip) return;
+
+  const target = anchorRect || currentAnchorRect;
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const scrollX = window.scrollX || window.pageXOffset || 0;
+  const scrollY = window.scrollY || window.pageYOffset || 0;
+  const padding = 12;
+  const gap = 8;
+
+  // Measure tooltip rendered dimensions
+  const tipRect = tooltip.getBoundingClientRect();
+  const tipWidth = tipRect.width || 360;
+  const tipHeight = tipRect.height || 220;
+
+  let idealTop;
+  let idealLeft;
+
+  if (target) {
+    const targetTop = target.top;
+    const targetBottom = target.bottom;
+    const targetLeft = target.left;
+
+    const spaceBelow = viewportHeight - targetBottom - padding;
+    const spaceAbove = targetTop - padding;
+
+    let viewportTop;
+
+    // Check whether to place below or flip above
+    if (spaceBelow >= tipHeight + gap) {
+      viewportTop = targetBottom + gap;
+    } else if (spaceAbove >= tipHeight + gap) {
+      viewportTop = targetTop - tipHeight - gap;
+    } else {
+      if (spaceBelow >= spaceAbove) {
+        viewportTop = targetBottom + gap;
+      } else {
+        viewportTop = targetTop - tipHeight - gap;
+      }
+    }
+
+    // Clamp viewportTop so tooltip stays completely within viewport bounds
+    const maxTop = Math.max(padding, viewportHeight - tipHeight - padding);
+    const minTop = padding;
+    viewportTop = Math.max(minTop, Math.min(viewportTop, maxTop));
+
+    idealTop = scrollY + viewportTop;
+
+    // Horizontally align with target.left, clamped within viewport
+    let viewportLeft = targetLeft;
+    const maxLeft = Math.max(padding, viewportWidth - tipWidth - padding);
+    const minLeft = padding;
+    viewportLeft = Math.max(minLeft, Math.min(viewportLeft, maxLeft));
+
+    idealLeft = scrollX + viewportLeft;
+  } else {
+    // Fallback: centered near top of screen
+    idealLeft = scrollX + Math.max(padding, (viewportWidth - tipWidth) / 2);
+    idealTop = scrollY + Math.max(padding, 60);
+  }
+
+  tooltip.style.left = `${Math.round(idealLeft)}px`;
+  tooltip.style.top = `${Math.round(idealTop)}px`;
+  tooltip.style.visibility = 'visible';
 }
 
 /**
  * Instant Shell (0ms): Renders popup card immediately with word header and AI shimmer skeleton
  */
-function showStreamingTooltip(text, isWord, x, y) {
+function showStreamingTooltip(text, isWord, anchorRect) {
   hideTooltip();
-  tooltip = createTooltipBase(x, y);
+  tooltip = createTooltipBase();
 
   const cleanText = (text || '').trim();
   const cambridgeUrl = `https://dictionary.cambridge.org/dictionary/english-vietnamese/${encodeURIComponent(cleanText.toLowerCase())}`;
@@ -227,6 +327,7 @@ function showStreamingTooltip(text, isWord, x, y) {
   `;
 
   document.body.appendChild(tooltip);
+  smartPositionTooltip(anchorRect);
 
   // Hook close button
   tooltip.querySelector('.vm-close-btn')?.addEventListener('click', (e) => {
@@ -253,8 +354,11 @@ function showStreamingTooltip(text, isWord, x, y) {
 /**
  * Progressive Typewriter Streaming for Core Meaning / Translation
  */
-function streamTypewriter(element, fullText, speed = 20) {
-  if (!element || !fullText) return;
+function streamTypewriter(element, fullText, speed = 20, onComplete = null) {
+  if (!element || !fullText) {
+    if (typeof onComplete === 'function') onComplete();
+    return;
+  }
   if (activeTypewriterTimer) {
     clearInterval(activeTypewriterTimer);
     activeTypewriterTimer = null;
@@ -280,13 +384,16 @@ function streamTypewriter(element, fullText, speed = 20) {
       clearInterval(activeTypewriterTimer);
       activeTypewriterTimer = null;
       cursor.remove();
+      if (typeof onComplete === 'function') {
+        onComplete();
+      }
     }
   }, speed);
 }
 
-function showErrorTooltip(msg, x, y, retryFn = null) {
+function showErrorTooltip(msg, anchorRect, retryFn = null) {
   if (!tooltip) {
-    tooltip = createTooltipBase(x, y);
+    tooltip = createTooltipBase();
     document.body.appendChild(tooltip);
   }
   tooltip.innerHTML = `
@@ -305,6 +412,8 @@ function showErrorTooltip(msg, x, y, retryFn = null) {
       ` : ''}
     </div>
   `;
+
+  smartPositionTooltip(anchorRect);
 
   tooltip.querySelector('.vm-close-btn')?.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -328,19 +437,27 @@ const ICONS = {
   book: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>`
 };
 
-function showResultTooltip(data, x, y) {
+function showResultTooltip(data, anchorRect) {
   if (!tooltip) {
-    tooltip = createTooltipBase(x, y);
+    tooltip = createTooltipBase();
     document.body.appendChild(tooltip);
   }
 
   tooltip.innerHTML = data.type === 'word' ? buildWordHTML(data) : buildPhraseHTML(data);
 
+  // Position immediately with full rendered contents
+  smartPositionTooltip(anchorRect);
+  requestAnimationFrame(() => {
+    smartPositionTooltip(anchorRect);
+  });
+
   // Trigger typewriter streaming on core meaning / translation
   const streamEl = tooltip.querySelector('[data-stream-text]');
   if (streamEl) {
     const rawText = streamEl.getAttribute('data-stream-text') || '';
-    streamTypewriter(streamEl, rawText, 18);
+    streamTypewriter(streamEl, rawText, 18, () => {
+      smartPositionTooltip(anchorRect);
+    });
   }
 
   // Close button

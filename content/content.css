@@ -16,7 +16,7 @@
   max-width: 440px !important;
   min-width: 270px !important;
   width: max-content !important;
-  max-height: 520px !important;
+  max-height: min(520px, calc(100vh - 28px)) !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
   pointer-events: all !important;
