@@ -17,6 +17,7 @@ function cleanText(html) {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, ' ')
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -55,11 +56,70 @@ export function getCandidateLemmas(word) {
     }
   }
 
+  // Comparative/superlative: bigger -> big, happier -> happy
+  if (w.endsWith('er') && w.length > 4) {
+    candidates.push(w.slice(0, -2)); // bigger -> bigg? no, but helps
+    candidates.push(w.slice(0, -1)); // wider -> wide
+    if (w.length > 5 && w[w.length - 3] === w[w.length - 4]) {
+      candidates.push(w.slice(0, -3)); // bigger -> big
+    }
+    if (w.endsWith('ier') && w.length > 5) {
+      candidates.push(w.slice(0, -3) + 'y'); // happier -> happy
+    }
+  }
+  if (w.endsWith('est') && w.length > 5) {
+    candidates.push(w.slice(0, -3)); // biggest -> bigg? helps
+    candidates.push(w.slice(0, -2)); // nicest -> nice? nices? not perfect but..
+    if (w.length > 6 && w[w.length - 4] === w[w.length - 5]) {
+      candidates.push(w.slice(0, -4)); // biggest -> big
+    }
+    if (w.endsWith('iest') && w.length > 6) {
+      candidates.push(w.slice(0, -4) + 'y'); // happiest -> happy
+    }
+  }
+
   return [...new Set(candidates)];
 }
 
 /**
+ * Parse a single def-block (ddef_block) to extract paired definition + translation + examples
+ */
+function parseDefBlock(blockHtml) {
+  // English definition
+  const defMatch = blockHtml.match(/<div[^>]*class="[^"]*ddef_d[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+  const defEn = defMatch ? cleanText(defMatch[1]) : '';
+
+  // Vietnamese translation (trans dtrans with lang="vi")
+  const transMatch = blockHtml.match(/<span[^>]*class="[^"]*trans\s+dtrans[^"]*"[^>]*lang="vi"[^>]*>([\s\S]*?)<\/span>/i) ||
+                     blockHtml.match(/<span[^>]*class="[^"]*dtrans[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
+  const transVi = transMatch ? cleanText(transMatch[1]) : '';
+
+  // Examples within this block
+  const examples = [];
+  const exRegex = /<span[^>]*class="[^"]*\bdeg\b[^"]*"[^>]*>([\s\S]*?)<\/span>/gi;
+  let em;
+  while ((em = exRegex.exec(blockHtml)) !== null) {
+    const ex = cleanText(em[1]);
+    if (ex && ex.length > 5 && !examples.includes(ex)) {
+      examples.push(ex);
+    }
+  }
+
+  // CEFR Level badge within this block
+  const lvlMatch = blockHtml.match(/<span[^>]*class="[^"]*(?:epp-xref|dxref)[^"]*"[^>]*>([A-C][1-2])<\/span>/i);
+  const level = lvlMatch ? lvlMatch[1].toUpperCase() : '';
+
+  // Usage label (e.g. "literary", "formal", "informal")
+  const usageMatch = blockHtml.match(/<span[^>]*class="[^"]*dusage[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
+  const usage = usageMatch ? cleanText(usageMatch[1]) : '';
+
+  return { defEn, transVi, examples, level, usage };
+}
+
+/**
  * Parses raw HTML from Cambridge English-Vietnamese dictionary page
+ * Uses sense-by-sense parsing: each def-block links its English definition
+ * with its Vietnamese translation and examples.
  */
 export function parseCambridgeHTML(html, originalWord) {
   if (!html) return null;
@@ -86,11 +146,22 @@ export function parseCambridgeHTML(html, originalWord) {
   }
 
   // 2. Part of Speech
-  let pos = 'noun';
-  const posMatch = html.match(/<span[^>]*class="[^"]*dpos[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
+  let pos = '';
+  const posMatch = html.match(/<span[^>]*class="[^"]*\bdpos\b[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
   if (posMatch) {
     pos = cleanText(posMatch[1]);
   }
+
+  // Countability / grammar info (e.g. [C], [U], [T], [I])
+  const gramMatch = html.match(/<span[^>]*class="[^"]*dgram[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
+  if (gramMatch) {
+    const gram = cleanText(gramMatch[1]);
+    if (gram && pos && !pos.includes('[')) {
+      pos = `${pos} ${gram}`;
+    }
+  }
+
+  if (!pos) pos = 'noun';
 
   // 3. Pronunciation & Audio (UK & US)
   let ipaUk = '';
@@ -125,76 +196,159 @@ export function parseCambridgeHTML(html, originalWord) {
     }
   }
 
-  // 4. CEFR Level
-  let level = '';
-  const levelMatch = html.match(/<span[^>]*class="[^"]*(?:epp-xref|dxref)[^"]*"[^>]*>([A-C][1-2])<\/span>/i);
-  if (levelMatch) {
-    level = levelMatch[1].toUpperCase();
+  // 4. Global CEFR Level (from top of entry)
+  let globalLevel = '';
+  const globalLevelMatch = html.match(/<span[^>]*class="[^"]*(?:epp-xref|dxref)[^"]*"[^>]*>([A-C][1-2])<\/span>/i);
+  if (globalLevelMatch) {
+    globalLevel = globalLevelMatch[1].toUpperCase();
   }
 
-  // 5. Vietnamese Translations (dtrans)
-  const viTranslations = [];
-  const transRegex = /<span[^>]*class="[^"]*dtrans[^"]*"[^>]*>([\s\S]*?)<\/span>/gi;
-  let tMatch;
-  while ((tMatch = transRegex.exec(html)) !== null) {
-    const t = cleanText(tMatch[1]);
-    if (t && !viTranslations.includes(t)) {
-      viTranslations.push(t);
+  // 5. SENSE-BY-SENSE PARSING — the core improvement
+  // Extract each def-block and parse definition + translation + examples together
+  const senses = [];
+  const defBlockRegex = /<div[^>]*class="[^"]*ddef_block[^"]*"[^>]*>([\s\S]*?)(?=<div[^>]*class="[^"]*ddef_block|<div[^>]*class="[^"]*(?:sense-block|dsense)\s|<\/div>\s*<\/div>\s*<\/div>)/gi;
+  let blockMatch;
+  while ((blockMatch = defBlockRegex.exec(html)) !== null) {
+    const parsed = parseDefBlock(blockMatch[0] + blockMatch[1]);
+    if (parsed.transVi || parsed.defEn) {
+      senses.push(parsed);
     }
   }
 
-  // 6. English Definitions (ddef_d)
-  const enDefinitions = [];
-  const defRegex = /<div[^>]*class="[^"]*ddef_d[^"]*"[^>]*>([\s\S]*?)<\/div>/gi;
-  let dMatch;
-  while ((dMatch = defRegex.exec(html)) !== null) {
-    const d = cleanText(dMatch[1]);
-    if (d && !enDefinitions.includes(d)) {
-      enDefinitions.push(d);
+  // Fallback: if regex above didn't capture blocks, try a simpler approach
+  if (senses.length === 0) {
+    // Try splitting by ddef_block markers
+    const blockParts = html.split(/(?=<div[^>]*class="[^"]*ddef_block)/i);
+    for (const part of blockParts) {
+      if (!part.includes('ddef_block')) continue;
+      const parsed = parseDefBlock(part);
+      if (parsed.transVi || parsed.defEn) {
+        senses.push(parsed);
+      }
     }
   }
 
-  // 7. Examples (dexamp / deg)
-  const examples = [];
-  const exampRegex = /<span[^>]*class="[^"]*deg[^"]*"[^>]*>([\s\S]*?)<\/span>/gi;
-  let eMatch;
-  while ((eMatch = exampRegex.exec(html)) !== null) {
-    const ex = cleanText(eMatch[1]);
-    if (ex && !examples.includes(ex)) {
-      examples.push(ex);
+  // 6. Also grab any dtrans that the block parser might have missed (flat extraction as backup)
+  if (senses.length === 0) {
+    const viTranslations = [];
+    const transRegex = /<span[^>]*class="[^"]*dtrans[^"]*"[^>]*>([\s\S]*?)<\/span>/gi;
+    let tMatch;
+    while ((tMatch = transRegex.exec(html)) !== null) {
+      const t = cleanText(tMatch[1]);
+      if (t && !viTranslations.includes(t)) {
+        viTranslations.push(t);
+      }
     }
-  }
 
-  // 8. Collocations / Idioms (phrase-title / dphrase-title)
-  const collocations = [];
-  const phraseRegex = /<(?:span|div|b)[^>]*class="[^"]*(?:phrase-title|dphrase-title)[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div|b)>/gi;
-  let pMatch;
-  while ((pMatch = phraseRegex.exec(html)) !== null) {
-    const phr = cleanText(pMatch[1]);
-    if (phr && phr.length > 2 && !collocations.some(c => c.phrase === phr)) {
-      collocations.push({ phrase: phr, meaning_vi: '' });
+    const enDefinitions = [];
+    const defRegex = /<div[^>]*class="[^"]*ddef_d[^"]*"[^>]*>([\s\S]*?)<\/div>/gi;
+    let dMatch;
+    while ((dMatch = defRegex.exec(html)) !== null) {
+      const d = cleanText(dMatch[1]);
+      if (d && !enDefinitions.includes(d)) {
+        enDefinitions.push(d);
+      }
     }
-    if (collocations.length >= 4) break;
-  }
 
-  // 9. Other Meanings (if multiple translations exist)
-  const otherMeanings = [];
-  if (viTranslations.length > 1) {
-    for (let i = 1; i < Math.min(viTranslations.length, 5); i++) {
-      otherMeanings.push({
-        pos: pos,
-        meaning_vi: viTranslations[i]
+    const examples = [];
+    const exampRegex = /<span[^>]*class="[^"]*\bdeg\b[^"]*"[^>]*>([\s\S]*?)<\/span>/gi;
+    let eMatch;
+    while ((eMatch = exampRegex.exec(html)) !== null) {
+      const ex = cleanText(eMatch[1]);
+      if (ex && !examples.includes(ex)) {
+        examples.push(ex);
+      }
+    }
+
+    // Pair them by index
+    const maxSenses = Math.max(viTranslations.length, enDefinitions.length);
+    for (let i = 0; i < maxSenses && i < 5; i++) {
+      senses.push({
+        transVi: viTranslations[i] || '',
+        defEn: enDefinitions[i] || '',
+        examples: i === 0 ? examples.slice(0, 2) : [],
+        level: '',
+        usage: ''
       });
     }
   }
 
-  const primaryMeaningVi = viTranslations[0] || '';
-  const primaryDefEn = enDefinitions[0] || '';
+  // 7. Collocations / Idioms (phrase-title / dphrase-title)
+  const collocations = [];
+  // Try to get collocations with their translations
+  const phraseBlockRegex = /<div[^>]*class="[^"]*dphrase-block[^"]*"[^>]*>([\s\S]*?)(?=<div[^>]*class="[^"]*dphrase-block|<\/div>\s*<\/div>\s*<\/div>)/gi;
+  let pbMatch;
+  while ((pbMatch = phraseBlockRegex.exec(html)) !== null) {
+    const phraseContent = pbMatch[0] + pbMatch[1];
+    const titleMatch = phraseContent.match(/<[^>]*class="[^"]*(?:phrase-title|dphrase-title)[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div|b)>/i);
+    const transMatch = phraseContent.match(/<span[^>]*class="[^"]*dtrans[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
+    if (titleMatch) {
+      const phr = cleanText(titleMatch[1]);
+      const meaning = transMatch ? cleanText(transMatch[1]) : '';
+      if (phr && phr.length > 2 && !collocations.some(c => c.phrase === phr)) {
+        collocations.push({ phrase: phr, meaning_vi: meaning });
+      }
+    }
+    if (collocations.length >= 4) break;
+  }
 
-  // If no translations or definitions were found, parser didn't find valid entry
+  // Fallback: simple phrase extraction if the block approach found nothing
+  if (collocations.length === 0) {
+    const phraseRegex = /<(?:span|div|b)[^>]*class="[^"]*(?:phrase-title|dphrase-title)[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div|b)>/gi;
+    let pMatch;
+    while ((pMatch = phraseRegex.exec(html)) !== null) {
+      const phr = cleanText(pMatch[1]);
+      if (phr && phr.length > 2 && !collocations.some(c => c.phrase === phr)) {
+        collocations.push({ phrase: phr, meaning_vi: '' });
+      }
+      if (collocations.length >= 4) break;
+    }
+  }
+
+  // 8. Build structured result from senses
+  if (senses.length === 0) {
+    return null;
+  }
+
+  const primarySense = senses[0];
+  const primaryMeaningVi = primarySense.transVi || '';
+  const primaryDefEn = primarySense.defEn || '';
+
   if (!primaryMeaningVi && !primaryDefEn) {
     return null;
   }
+
+  // Combine all Vietnamese translations for definition_vi (semicolon-separated)
+  const allViTranslations = senses
+    .map(s => s.transVi)
+    .filter(t => t && t.length > 0);
+  const definitionVi = allViTranslations.slice(0, 4).join('; ');
+
+  // Build other_meanings from secondary senses (paired definition + translation)
+  const otherMeanings = [];
+  for (let i = 1; i < senses.length && i < 5; i++) {
+    const s = senses[i];
+    if (s.transVi) {
+      otherMeanings.push({
+        pos: s.usage ? `${pos} (${s.usage})` : pos,
+        meaning_vi: s.transVi,
+        definition_en: s.defEn || ''
+      });
+    }
+  }
+
+  // Collect all examples from all senses
+  const allExamples = [];
+  for (const s of senses) {
+    for (const ex of s.examples) {
+      if (!allExamples.includes(ex)) {
+        allExamples.push(ex);
+      }
+    }
+  }
+
+  // Best CEFR level: prefer sense-level, then global
+  const bestLevel = primarySense.level || globalLevel || '';
 
   return {
     type: 'word',
@@ -208,11 +362,11 @@ export function parseCambridgeHTML(html, originalWord) {
       ipa_uk: ipaUk ? `/${ipaUk.replace(/^\/|\/$/g, '')}/` : '',
       ipa_us: ipaUs ? `/${ipaUs.replace(/^\/|\/$/g, '')}/` : (ipaUk ? `/${ipaUk.replace(/^\/|\/$/g, '')}/` : ''),
       partOfSpeech: pos,
-      level: level || 'B1',
+      level: bestLevel || 'B1',
       meaning_vi: primaryMeaningVi || headword,
-      definition_vi: viTranslations.slice(0, 3).join('; '),
+      definition_vi: definitionVi || primaryMeaningVi || headword,
       definition_en: primaryDefEn,
-      examples: examples.slice(0, 3),
+      examples: allExamples.slice(0, 4),
       word_family: [],
       other_meanings: otherMeanings,
       collocations: collocations,
@@ -222,7 +376,7 @@ export function parseCambridgeHTML(html, originalWord) {
 }
 
 /**
- * Fetch word from Cambridge Dictionary Online with fast timeout (1800ms)
+ * Fetch word from Cambridge Dictionary Online with reliable timeout (3.5s)
  * Tests candidate lemmas if the exact form is not found (e.g. "becomes" -> "become")
  */
 export async function fetchFromCambridge(word) {
@@ -242,7 +396,7 @@ export async function fetchFromCambridge(word) {
     for (const url of urls) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1800); // 1.8s timeout for maximum speed
+        const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5s timeout for reliable results
 
         const resp = await fetch(url, {
           signal: controller.signal,
@@ -266,10 +420,11 @@ export async function fetchFromCambridge(word) {
           return parsed;
         }
       } catch (_) {
-        // Fast timeout, proceed to next or fallback to AI
+        // Timeout or network issue, proceed to next or fallback to AI
       }
     }
   }
 
   return null;
 }
+

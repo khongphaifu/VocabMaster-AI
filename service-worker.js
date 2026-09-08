@@ -5,7 +5,12 @@
 import { callAI, isPlaceholderText, findFallbackData, buildFallbackWordResponse } from './utils/ai-client.js';
 import { fetchFromCambridge } from './utils/cambridge-client.js';
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
+  // On UPDATE: clear dictionary cache so words are re-fetched with improved parser
+  if (details.reason === 'update') {
+    chrome.storage.local.remove('dict_cache').catch(() => {});
+  }
+
   // Cleanup corrupted cache entries (e.g. placeholder texts like "nghĩa tiếng Việt")
   (async () => {
     try {

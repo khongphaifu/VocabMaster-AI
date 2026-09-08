@@ -359,62 +359,72 @@ export function buildFallbackWordResponse(originalText, fbData) {
 }
 
 const WORD_PROMPT_EN_VI = (word) => {
-  return `Bạn là hệ thống từ điển Anh - Việt theo chuẩn Từ điển Cambridge (Cambridge Advanced Learner's Dictionary & Cambridge English-Vietnamese Dictionary).
-Hãy tra cứu và trả về mục từ điển đầy đủ, chi tiết cho từ tiếng Anh sau:
-"${word}"
+  return `Bạn là hệ thống từ điển Anh - Việt theo chuẩn Cambridge English-Vietnamese Dictionary (dictionary.cambridge.org).
+Hãy tra cứu từ tiếng Anh "${word}" và trả về mục từ điển CHÍNH XÁC như cách Cambridge Dictionary trình bày.
+
+CÁCH DỊCH CHUẨN CAMBRIDGE:
+- "meaning_vi" phải là bản dịch NGẮN GỌN, SÁT NGHĨA giống hệt cách Cambridge English-Vietnamese hiển thị.
+  Ví dụ: "abandon" → "từ bỏ" (KHÔNG phải "sự bỏ rơi, sự từ bỏ hoàn toàn")
+  Ví dụ: "table" → "cái bàn" (KHÔNG phải "một bề mặt phẳng có chân dùng để đặt đồ")
+  Ví dụ: "become" → "trở thành, trở nên"
+  Ví dụ: "significant" → "đáng kể, quan trọng"
+- meaning_vi là TỪ/CỤM TỪ TIẾNG VIỆT tương đương, KHÔNG phải câu giải thích dài.
+- "definition_vi" mới là phần giải thích chi tiết hơn bằng tiếng Việt.
 
 TIÊU CHUẨN MỤC TỪ ĐIỂN:
-1. "word_root": Dạng từ nguyên thể (lemma) của từ "${word}".
-2. "ipa_uk": Phiên âm chuẩn Anh-Anh (UK), ví dụ "/teɪ.bəl/".
-3. "ipa_us": Phiên âm chuẩn Anh-Mỹ (US), ví dụ "/teɪ.bəl/".
-4. "partOfSpeech": Từ loại chuẩn Cambridge (ví dụ "noun [C]", "verb [T]", "adjective", "adverb").
-5. "level": Cấp độ CEFR theo chuẩn Cambridge (A1, A2, B1, B2, C1, C2).
-6. "meaning_vi": BẮT BUỘC là NGHĨA TIẾNG VIỆT THẬT SỰ của từ "${word}" (Ví dụ nếu từ là "table" thì meaning_vi phải là "cái bàn, bảng biểu"; nếu "become" thì là "trở thành, trở nên"). TUYỆT ĐỐI KHÔNG trả về chữ "nghĩa tiếng Việt" hay văn bản khuôn mẫu!
-7. "definition_vi": Giải thích chi tiết ý nghĩa và ngữ cảnh bằng tiếng Việt.
-8. "definition_en": Định nghĩa tiếng Anh chuẩn mực, ngắn gọn theo Cambridge Dictionary.
-9. "examples": Ít nhất 2 câu ví dụ tiếng Anh tự nhiên chứa từ "${word}".
-10. "word_family": Mảng các từ họ hàng cùng gốc thực tế (noun, verb, adjective, adverb...). Nếu từ là danh từ đơn giản không có dạng phái sinh phổ biến thì để mảng rỗng []. TUYỆT ĐỐI KHÔNG tự chế từ vô nghĩa (như "bàn điệt") và KHÔNG lặp lại chính từ "${word}".
-11. "other_meanings": Các nghĩa hoặc cách dùng khác nếu có (ví dụ khi từ là động từ hoặc danh từ nghĩa bóng). Cấu trúc: [{"pos": "...", "meaning_vi": "..."}].
-12. "collocations": 2-3 cụm từ tiếng Anh thông dụng nhất kèm nghĩa tiếng Việt. Cấu trúc: [{"phrase": "cụm từ tiếng Anh", "meaning_vi": "nghĩa tiếng Việt"}].
-13. "synonyms": 2-4 từ đồng nghĩa BẰNG TIẾNG ANH (Ví dụ với "table" là ["desk", "counter", "board", "chart"]). TUYỆT ĐỐI KHÔNG dùng tiếng Việt trong synonyms.
+1. "word_root": Dạng nguyên thể (lemma) của "${word}".
+2. "ipa_uk": Phiên âm UK chuẩn Cambridge, ví dụ "/teɪ.bəl/".
+3. "ipa_us": Phiên âm US chuẩn Cambridge, ví dụ "/teɪ.bəl/".
+4. "partOfSpeech": Từ loại chuẩn Cambridge ("noun [C]", "verb [T]", "adjective"...).
+5. "level": Cấp độ CEFR (A1, A2, B1, B2, C1, C2).
+6. "meaning_vi": Bản dịch tiếng Việt NGẮN GỌN, SÁT NGHĨA theo chuẩn Cambridge (xem ví dụ ở trên). TUYỆT ĐỐI KHÔNG trả về "nghĩa tiếng Việt" hay khuôn mẫu!
+7. "definition_vi": Giải thích nghĩa bằng tiếng Việt (1-2 câu ngắn).
+8. "definition_en": Định nghĩa tiếng Anh ngắn gọn theo Cambridge.
+9. "examples": 2 câu ví dụ tiếng Anh tự nhiên.
+10. "word_family": Từ cùng gốc [{\"pos\": \"...\", \"word\": \"...\", \"meaning_vi\": \"...\"}]. Mảng rỗng [] nếu không có. KHÔNG lặp "${word}", KHÔNG tự chế từ.
+11. "other_meanings": Các nghĩa khác [{\"pos\": \"...\", \"meaning_vi\": \"bản dịch ngắn gọn\", \"definition_en\": \"English definition\"}].
+12. "collocations": 2-3 cụm từ thông dụng [{\"phrase\": \"...\", \"meaning_vi\": \"...\"}].
+13. "synonyms": 2-4 từ đồng nghĩa TIẾNG ANH. KHÔNG dùng tiếng Việt.
 
-MỤC TỪ MẪU THAM KHẢO (với từ "decision"):
+MẪU THAM KHẢO (từ "abandon"):
 {
   "type": "word",
   "word": {
-    "word_root": "decision",
-    "ipa_uk": "/dɪˈsɪʒ.ən/",
-    "ipa_us": "/dɪˈsɪʒ.ən/",
-    "partOfSpeech": "noun [C or U]",
-    "level": "B1",
-    "meaning_vi": "sự quyết định, phán quyết",
-    "definition_vi": "sự lựa chọn hoặc phán xét sau khi đã suy nghĩ kỹ",
-    "definition_en": "a choice that you make about something after thinking about several possibilities",
+    "word_root": "abandon",
+    "ipa_uk": "/əˈbæn.dən/",
+    "ipa_us": "/əˈbæn.dən/",
+    "partOfSpeech": "verb",
+    "level": "B2",
+    "meaning_vi": "từ bỏ",
+    "definition_vi": "rời đi không có ý định quay lại",
+    "definition_en": "to leave, not intending to return to",
     "examples": [
-      "She made a decision to study abroad.",
-      "It was a difficult decision to make."
+      "The bank robbers abandoned the stolen car.",
+      "By the time the rebel troops arrived, the village had already been abandoned."
     ],
     "word_family": [
-      {"pos": "verb", "word": "decide", "meaning_vi": "quyết định"},
-      {"pos": "adj", "word": "decisive", "meaning_vi": "kiên quyết, dứt khoát"}
+      {"pos": "noun", "word": "abandonment", "meaning_vi": "sự bỏ rơi"},
+      {"pos": "adj", "word": "abandoned", "meaning_vi": "bị bỏ hoang"}
     ],
     "other_meanings": [
-      {"pos": "noun", "meaning_vi": "sự dứt khoát, tính quyết đoán"}
+      {"pos": "verb", "meaning_vi": "hủy", "definition_en": "to stop doing something because of a problem"},
+      {"pos": "verb (literary)", "meaning_vi": "buông thả", "definition_en": "to give (oneself) completely to something"}
     ],
     "collocations": [
-      {"phrase": "make a decision", "meaning_vi": "đưa ra quyết định"}
+      {"phrase": "abandon hope", "meaning_vi": "từ bỏ hy vọng"},
+      {"phrase": "abandon ship", "meaning_vi": "rời tàu (khi gặp nguy)"}
     ],
-    "synonyms": ["choice", "judgment", "resolution"],
-    "antonyms": ["indecision"]
+    "synonyms": ["desert", "forsake", "leave", "give up"],
+    "antonyms": ["keep", "retain"]
   }
 }
 
 QUY TẮC BẮT BUỘC:
-- Trả về DUY NHẤT một JSON hợp lệ (không kèm bất kỳ văn bản nào ngoài JSON).
+- Trả về DUY NHẤT một JSON hợp lệ, không kèm văn bản nào ngoài JSON.
 - Không điền dấu ba chấm (...).
-- Mọi nội dung phải là dữ liệu thật của từ "${word}".
+- meaning_vi PHẢI là từ/cụm từ tiếng Việt ngắn gọn tương đương, KHÔNG phải định nghĩa dài.
 
-Bây giờ hãy phân tích từ "${word}" và trả về JSON chuẩn xác:`;
+Bây giờ hãy tra từ "${word}" và trả về JSON:`;
 };
 
 const WORD_PROMPT_VI_EN = (word) => {
