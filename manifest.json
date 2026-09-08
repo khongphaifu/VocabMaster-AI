@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "VocabMaster AI",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Dịch và phân tích từ vựng tiếng Anh bằng AI. Lưu từ mới, luyện tập qua minigame Flashcard, Quiz, Typing.",
   "icons": {
     "16": "icons/icon-16.png",

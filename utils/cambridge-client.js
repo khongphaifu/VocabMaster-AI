@@ -164,43 +164,60 @@ export function parseCambridgeHTML(html, originalWord) {
   if (!pos) pos = 'noun';
 
   // 3. Pronunciation & Audio (UK & US)
+  // Bilingual dictionaries (english-vietnamese) typically have a SINGLE pronunciation
+  // in the entry header using class "ipa dipa" inside "pron dpron".
+  // Monolingual pages may have separate UK/US sections with dpron-i.
   let ipaUk = '';
   let ipaUs = '';
   let audioUk = '';
   let audioUs = '';
 
-  const ukSection = html.match(/<span[^>]*class="[^"]*uk[^"]*dpron-i[^"]*"[\s\S]*?<\/span>\s*<\/span>/i) ||
-                    html.match(/<span[^>]*class="[^"]*uk[^"]*"[\s\S]*?<\/span>/i);
+  // First: try to get the general IPA from the entry header (most bilingual entries)
+  const entryHeader = html.match(/<div[^>]*class="[^"]*dpos-h[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<div[^>]*class="[^"]*di-body/i);
+  if (entryHeader) {
+    const headerIpa = entryHeader[1].match(/<span[^>]*class="[^"]*\bipa\b[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
+    if (headerIpa) {
+      const ipa = cleanText(headerIpa[1]);
+      if (ipa) {
+        ipaUk = ipa;
+        ipaUs = ipa;
+      }
+    }
+  }
+
+  // Then: try UK/US specific sections (monolingual pages / some entries)
+  const ukSection = html.match(/<span[^>]*class="[^"]*uk[^"]*dpron-i[^"]*"[\s\S]*?<\/span>\s*<\/span>/i);
   if (ukSection) {
-    const ipaM = ukSection[0].match(/<span[^>]*class="[^"]*ipa[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
+    const ipaM = ukSection[0].match(/<span[^>]*class="[^"]*\bipa\b[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
     if (ipaM) ipaUk = cleanText(ipaM[1]);
     const srcM = ukSection[0].match(/<source[^>]*type="audio\/mpeg"[^>]*src="([^"]+)"/i);
     if (srcM) audioUk = srcM[1].startsWith('http') ? srcM[1] : `${CAMBRIDGE_BASE}${srcM[1]}`;
   }
 
-  const usSection = html.match(/<span[^>]*class="[^"]*us[^"]*dpron-i[^"]*"[\s\S]*?<\/span>\s*<\/span>/i) ||
-                    html.match(/<span[^>]*class="[^"]*us[^"]*"[\s\S]*?<\/span>/i);
+  const usSection = html.match(/<span[^>]*class="[^"]*us[^"]*dpron-i[^"]*"[\s\S]*?<\/span>\s*<\/span>/i);
   if (usSection) {
-    const ipaM = usSection[0].match(/<span[^>]*class="[^"]*ipa[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
+    const ipaM = usSection[0].match(/<span[^>]*class="[^"]*\bipa\b[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
     if (ipaM) ipaUs = cleanText(ipaM[1]);
     const srcM = usSection[0].match(/<source[^>]*type="audio\/mpeg"[^>]*src="([^"]+)"/i);
     if (srcM) audioUs = srcM[1].startsWith('http') ? srcM[1] : `${CAMBRIDGE_BASE}${srcM[1]}`;
   }
 
-  // Fallback IPA if not in uk/us blocks
+  // Final fallback: any IPA on the page
   if (!ipaUk && !ipaUs) {
-    const generalIpa = html.match(/<span[^>]*class="[^"]*ipa[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
+    const generalIpa = html.match(/<span[^>]*class="[^"]*\bipa\b[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
     if (generalIpa) {
       ipaUk = cleanText(generalIpa[1]);
       ipaUs = ipaUk;
     }
   }
 
-  // 4. Global CEFR Level (from top of entry)
+  // 4. Global CEFR Level (bilingual uses "cefr dcefr", monolingual uses "epp-xref/dxref")
   let globalLevel = '';
-  const globalLevelMatch = html.match(/<span[^>]*class="[^"]*(?:epp-xref|dxref)[^"]*"[^>]*>([A-C][1-2])<\/span>/i);
+  const globalLevelMatch = html.match(/<span[^>]*class="[^"]*(?:cefr|epp-xref|dxref)[^"]*"[^>]*>([A-C][1-2])<\/span>/i) ||
+                           html.match(/<span[^>]*class="[^"]*(?:cefr|epp-xref|dxref)[^"]*"[^>]*>\s*([A-C][1-2](?:\s*,\s*[A-C][1-2])?)\s*<\/span>/i);
   if (globalLevelMatch) {
-    globalLevel = globalLevelMatch[1].toUpperCase();
+    // Take the first level if multiple (e.g. "B2,C1" → "B2")
+    globalLevel = globalLevelMatch[1].split(',')[0].trim().toUpperCase();
   }
 
   // 5. SENSE-BY-SENSE PARSING — the core improvement
@@ -387,40 +404,56 @@ export async function fetchFromCambridge(word) {
 
   const lemmas = getCandidateLemmas(cleanWord);
 
-  for (const lemma of lemmas) {
-    const urls = [
-      `${CAMBRIDGE_BASE}/dictionary/english-vietnamese/${encodeURIComponent(lemma)}`,
-      `${CAMBRIDGE_BASE}/dictionary/english/${encodeURIComponent(lemma)}`
-    ];
+  // Strategy: try english-vietnamese first for all lemmas, then english-only as final fallback
+  // This avoids wasting time on english-only when english-vietnamese usually works
+  const primaryUrls = lemmas.map(l => ({
+    lemma: l,
+    url: `${CAMBRIDGE_BASE}/dictionary/english-vietnamese/${encodeURIComponent(l)}`
+  }));
 
-    for (const url of urls) {
+  // English-only as last resort (only for the first lemma)
+  const fallbackUrls = [{
+    lemma: lemmas[0],
+    url: `${CAMBRIDGE_BASE}/dictionary/english/${encodeURIComponent(lemmas[0])}`
+  }];
+
+  const allAttempts = [...primaryUrls, ...fallbackUrls];
+
+  for (const { lemma, url } of allAttempts) {
+    // Retry up to 2 times per URL
+    for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5s timeout for reliable results
+        const timeoutMs = attempt === 0 ? 5000 : 4000; // 5s first, 4s retry
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
         const resp = await fetch(url, {
           signal: controller.signal,
           credentials: 'include',
           headers: {
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
             'Cache-Control': 'no-cache'
           }
         });
         clearTimeout(timeoutId);
 
-        if (!resp.ok) continue;
+        if (!resp.ok) break; // Don't retry 404s etc, move to next URL
 
         const html = await resp.text();
         const parsed = parseCambridgeHTML(html, cleanWord);
         if (parsed && (parsed.word?.meaning_vi || parsed.word?.definition_en)) {
-          if (lemma !== cleanWord && !parsed.word.word_root) {
+          if (lemma !== cleanWord) {
             parsed.word.word_root = lemma;
           }
           return parsed;
         }
-      } catch (_) {
-        // Timeout or network issue, proceed to next or fallback to AI
+        break; // Page loaded but no valid entry, don't retry, move to next
+      } catch (e) {
+        // On timeout (AbortError), retry once; on other errors, move to next
+        if (e.name !== 'AbortError' || attempt >= 1) break;
+        // Will retry on next loop iteration
       }
     }
   }
