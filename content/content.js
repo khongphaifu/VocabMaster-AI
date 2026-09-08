@@ -242,7 +242,7 @@ function hideTooltip(immediate = false) {
     }
     isExitingTooltip = false;
     exitTooltipTimer = null;
-  }, 180);
+  }, 190);
 }
 
 function createTooltipBase() {
