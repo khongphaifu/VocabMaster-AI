@@ -24,12 +24,33 @@
   transform-origin: center top !important;
   animation: vm-popup-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
   scrollbar-width: thin !important;
-  scrollbar-color: #45475a #1e1e2e !important;
+  scrollbar-color: #585b70 transparent !important;
 }
 
-.vm-tooltip::-webkit-scrollbar { width: 4px !important; }
-.vm-tooltip::-webkit-scrollbar-track { background: #1e1e2e !important; }
-.vm-tooltip::-webkit-scrollbar-thumb { background: #45475a !important; border-radius: 2px !important; }
+.vm-tooltip::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.vm-tooltip::-webkit-scrollbar-track {
+  background: transparent !important;
+  margin: 8px 0 !important;
+}
+
+.vm-tooltip::-webkit-scrollbar-thumb {
+  background: #45475a !important;
+  border-radius: 99px !important;
+  border: 2px solid transparent !important;
+  background-clip: padding-box !important;
+}
+
+.vm-tooltip::-webkit-scrollbar-thumb:hover {
+  background: #7c7f93 !important;
+  background-clip: padding-box !important;
+}
+
+.vm-tooltip::-webkit-scrollbar-corner {
+  background: transparent !important;
+}
 
 /* Entrance Animation: Smooth popover with subtle scale & blur */
 @keyframes vm-popup-enter {
