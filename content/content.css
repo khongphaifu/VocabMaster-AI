@@ -35,6 +35,41 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Exit Animations */
+.vm-tooltip.vm-tooltip-exit {
+  animation: vm-tooltip-fadeout 0.18s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+  pointer-events: none !important;
+}
+
+@keyframes vm-tooltip-fadeout {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+    filter: blur(2px);
+  }
+}
+
+.vm-float-trigger.vm-float-trigger-exit {
+  animation: vm-trigger-fadeout 0.15s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+  pointer-events: none !important;
+}
+
+@keyframes vm-trigger-fadeout {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+}
+
 /* AI Progressive Streaming & Cascading Animations */
 @keyframes vm-stream-in {
   0% {
@@ -624,6 +659,98 @@
   white-space: pre-wrap !important;
   word-break: break-word !important;
 }
+
+/* Alternative Phrasing */
+.vm-phrase-alt {
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 6px !important;
+  background: rgba(137, 220, 235, 0.08) !important;
+  border-left: 3px solid #89dceb !important;
+  border-radius: 6px !important;
+  padding: 6px 10px !important;
+  margin-bottom: 6px !important;
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+}
+
+.vm-phrase-alt-tag {
+  color: #89dceb !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  letter-spacing: 0.3px !important;
+  flex-shrink: 0 !important;
+}
+
+.vm-phrase-alt-text {
+  color: #cdd6f4 !important;
+  font-style: italic !important;
+}
+
+/* Key Vocabulary in Sentence */
+.vm-phrase-vocab-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 5px !important;
+}
+
+.vm-phrase-vocab-item {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  background: rgba(49, 50, 68, 0.6) !important;
+  border: 1px solid rgba(69, 71, 90, 0.6) !important;
+  border-radius: 6px !important;
+  padding: 4px 8px !important;
+  font-size: 12.5px !important;
+  line-height: 1.35 !important;
+  transition: all 0.15s !important;
+}
+
+.vm-phrase-vocab-item:hover {
+  background: rgba(49, 50, 68, 0.95) !important;
+  border-color: #cba6f7 !important;
+}
+
+.vm-vocab-speak-btn {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  background: transparent !important;
+  border: none !important;
+  color: #89b4fa !important;
+  cursor: pointer !important;
+  padding: 2px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 0.75 !important;
+  transition: opacity 0.15s, transform 0.1s !important;
+}
+
+.vm-vocab-speak-btn:hover {
+  opacity: 1 !important;
+  transform: scale(1.18) !important;
+  color: #ffffff !important;
+}
+
+.vm-phrase-vocab-word {
+  color: #cba6f7 !important;
+  font-weight: 700 !important;
+}
+
+.vm-phrase-vocab-ipa {
+  font-size: 11px !important;
+  font-style: italic !important;
+  color: #bac2de !important;
+  font-family: 'Lucida Console', Monaco, 'Courier New', monospace !important;
+}
+
+.vm-phrase-vocab-meaning {
+  color: #a6e3a1 !important;
+  font-weight: 500 !important;
+}
+
 
 /* AI Stream Skeleton & Shimmer */
 .vm-stream-skeleton {

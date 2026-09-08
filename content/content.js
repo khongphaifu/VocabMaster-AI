@@ -93,8 +93,11 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+let isExitingTrigger = false;
+let exitTriggerTimer = null;
+
 function showFloatTrigger(x, y, text) {
-  hideFloatTrigger();
+  hideFloatTrigger(true);
 
   floatTrigger = document.createElement('div');
   floatTrigger.className = 'vm-float-trigger';
@@ -117,18 +120,41 @@ function showFloatTrigger(x, y, text) {
       height: triggerRect.height
     };
 
-    hideFloatTrigger();
+    hideFloatTrigger(true);
     await doTranslate(text, anchor);
   });
 
   document.body.appendChild(floatTrigger);
 }
 
-function hideFloatTrigger() {
-  if (floatTrigger) {
+function hideFloatTrigger(immediate = false) {
+  if (!floatTrigger) return;
+
+  if (immediate) {
+    if (exitTriggerTimer) {
+      clearTimeout(exitTriggerTimer);
+      exitTriggerTimer = null;
+    }
+    isExitingTrigger = false;
     floatTrigger.remove();
     floatTrigger = null;
+    return;
   }
+
+  if (isExitingTrigger) return;
+  isExitingTrigger = true;
+
+  const currentTrigger = floatTrigger;
+  currentTrigger.classList.add('vm-float-trigger-exit');
+
+  exitTriggerTimer = setTimeout(() => {
+    if (floatTrigger === currentTrigger) {
+      currentTrigger.remove();
+      floatTrigger = null;
+    }
+    isExitingTrigger = false;
+    exitTriggerTimer = null;
+  }, 150);
 }
 
 let activeTypewriterTimer = null;
@@ -182,15 +208,41 @@ chrome.runtime.onMessage.addListener((msg) => {
   }
 });
 
-function hideTooltip() {
+let isExitingTooltip = false;
+let exitTooltipTimer = null;
+
+function hideTooltip(immediate = false) {
   if (activeTypewriterTimer) {
     clearInterval(activeTypewriterTimer);
     activeTypewriterTimer = null;
   }
-  if (tooltip) {
+  if (!tooltip) return;
+
+  if (immediate) {
+    if (exitTooltipTimer) {
+      clearTimeout(exitTooltipTimer);
+      exitTooltipTimer = null;
+    }
+    isExitingTooltip = false;
     tooltip.remove();
     tooltip = null;
+    return;
   }
+
+  if (isExitingTooltip) return;
+  isExitingTooltip = true;
+
+  const currentTip = tooltip;
+  currentTip.classList.add('vm-tooltip-exit');
+
+  exitTooltipTimer = setTimeout(() => {
+    if (tooltip === currentTip) {
+      currentTip.remove();
+      tooltip = null;
+    }
+    isExitingTooltip = false;
+    exitTooltipTimer = null;
+  }, 180);
 }
 
 function createTooltipBase() {
@@ -279,7 +331,7 @@ function smartPositionTooltip(anchorRect) {
  * Instant Shell (0ms): Renders popup card immediately with word header and AI shimmer skeleton
  */
 function showStreamingTooltip(text, isWord, anchorRect) {
-  hideTooltip();
+  hideTooltip(true);
   tooltip = createTooltipBase();
 
   const cleanText = (text || '').trim();
@@ -392,7 +444,8 @@ function streamTypewriter(element, fullText, speed = 20, onComplete = null) {
 }
 
 function showErrorTooltip(msg, anchorRect, retryFn = null) {
-  if (!tooltip) {
+  if (!tooltip || isExitingTooltip) {
+    hideTooltip(true);
     tooltip = createTooltipBase();
     document.body.appendChild(tooltip);
   }
@@ -438,7 +491,8 @@ const ICONS = {
 };
 
 function showResultTooltip(data, anchorRect) {
-  if (!tooltip) {
+  if (!tooltip || isExitingTooltip) {
+    hideTooltip(true);
     tooltip = createTooltipBase();
     document.body.appendChild(tooltip);
   }
@@ -816,23 +870,69 @@ function buildWordHTML(data) {
 
 function buildPhraseHTML(data) {
   const orig = data.original || '';
-  const preview = orig.length > 180 ? orig.slice(0, 180) + '...' : orig;
+  const preview = orig.length > 200 ? orig.slice(0, 200) + '...' : orig;
+  const translation = data.translation || '';
+  const alt = data.natural_alternative || '';
+  const vocab = Array.isArray(data.key_vocabulary) ? data.key_vocabulary : [];
+  const explanation = data.explanation || '';
+
   return `
     <div class="vm-card">
+      <!-- Header Row: Title & Actions -->
       <div class="vm-header">
         <div class="vm-word-wrap">
           <span class="vm-phrase-tag">Dịch câu &amp; đoạn văn</span>
         </div>
         <div class="vm-header-tools">
           <button type="button" class="vm-tool-btn vm-copy-btn" title="Sao chép bản dịch">${ICONS.copy}</button>
-          <button type="button" class="vm-tool-btn vm-audio-btn" data-speak="${escHtml(orig)}" data-lang="en-US" title="Phát âm">${ICONS.speaker}</button>
-          <button type="button" class="vm-tool-btn vm-close-btn" title="Đóng">${ICONS.close}</button>
+          <button type="button" class="vm-tool-btn vm-audio-btn" data-speak="${escHtml(orig)}" data-lang="en-US" title="Phát âm câu">${ICONS.speaker}</button>
+          <button type="button" class="vm-tool-btn vm-close-btn" title="Đóng (Esc)">${ICONS.close}</button>
         </div>
       </div>
+
+      <!-- Original Text Preview -->
       <div class="vm-phrase-original vm-cascade-item vm-cascade-delay-1">"${escHtml(preview)}"</div>
-      <div class="vm-phrase-translation vm-cascade-item vm-cascade-delay-2" data-stream-text="${escHtml(data.translation || '')}">${escHtml(data.translation || '')}</div>
-      ${data.explanation ? `<div class="vm-phrase-explain vm-cascade-item vm-cascade-delay-3">💡 <b>Phân tích:</b> ${escHtml(data.explanation)}</div>` : ''}
-      <div class="vm-actions vm-cascade-item vm-cascade-delay-4">
+
+      <!-- Core Translation (Natural, Pure Vietnamese) -->
+      <div class="vm-phrase-translation vm-cascade-item vm-cascade-delay-2" data-stream-text="${escHtml(translation)}">${escHtml(translation)}</div>
+
+      <!-- Alternative Phrasing (if available) -->
+      ${alt ? `
+        <div class="vm-phrase-alt vm-cascade-item vm-cascade-delay-2">
+          <span class="vm-phrase-alt-tag">✨ Diễn đạt khác:</span>
+          <span class="vm-phrase-alt-text">${escHtml(alt)}</span>
+        </div>
+      ` : ''}
+
+      <!-- Key Vocabulary in Sentence -->
+      ${vocab.length ? `
+        <div class="vm-section vm-cascade-item vm-cascade-delay-3">
+          <div class="vm-section-title">🔑 Từ vựng & cụm từ trong câu</div>
+          <div class="vm-phrase-vocab-list">
+            ${vocab.map(item => `
+              <div class="vm-phrase-vocab-item">
+                <button type="button" class="vm-vocab-speak-btn" data-speak="${escHtml(item.word)}" data-lang="en-US" title="Nghe phát âm">
+                  ${ICONS.speaker}
+                </button>
+                <b class="vm-phrase-vocab-word">${escHtml(item.word)}</b>
+                ${item.ipa ? `<span class="vm-phrase-vocab-ipa">${escHtml(item.ipa)}</span>` : ''}
+                ${item.pos ? `<span class="vm-family-pos">${escHtml(item.pos)}</span>` : ''}
+                <span class="vm-phrase-vocab-meaning">: ${escHtml(item.meaning_vi)}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Vietnamese Linguistic & Grammar Analysis -->
+      ${explanation ? `
+        <div class="vm-phrase-explain vm-cascade-item vm-cascade-delay-4">
+          💡 <b>Phân tích:</b> ${escHtml(explanation)}
+        </div>
+      ` : ''}
+
+      <!-- Action Buttons -->
+      <div class="vm-actions vm-cascade-item vm-cascade-delay-5">
         <button type="button" class="vm-add-btn" title="Lưu câu vào sổ">
           ${ICONS.plus}
           <span>Lưu câu</span>

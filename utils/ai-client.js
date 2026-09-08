@@ -465,39 +465,65 @@ const PHRASE_PROMPT = (text, direction = 'auto') => {
   const isVi = direction === 'vi-en' || (direction === 'auto' && VIETNAMESE_REGEX.test(text));
 
   if (isVi) {
-    return `Bạn là chuyên gia dịch thuật theo tiêu chuẩn Cambridge English. Hãy dịch đoạn văn tiếng Việt sau sang tiếng Anh tự nhiên, mượt mà và chuẩn bản ngữ:
+    return `Bạn là chuyên gia dịch thuật ngôn ngữ Anh - Việt theo tiêu chuẩn Cambridge English.
+Hãy dịch đoạn văn tiếng Việt sau sang tiếng Anh tự nhiên, mượt mà và chuẩn bản ngữ:
 """
 ${text}
 """
 
 YÊU CẦU:
-- Dịch mượt mà, đúng ngữ pháp và cách diễn đạt tự nhiên theo chuẩn Cambridge.
-- Giữ nguyên cấu trúc xuống dòng (\\n) nếu văn bản gốc có nhiều dòng.
-- Tuyệt đối KHÔNG điền dấu ba chấm (...).
+1. "translation": Bản dịch tiếng Anh chuẩn xác, mượt mà, đúng ngữ pháp và cách diễn đạt tự nhiên theo chuẩn Cambridge (native English).
+2. "natural_alternative": Cách diễn đạt tiếng Anh tự nhiên khác (nếu có sắc thái trang trọng hơn hoặc đời thường hơn).
+3. "key_vocabulary": Mảng 2-5 từ vựng/cụm từ tiếng Anh hay nhất trong câu, cấu trúc:
+   [{"word": "từ/cụm từ tiếng Anh", "ipa": "/phiên âm IPA/", "pos": "noun/verb/adj/idiom", "meaning_vi": "nghĩa tiếng Việt"}]
+4. "explanation": Phân tích ngắn gọn về cấu trúc câu, ngữ pháp và collocations đã dùng. BẮT BUỘC VIẾT 100% BẰNG TIẾNG VIỆT.
+5. Giữ nguyên cấu trúc xuống dòng (\\n) nếu văn bản gốc có nhiều dòng.
+6. Tuyệt đối KHÔNG điền dấu ba chấm (...).
 
 Trả về DUY NHẤT một JSON hợp lệ theo đúng cấu trúc:
 {
   "type": "phrase",
   "translation": "<Bản dịch tiếng Anh mượt mà, chuẩn ngữ pháp>",
-  "explanation": "<Phân tích cấu trúc ngữ pháp và collocations theo chuẩn Cambridge>"
+  "natural_alternative": "<Cách diễn đạt tự nhiên khác nếu có>",
+  "key_vocabulary": [
+    {"word": "word", "ipa": "/ipa/", "pos": "pos", "meaning_vi": "nghĩa"}
+  ],
+  "explanation": "<Phân tích ngữ pháp và collocations viết 100% bằng tiếng Việt>"
 }`;
   }
 
-  return `Bạn là chuyên gia dịch thuật theo tiêu chuẩn Từ điển Cambridge. Hãy dịch đoạn văn tiếng Anh sau sang tiếng Việt một cách THUẦN VIỆT, tự nhiên, chuẩn xác:
+  return `Bạn là chuyên gia dịch thuật và ngôn ngữ học Anh - Việt cao cấp theo tiêu chuẩn Từ điển Cambridge.
+Hãy dịch câu/đoạn văn tiếng Anh sau sang tiếng Việt một cách THUẦN VIỆT, TỰ NHIÊN, CHUẨN XÁC:
 """
 ${text}
 """
 
-YÊU CẦU:
-- Dịch mượt mà, thoát ý, thuần Việt theo phong cách dịch thuật của Cambridge English-Vietnamese Dictionary.
-- Giữ nguyên cấu trúc xuống dòng (\\n) nếu văn bản gốc có nhiều dòng.
-- Tuyệt đối KHÔNG điền dấu ba chấm (...).
+TIÊU CHÍ BẢN DỊCH:
+1. "translation": Bản dịch tiếng Việt mượt mà, thoát ý, thuần Việt, đúng văn phong người Việt nói và viết. Tuyệt đối KHÔNG dịch máy móc thô cứng từng từ một (word-by-word).
+2. "natural_alternative": Cách diễn đạt tiếng Việt tự nhiên khác (hoặc văn phong mềm mại hơn/chuyên ngành hơn nếu có).
+3. "key_vocabulary": Bóc tách 2-5 từ vựng, phrasal verbs, idioms hoặc collocations trọng tâm trong câu để người học tra cứu, cấu trúc:
+   [
+     {
+       "word": "từ hoặc cụm từ tiếng Anh nguyên mẫu",
+       "ipa": "/phiên âm IPA chuẩn/",
+       "pos": "từ loại (noun, verb, phrasal verb, idiom...)",
+       "meaning_vi": "nghĩa tiếng Việt chính xác trong ngữ cảnh câu này"
+     }
+   ]
+4. "explanation": Phân tích cấu trúc câu, ngữ pháp nổi bật, sắc thái từ ngữ hoặc lưu ý lỗi chính tả/dễ nhầm lẫn (nếu có).
+   QUY TẮC CỐT LÕI: Phần "explanation" BẮT BUỘC PHẢI VIẾT 100% HOÀN TOÀN BẰNG TIẾNG VIỆT. TUYỆT ĐỐI KHÔNG giải thích bằng tiếng Anh!
+5. Giữ nguyên cấu trúc xuống dòng (\\n) nếu văn bản gốc có nhiều dòng.
+6. Tuyệt đối KHÔNG điền dấu ba chấm (...).
 
 Trả về DUY NHẤT một JSON hợp lệ theo đúng cấu trúc:
 {
   "type": "phrase",
   "translation": "<Bản dịch tiếng Việt thuần Việt, tự nhiên, chuẩn mực>",
-  "explanation": "<Phân tích ngữ pháp, cụm từ trọng tâm và collocations theo chuẩn Cambridge>"
+  "natural_alternative": "<Cách diễn đạt tự nhiên khác>",
+  "key_vocabulary": [
+    {"word": "từ tiếng Anh", "ipa": "/phiên âm/", "pos": "từ loại", "meaning_vi": "nghĩa tiếng Việt ngữ cảnh"}
+  ],
+  "explanation": "<Phân tích ngữ pháp và sắc thái viết 100% bằng tiếng Việt>"
 }`;
 };
 
@@ -603,13 +629,30 @@ export function safeParseJSON(rawText, isWord, originalText) {
   // 2. Validate and handle phrase translation
   if (!isWord) {
     let translation = '';
+    let naturalAlternative = '';
     let explanation = '';
+    let keyVocabulary = [];
 
     if (parsed && typeof parsed.translation === 'string' && parsed.translation.trim()) {
       translation = parsed.translation.trim();
       explanation = parsed.explanation || '';
+      if (typeof parsed.natural_alternative === 'string') {
+        naturalAlternative = parsed.natural_alternative.trim();
+      }
+
+      if (Array.isArray(parsed.key_vocabulary)) {
+        keyVocabulary = parsed.key_vocabulary
+          .filter(item => item && typeof item === 'object')
+          .map(item => ({
+            word: String(item.word || '').trim(),
+            ipa: String(item.ipa || '').trim(),
+            pos: String(item.pos || '').trim(),
+            meaning_vi: String(item.meaning_vi || '').trim()
+          }))
+          .filter(item => item.word.length > 0 && item.meaning_vi.length > 0 && !isPlaceholderText(item.word) && !isPlaceholderText(item.meaning_vi));
+      }
     } else {
-      const transMatch = cleanRaw.match(/"translation"\s*:\s*"([\s\S]*?)"\s*(?:,\s*"explanation"|\})/i) ||
+      const transMatch = cleanRaw.match(/"translation"\s*:\s*"([\s\S]*?)"\s*(?:,\s*"natural_alternative"|,\s*"key_vocabulary"|,\s*"explanation"|\})/i) ||
                          cleanRaw.match(/"translation"\s*:\s*"([\s\S]*?)"/i) ||
                          cleanRaw.match(/(?:bản dịch|translation|dịch)\s*:\s*([\s\S]+?)(?:\n\s*(?:giải thích|phân tích|explanation)|$)/i);
 
@@ -618,6 +661,14 @@ export function safeParseJSON(rawText, isWord, originalText) {
           .replace(/\\n/g, '\n')
           .replace(/\\"/g, '"')
           .replace(/\\\\/g, '\\')
+          .trim();
+      }
+
+      const altMatch = cleanRaw.match(/"natural_alternative"\s*:\s*"([\s\S]*?)"/i);
+      if (altMatch && altMatch[1].trim()) {
+        naturalAlternative = altMatch[1]
+          .replace(/\\n/g, '\n')
+          .replace(/\\"/g, '"')
           .trim();
       }
 
@@ -649,6 +700,8 @@ export function safeParseJSON(rawText, isWord, originalText) {
       type: 'phrase',
       original: originalText,
       translation,
+      natural_alternative: naturalAlternative,
+      key_vocabulary: keyVocabulary,
       explanation
     };
   }
@@ -1005,6 +1058,13 @@ async function executeGeminiGeneration(apiKey, modelName, prompt, isWord) {
       headers,
       signal: controller.signal,
       body: JSON.stringify({
+        systemInstruction: {
+          parts: [{
+            text: isWord
+              ? "Bạn là hệ thống từ điển Anh - Việt chuẩn mực theo Từ điển Cambridge. Luôn trả về DUY NHẤT một JSON hợp lệ theo đúng schema được yêu cầu."
+              : "Bạn là chuyên gia dịch thuật và ngôn ngữ học Anh - Việt cao cấp. Khi dịch câu hoặc đoạn văn sang tiếng Việt, phải dịch thật tự nhiên, thuần Việt, mượt mà và đúng ngữ cảnh nhất (không dịch thô word-by-word). Bóc tách 2-5 từ vựng hoặc cụm từ trọng tâm trong câu. Toàn bộ phần giải thích, phân tích ngữ pháp và nghĩa từ vựng BẮT BUỘC viết 100% HOÀN TOÀN BẰNG TIẾNG VIỆT, tuyệt đối không giải thích bằng tiếng Anh. Trả về DUY NHẤT một JSON hợp lệ theo đúng schema."
+          }]
+        },
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.1,
@@ -1181,7 +1241,12 @@ async function executeGroqGeneration(apiKey, model, prompt, isWord) {
       body: JSON.stringify({
         model,
         messages: [
-          { role: 'system', content: 'You are a professional English-Vietnamese dictionary and translator adhering strictly to Cambridge Dictionary standards (Cambridge Advanced Learner\'s Dictionary & Cambridge English-Vietnamese Dictionary). Output ONLY a valid JSON object matching the requested schema.' },
+          {
+            role: 'system',
+            content: isWord
+              ? 'You are a professional English-Vietnamese dictionary and translator adhering strictly to Cambridge Dictionary standards (Cambridge Advanced Learner\'s Dictionary & Cambridge English-Vietnamese Dictionary). Output ONLY a valid JSON object matching the requested schema.'
+              : 'You are an elite English-Vietnamese translator and linguist. Produce the most natural, idiomatic, culturally authentic Vietnamese translations possible (thuần Việt, mượt mà). Extract key vocabulary in the sentence. All explanations, linguistic analysis, and vocabulary meanings MUST be written 100% in VIETNAMESE, never in English. Output ONLY a valid JSON object matching the requested schema.'
+          },
           { role: 'user', content: prompt }
         ],
         temperature: 0.1,
@@ -1228,7 +1293,12 @@ async function callOpenAI(apiKey, prompt, isWord) {
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: 'You are an English-Vietnamese dictionary and translator adhering to Cambridge Dictionary standards. Output ONLY a valid JSON object.' },
+          {
+            role: 'system',
+            content: isWord
+              ? 'You are an English-Vietnamese dictionary and translator adhering to Cambridge Dictionary standards. Output ONLY a valid JSON object.'
+              : 'You are an elite English-Vietnamese translator and linguist. Produce the most natural, idiomatic, culturally authentic Vietnamese translations (thuần Việt, mượt mà). Extract key vocabulary. All explanations and vocabulary meanings MUST be 100% in VIETNAMESE. Output ONLY a valid JSON object.'
+          },
           { role: 'user', content: prompt }
         ],
         temperature: 0.1,
@@ -1272,7 +1342,9 @@ async function callClaude(apiKey, prompt, isWord) {
       signal: controller.signal,
       body: JSON.stringify({
         model: 'claude-3-5-haiku-20241022',
-        system: 'You are an English-Vietnamese dictionary adhering strictly to Cambridge Dictionary standards. Output ONLY valid JSON matching the schema.',
+        system: isWord
+          ? 'You are an English-Vietnamese dictionary adhering strictly to Cambridge Dictionary standards. Output ONLY valid JSON matching the schema.'
+          : 'You are an elite English-Vietnamese translator and linguist. Translate into authentic, natural Vietnamese (thuần Việt). Extract key vocabulary. All explanations and vocabulary meanings MUST be 100% in VIETNAMESE. Output ONLY valid JSON matching the schema.',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.1,
         max_tokens: isWord ? 2048 : 3000
