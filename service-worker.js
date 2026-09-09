@@ -4,6 +4,7 @@
 
 import { callAI, isPlaceholderText, findFallbackData, buildFallbackWordResponse } from './utils/ai-client.js';
 import { fetchFromCambridge } from './utils/cambridge-client.js';
+import { resolveDictionaryWord } from './utils/dict-resolver.js';
 
 chrome.runtime.onInstalled.addListener((details) => {
   // On UPDATE: clear dictionary cache so words are re-fetched with improved parser
@@ -11,14 +12,21 @@ chrome.runtime.onInstalled.addListener((details) => {
     chrome.storage.local.remove('dict_cache').catch(() => {});
   }
 
-  // Cleanup corrupted cache entries (e.g. placeholder texts like "nghĩa tiếng Việt")
+  // Cleanup corrupted cache entries (e.g. placeholder texts like "nghĩa tiếng Việt" or hallucinated translations)
   (async () => {
     try {
       const { dict_cache = {} } = await chrome.storage.local.get('dict_cache');
       let modified = false;
       for (const k of Object.keys(dict_cache)) {
         const item = dict_cache[k];
-        if (item?.word?.meaning_vi && isPlaceholderText(item.word.meaning_vi)) {
+        const m = item?.word?.meaning_vi?.toLowerCase();
+        if (
+          !m ||
+          isPlaceholderText(m) ||
+          m === 'tựa ứng' ||
+          item?.word?.ipa_uk?.includes('sə\'fər') ||
+          item?.word?.ipa_us?.includes('sə\'fər')
+        ) {
           delete dict_cache[k];
           modified = true;
         }
@@ -139,7 +147,17 @@ async function getCachedTranslation(key, cleanText) {
     // Validate entry integrity
     if (cached.type === 'word') {
       const w = cached.word;
-      if (!w || typeof w !== 'object' || w.meaning_vi === cleanText || !w.meaning_vi || isPlaceholderText(w.meaning_vi)) {
+      const m = w?.meaning_vi?.toLowerCase();
+      if (
+        !w ||
+        typeof w !== 'object' ||
+        w.meaning_vi === cleanText ||
+        !w.meaning_vi ||
+        isPlaceholderText(w.meaning_vi) ||
+        m === 'tựa ứng' ||
+        w.ipa_uk?.includes('sə\'fər') ||
+        w.ipa_us?.includes('sə\'fər')
+      ) {
         memoryCache.delete(key);
         try {
           const { dict_cache = {} } = await chrome.storage.local.get('dict_cache');
@@ -183,24 +201,27 @@ async function handleTranslate(text, isWord, direction = 'auto') {
     return cached;
   }
 
-  // 2. PRIORITIZE CAMBRIDGE DICTIONARY ONLINE (fast 1.8s timeout + lemmatization)
+  // 2. BULLETPROOF MULTI-TIER DICTIONARY RESOLUTION
+  // Pipeline: 1. Offline Core Dict -> 2. Cambridge Online -> 3. Google Dict + Datamuse IPA
+  let dictResult = null;
   if (isWord && (direction === 'auto' || direction === 'en-vi')) {
     try {
-      const cambridgeResult = await fetchFromCambridge(cleanText);
-      if (cambridgeResult && cambridgeResult.word?.meaning_vi) {
-        await setCachedTranslation(cacheKey, cambridgeResult);
-        return cambridgeResult;
-      }
+      dictResult = await resolveDictionaryWord(cleanText);
     } catch (e) {
-      console.warn('Cambridge Dictionary lookup failed, falling back to AI:', e);
+      console.warn('Dictionary resolution failed, falling back:', e);
     }
   }
 
-  // 3. FALLBACK TO AI (Optimized prompt & token limits for speed)
+  // 3. AI ENRICHMENT (Optional - enriches collocations, examples, and CEFR level)
   const { aiProvider = 'gemini', apiKey = '' } =
     await chrome.storage.sync.get(['aiProvider', 'apiKey']);
 
+  // If user has no API key configured:
   if (!apiKey) {
+    if (dictResult && dictResult.word?.meaning_vi) {
+      await setCachedTranslation(cacheKey, dictResult);
+      return dictResult;
+    }
     if (isWord) {
       const fb = findFallbackData(cleanText);
       if (fb) {
@@ -212,13 +233,26 @@ async function handleTranslate(text, isWord, direction = 'auto') {
     throw new Error('Chưa cài API key. Mở Settings (biểu tượng extension → ⚙️) để cài đặt.');
   }
 
+  // If user HAS API key: call AI with ground-truth dictionary data injected (RAG)
   try {
-    const result = await callAI(aiProvider, apiKey, cleanText, isWord, direction);
+    const result = await callAI(aiProvider, apiKey, cleanText, isWord, direction, dictResult?.word || null);
     if (result) {
+      // Retain verified dictionary source badge and official audio
+      if (dictResult) {
+        result.source = dictResult.source || 'dictionary';
+        if (!result.audioUk && dictResult.audioUk) result.audioUk = dictResult.audioUk;
+        if (!result.audioUs && dictResult.audioUs) result.audioUs = dictResult.audioUs;
+        if (!result.cambridgeUrl && dictResult.cambridgeUrl) result.cambridgeUrl = dictResult.cambridgeUrl;
+      }
       await setCachedTranslation(cacheKey, result);
+      return result;
     }
-    return result;
   } catch (aiErr) {
+    console.warn('AI call failed, returning verified dictionary data:', aiErr);
+    if (dictResult && dictResult.word?.meaning_vi) {
+      await setCachedTranslation(cacheKey, dictResult);
+      return dictResult;
+    }
     if (isWord) {
       const fb = findFallbackData(cleanText);
       if (fb) {

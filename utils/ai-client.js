@@ -358,10 +358,21 @@ export function buildFallbackWordResponse(originalText, fbData) {
   };
 }
 
-const WORD_PROMPT_EN_VI = (word) => {
+const WORD_PROMPT_EN_VI = (word, dictContext = null) => {
+  let groundTruthBlock = '';
+  if (dictContext && dictContext.meaning_vi) {
+    groundTruthBlock = `
+DỮ LIỆU TỪ ĐIỂN CHUẨN XÁC ĐÃ ĐƯỢC XÁC THỰC (BẮT BUỘC TUÂN THỦ 100%):
+- "meaning_vi" BẮT BUỘC LÀ: "${dictContext.meaning_vi}"
+${dictContext.ipa ? `- Phiên âm IPA chuẩn: "${dictContext.ipa}"` : ''}
+${dictContext.partOfSpeech ? `- Từ loại chuẩn: "${dictContext.partOfSpeech}"` : ''}
+TUYỆT ĐỐI KHÔNG tự sáng tác nghĩa khác ngoài "${dictContext.meaning_vi}". Dùng dữ liệu này để hoàn thiện mục từ điển theo chuẩn Cambridge.
+`;
+  }
+
   return `Bạn là hệ thống từ điển Anh - Việt theo chuẩn Cambridge English-Vietnamese Dictionary (dictionary.cambridge.org).
 Hãy tra cứu từ tiếng Anh "${word}" và trả về mục từ điển CHÍNH XÁC như cách Cambridge Dictionary trình bày.
-
+${groundTruthBlock}
 CÁCH DỊCH CHUẨN CAMBRIDGE:
 - "meaning_vi" phải là bản dịch NGẮN GỌN, SÁT NGHĨA giống hệt cách Cambridge English-Vietnamese hiển thị.
   Ví dụ: "abandon" → "từ bỏ" (KHÔNG phải "sự bỏ rơi, sự từ bỏ hoàn toàn")
@@ -527,11 +538,11 @@ Trả về DUY NHẤT một JSON hợp lệ theo đúng cấu trúc:
 }`;
 };
 
-export async function callAI(provider, apiKey, text, isWord, direction = 'auto') {
+export async function callAI(provider, apiKey, text, isWord, direction = 'auto', dictContext = null) {
   const isVi = direction === 'vi-en' || (direction === 'auto' && VIETNAMESE_REGEX.test(text));
   let prompt;
   if (isWord) {
-    prompt = isVi ? WORD_PROMPT_VI_EN(text) : WORD_PROMPT_EN_VI(text);
+    prompt = isVi ? WORD_PROMPT_VI_EN(text) : WORD_PROMPT_EN_VI(text, dictContext);
   } else {
     prompt = PHRASE_PROMPT(text, direction);
   }
@@ -554,7 +565,7 @@ export async function callAI(provider, apiKey, text, isWord, direction = 'auto')
     throw new Error('Unknown AI provider: ' + provider);
   }
 
-  return safeParseJSON(rawText, isWord, text);
+  return safeParseJSON(rawText, isWord, text, dictContext);
 }
 
 function repairAndParseJSON(rawStr) {
@@ -600,10 +611,13 @@ function repairAndParseJSON(rawStr) {
   return null;
 }
 
-export function safeParseJSON(rawText, isWord, originalText) {
+export function safeParseJSON(rawText, isWord, originalText, dictContext = null) {
   const initialFallback = findFallbackData(originalText);
 
   if (!rawText || !rawText.trim()) {
+    if (isWord && dictContext && dictContext.meaning_vi) {
+      return dictContext;
+    }
     if (isWord && initialFallback) {
       return buildFallbackWordResponse(originalText, initialFallback);
     }
@@ -737,6 +751,24 @@ export function safeParseJSON(rawText, isWord, originalText) {
 
     const cleanRoot = (w.word_root || originalText).trim().toLowerCase();
     const fallbackData = findFallbackData(cleanRoot) || initialFallback;
+
+    // STRICT GROUND-TRUTH ENFORCEMENT:
+    // If verified dictionary data was provided, strictly enforce meaning_vi and IPA
+    // to prevent any AI hallucination from leaking to the user!
+    if (dictContext && dictContext.meaning_vi) {
+      w.meaning_vi = dictContext.meaning_vi;
+      if (dictContext.ipa) {
+        w.ipa_uk = dictContext.ipa;
+        w.ipa_us = dictContext.ipa;
+        w.ipa = dictContext.ipa;
+      }
+      if (dictContext.partOfSpeech) {
+        w.partOfSpeech = dictContext.partOfSpeech;
+      }
+      if (dictContext.definition_en && (!w.definition_en || isPlaceholderText(w.definition_en))) {
+        w.definition_en = dictContext.definition_en;
+      }
+    }
 
     // 1. Sanitize meaning_vi
     let isMeaningBad = isPlaceholderText(w.meaning_vi) ||

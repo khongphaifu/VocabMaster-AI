@@ -526,7 +526,17 @@ function showResultTooltip(data, anchorRect) {
       e.stopPropagation();
       const text = btn.getAttribute('data-speak') || data.original;
       const lang = btn.getAttribute('data-lang') || 'en-US';
-      speakText(text, lang);
+      const audioUrl = (lang === 'en-GB' ? data.audioUk : data.audioUs) || data.audioUk || data.audioUs;
+      if (audioUrl) {
+        try {
+          const audio = new Audio(audioUrl);
+          audio.play().catch(() => speakText(text, lang));
+        } catch (_) {
+          speakText(text, lang);
+        }
+      } else {
+        speakText(text, lang);
+      }
     });
   });
 
@@ -703,7 +713,7 @@ function buildWordHTML(data) {
         <div class="vm-word-wrap">
           <span class="vm-word">${escHtml(orig)}</span>
           ${rootWord ? `<span class="vm-root-tag vm-cascade-item vm-cascade-delay-1" title="Từ nguyên thể">➔ ${escHtml(rootWord)}</span>` : ''}
-          ${data.source === 'cambridge' ? `<span class="vm-source-tag vm-cascade-item vm-cascade-delay-1" title="Bản dịch trực tiếp từ Cambridge Dictionary Online">📚 Cambridge</span>` : ''}
+          ${data.source === 'cambridge' ? `<span class="vm-source-tag vm-cascade-item vm-cascade-delay-1" title="Bản dịch trực tiếp từ Cambridge Dictionary Online">📚 Cambridge</span>` : (data.source === 'dictionary' ? `<span class="vm-source-tag vm-cascade-item vm-cascade-delay-1" title="Bản dịch chuẩn từ điển đã xác thực">📚 Từ điển chuẩn</span>` : '')}
         </div>
         <div class="vm-header-tools">
           <button type="button" class="vm-tool-btn vm-copy-btn" title="Sao chép từ & nghĩa">${ICONS.copy}</button>

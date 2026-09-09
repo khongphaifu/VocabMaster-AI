@@ -439,6 +439,11 @@ export async function fetchFromCambridge(word) {
         });
         clearTimeout(timeoutId);
 
+        if (resp.status === 403) {
+          // Cloudflare Bot Management Challenge detected - bail out immediately
+          return null;
+        }
+
         if (!resp.ok) break; // Don't retry 404s etc, move to next URL
 
         const html = await resp.text();
