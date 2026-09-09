@@ -139,10 +139,14 @@ hr { border: none; border-top: 1px solid #313244; margin: 4px 0 12px; }
     </div>
 
     <div class="api-grp" id="api-gemini">
-      <label>Google Gemini API Key <a href="https://aistudio.google.com/app/apikey" target="_blank" class="help">Lấy key →</a></label>
+      <label>Google Gemini API Key <a href="https://aistudio.google.com/app/apikey" target="_blank" class="help">1. Lấy key tại Google AI Studio →</a></label>
       <div class="key-row">
         <input type="password" id="key-gemini" placeholder="AIza... hoặc AQ...">
         <button class="toggle-pw" data-t="key-gemini">👁 Hiện</button>
+      </div>
+      <div style="font-size:11.5px;color:#bac2de;background:#313244;padding:8px 10px;border-radius:6px;margin-top:6px;line-height:1.5;border:1px solid #45475a">
+        ⚠️ <b>Cập nhật Google Cloud mới:</b> Các project mới hiện bị <b>tắt mặc định</b> Generative Language API.<br>
+        👉 <a href="https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com" target="_blank" style="color:#89b4fa;font-weight:600;text-decoration:underline;">2. Bấm vào đây để BẬT (Enable) API trên Google Cloud</a> (chọn đúng Project của key, bấm <b>ENABLE</b> rồi đợi 2-3 phút).
       </div>
     </div>
     <div class="api-grp" id="api-groq">

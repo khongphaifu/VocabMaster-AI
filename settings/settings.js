@@ -166,10 +166,18 @@ async function loadStats() {
 
 function showMsg(id, text, type) {
   const el = document.getElementById(id);
-  el.textContent = text;
+  if (!el) return;
+  if (text.includes('<a') || text.includes('http')) {
+    const formatted = text.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#89b4fa;font-weight:600;text-decoration:underline;word-break:break-all;">$1</a>').replace(/\n/g, '<br>');
+    el.innerHTML = formatted;
+  } else {
+    el.innerHTML = text.replace(/\n/g, '<br>');
+  }
   el.className = 'msg msg-' + type;
   el.style.display = 'block';
-  setTimeout(() => { el.style.display = 'none'; }, 5000);
+  const duration = type === 'err' ? 15000 : 5000;
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => { el.style.display = 'none'; }, duration);
 }
 
 async function exportCSV() {
