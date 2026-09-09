@@ -28,6 +28,7 @@ chrome.runtime.onInstalled.addListener((details) => {
           m === 'tựa ứng' ||
           m === 'nơn' ||
           m === 'máy xe' ||
+          m === 'bữa ăn lớn' ||
           item?.word?.ipa_uk?.includes('sə\'fər') ||
           item?.word?.ipa_us?.includes('sə\'fər')
         ) {
@@ -163,6 +164,7 @@ async function getCachedTranslation(key, cleanText) {
         m === 'tựa ứng' ||
         m === 'nơn' ||
         m === 'máy xe' ||
+        m === 'bữa ăn lớn' ||
         w.ipa_uk?.includes('sə\'fər') ||
         w.ipa_us?.includes('sə\'fər')
       ) {

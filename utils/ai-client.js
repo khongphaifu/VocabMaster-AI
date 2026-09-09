@@ -373,19 +373,28 @@ TUYỆT ĐỐI KHÔNG tự sáng tác nghĩa khác ngoài "${dictContext.meaning
   return `Bạn là hệ thống từ điển Anh - Việt cao cấp theo chuẩn Cambridge English-Vietnamese Dictionary (dictionary.cambridge.org).
 Hãy tra cứu từ tiếng Anh "${word}" và trả về mục từ điển CHÍNH XÁC, TỰ NHIÊN NHẤT như cách Cambridge Dictionary trình bày.
 ${groundTruthBlock}
-TIÊU CHUẨN DỊCH NGHĨA VIỆT NAM (BẮT BUỘC):
-- "meaning_vi" PHẢI là từ/cụm từ tiếng Việt phổ thông, tự nhiên và chính xác nhất mà người Việt dùng hàng ngày:
-  Ví dụ: "car" → "xe hơi, ô tô" (TUYỆT ĐỐI KHÔNG dịch là "máy xe")
-  Ví dụ: "petrol" → "xăng, dầu xăng" (TUYỆT ĐỐI KHÔNG dịch là "nơn" hay bịa từ)
-  Ví dụ: "software" → "phần mềm" (TUYỆT ĐỐI KHÔNG dịch là "tựa ứng")
-  Ví dụ: "abandon" → "từ bỏ, bỏ rơi"
-  Ví dụ: "table" → "cái bàn"
-  Ví dụ: "become" → "trở thành, trở nên"
-  Ví dụ: "significant" → "đáng kể, quan trọng"
-- TUYỆT ĐỐI KHÔNG tự chế từ ghép vô nghĩa, không dùng từ Hán-Việt cổ tối nghĩa, không dùng từ địa phương hiếm gặp.
-- meaning_vi là TỪ/CỤM TỪ TIẾNG VIỆT tương đương, KHÔNG phải câu giải thích dài.
-- "definition_vi" mới là phần giải thích chi tiết hơn bằng tiếng Việt.
-- "definition_en" là định nghĩa tiếng Anh chuẩn Cambridge.
+TIÊU CHUẨN DỊCH NGHĨA VIỆT NAM (BẮT BUỘC - CHUẨN TỪ ĐIỂN CAMBRIDGE & OXFORD):
+1. "meaning_vi" LÀ TỪ TƯƠNG ĐƯƠNG CHÍNH DANH (LEXICAL EQUIVALENT):
+   - Phải là từ hoặc ngữ tiếng Việt chuẩn mực, ngắn gọn (1-3 từ), tự nhiên và chính xác nhất mà người Việt dùng làm tên gọi cho sự vật/hành động.
+   - TUYỆT ĐỐI KHÔNG DỊCH CỤM ĐỊNH NGHĨA TIẾNG ANH (Definition Glossing) THÀNH "meaning_vi":
+     * "feast" (định nghĩa: "a large meal...") → "meaning_vi" BẮT BUỘC LÀ: "bữa tiệc, yến tiệc" (TUYỆT ĐỐI CẤM dịch: "bữa ăn lớn")!
+     * "drought" (định nghĩa: "a long period of dry weather...") → "meaning_vi" BẮT BUỘC LÀ: "hạn hán" (TUYỆT ĐỐI CẤM dịch: "thời kỳ khô hạn")!
+     * "famine" (định nghĩa: "extreme scarcity of food...") → "meaning_vi" BẮT BUỘC LÀ: "nạn đói" (TUYỆT ĐỐI CẤM dịch: "sự thiếu thức ăn")!
+     * "pedestrian" (định nghĩa: "a person walking along a road...") → "meaning_vi" BẮT BUỘC LÀ: "người đi bộ" (CẤM: "người đi trên đường")!
+     * "sibling" (định nghĩa: "a brother or sister...") → "meaning_vi" BẮT BUỘC LÀ: "anh chị em ruột" (CẤM: "người có chung cha mẹ")!
+     * "beverage" (định nghĩa: "a drink...") → "meaning_vi" BẮT BUỘC LÀ: "thức uống, đồ uống" (CẤM dịch dài dòng)!
+     * "bachelor" (định nghĩa: "an unmarried man...") → "meaning_vi" BẮT BUỘC LÀ: "người độc thân, cử nhân" (CẤM: "người đàn ông chưa kết hôn")!
+     * "car" → "xe hơi, ô tô" (TUYỆT ĐỐI CẤM: "máy xe")!
+     * "petrol" → "xăng, dầu xăng" (TUYỆT ĐỐI CẤM: "nơn" hay bịa từ)!
+     * "software" → "phần mềm" (TUYỆT ĐỐI CẤM: "tựa ứng")!
+     * "hardware" → "phần cứng"!
+     * "abandon" → "từ bỏ, bỏ rơi"!
+     * "table" → "cái bàn"!
+     * "become" → "trở thành, trở nên"!
+     * "significant" → "đáng kể, quan trọng"!
+2. TUYỆT ĐỐI KHÔNG tự chế từ ghép vô nghĩa, không dùng từ Hán-Việt cổ tối nghĩa, không dùng từ địa phương hiếm gặp.
+3. "definition_vi": ĐÂY MỚI LÀ NƠI giải thích câu định nghĩa chi tiết (1 câu ngắn gọn, súc tích).
+4. "definition_en": Định nghĩa tiếng Anh chuẩn Cambridge Learner's Dictionary.
 
 TIÊU CHUẨN MỤC TỪ ĐIỂN:
 1. "word_root": Dạng nguyên thể (lemma) của "${word}".
@@ -1100,7 +1109,7 @@ async function executeGeminiGeneration(apiKey, modelName, prompt, isWord) {
         systemInstruction: {
           parts: [{
             text: isWord
-              ? "Bạn là hệ thống từ điển Anh - Việt chuẩn mực theo Từ điển Cambridge. Luôn trả về DUY NHẤT một JSON hợp lệ theo đúng schema được yêu cầu."
+              ? "Bạn là chuyên gia biên soạn từ điển Anh - Việt cao cấp theo chuẩn Từ điển Cambridge & Oxford. Nhiệm vụ của bạn là cung cấp mục từ điển chuẩn xác, tự nhiên, thuần Việt nhất: 'meaning_vi' BẮT BUỘC là từ/ngữ tiếng Việt tương đương chính danh (Lexical Equivalent), ngắn gọn (1-3 từ). TUYỆT ĐỐI KHÔNG dịch nguyên văn câu định nghĩa tiếng Anh thành 'meaning_vi' (Ví dụ: 'feast' PHẢI dịch là 'bữa tiệc, yến tiệc', TUYỆT ĐỐI KHÔNG dịch là 'bữa ăn lớn'; 'drought' PHẢI dịch là 'hạn hán', KHÔNG dịch là 'thời kỳ khô hạn'). Luôn trả về DUY NHẤT một JSON hợp lệ theo đúng schema được yêu cầu."
               : "Bạn là chuyên gia dịch thuật và ngôn ngữ học Anh - Việt cao cấp. Khi dịch câu hoặc đoạn văn sang tiếng Việt, phải dịch thật tự nhiên, thuần Việt, mượt mà và đúng ngữ cảnh nhất (không dịch thô word-by-word). Bóc tách 2-5 từ vựng hoặc cụm từ trọng tâm trong câu. Toàn bộ phần giải thích, phân tích ngữ pháp và nghĩa từ vựng BẮT BUỘC viết 100% HOÀN TOÀN BẰNG TIẾNG VIỆT, tuyệt đối không giải thích bằng tiếng Anh. Trả về DUY NHẤT một JSON hợp lệ theo đúng schema."
           }]
         },
@@ -1283,7 +1292,7 @@ async function executeGroqGeneration(apiKey, model, prompt, isWord) {
           {
             role: 'system',
             content: isWord
-              ? 'You are a professional English-Vietnamese dictionary and translator adhering strictly to Cambridge Dictionary standards (Cambridge Advanced Learner\'s Dictionary & Cambridge English-Vietnamese Dictionary). Output ONLY a valid JSON object matching the requested schema.'
+              ? "You are an elite bilingual lexicographer for Cambridge English-Vietnamese Dictionary. Provide authentic, natural, culturally idiomatic Vietnamese translations ('thuần Việt') matching Cambridge and Oxford published dictionaries. Crucial rule: In 'meaning_vi', ALWAYS provide the concise lexical headword equivalent (e.g. 'feast' -> 'bữa tiệc, yến tiệc', never 'bữa ăn lớn'; 'drought' -> 'hạn hán', never 'thời kỳ khô hạn'). Never translate the English definition phrase literally into 'meaning_vi'. Output ONLY a valid JSON object matching the requested schema."
               : 'You are an elite English-Vietnamese translator and linguist. Produce the most natural, idiomatic, culturally authentic Vietnamese translations possible (thuần Việt, mượt mà). Extract key vocabulary in the sentence. All explanations, linguistic analysis, and vocabulary meanings MUST be written 100% in VIETNAMESE, never in English. Output ONLY a valid JSON object matching the requested schema.'
           },
           { role: 'user', content: prompt }
@@ -1335,7 +1344,7 @@ async function callOpenAI(apiKey, prompt, isWord) {
           {
             role: 'system',
             content: isWord
-              ? 'You are an English-Vietnamese dictionary and translator adhering to Cambridge Dictionary standards. Output ONLY a valid JSON object.'
+              ? "You are an elite bilingual lexicographer for Cambridge English-Vietnamese Dictionary. In 'meaning_vi', ALWAYS provide the concise lexical headword equivalent in natural Vietnamese (e.g. 'feast' -> 'bữa tiệc, yến tiệc', never 'bữa ăn lớn'). Never translate the English definition phrase literally into 'meaning_vi'. Output ONLY a valid JSON object."
               : 'You are an elite English-Vietnamese translator and linguist. Produce the most natural, idiomatic, culturally authentic Vietnamese translations (thuần Việt, mượt mà). Extract key vocabulary. All explanations and vocabulary meanings MUST be 100% in VIETNAMESE. Output ONLY a valid JSON object.'
           },
           { role: 'user', content: prompt }
@@ -1382,7 +1391,7 @@ async function callClaude(apiKey, prompt, isWord) {
       body: JSON.stringify({
         model: 'claude-3-5-haiku-20241022',
         system: isWord
-          ? 'You are an English-Vietnamese dictionary adhering strictly to Cambridge Dictionary standards. Output ONLY valid JSON matching the schema.'
+          ? "You are an elite bilingual lexicographer for Cambridge English-Vietnamese Dictionary. In 'meaning_vi', ALWAYS provide the concise lexical headword equivalent in natural Vietnamese (e.g. 'feast' -> 'bữa tiệc, yến tiệc', never 'bữa ăn lớn'). Never translate the English definition phrase literally into 'meaning_vi'. Output ONLY valid JSON matching the schema."
           : 'You are an elite English-Vietnamese translator and linguist. Translate into authentic, natural Vietnamese (thuần Việt). Extract key vocabulary. All explanations and vocabulary meanings MUST be 100% in VIETNAMESE. Output ONLY valid JSON matching the schema.',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.1,
