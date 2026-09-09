@@ -1129,8 +1129,12 @@ async function executeGeminiGeneration(apiKey, modelName, prompt, isWord) {
       const reason = errData.error?.details?.[0]?.reason || '';
 
       if (reason === 'API_KEY_SERVICE_BLOCKED' || rawMsg.includes('has not been used in project') || rawMsg.includes('disabled')) {
-        const err = new Error('Generative Language API đang bị chặn/chưa bật trong Google Cloud Project.');
+        const linkMatch = rawMsg.match(/https:\/\/console\.developers\.google\.com\/[^\s\)]+/i) ||
+                          rawMsg.match(/https:\/\/console\.cloud\.google\.com\/[^\s\)]+/i);
+        const directLink = linkMatch ? linkMatch[0] : 'https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com';
+        const err = new Error(`Google Cloud Project của key này chưa bật Generative Language API.\n\n👉 Cách sửa nhanh nhất (15s): Vào https://aistudio.google.com/app/apikey và bấm "Create API key in new project" (Project mới sẽ được Google tự động bật sẵn 100%).\n\nHoặc bấm link để Bật API cho project hiện tại: ${directLink}`);
         err.status = res.status;
+        err.activationUrl = directLink;
         throw err;
       }
 

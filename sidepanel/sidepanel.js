@@ -97,8 +97,10 @@ async function renderLibrary() {
         <span class="vw">${esc(w.word)}</span>
         ${w.ipa ? `<span class="vipa">${esc(w.ipa)}</span>` : ''}
         ${w.partOfSpeech ? `<span class="vpos">${esc(w.partOfSpeech)}</span>` : ''}
+        <span class="vstatus s-${w.status || 'new'}">${labels[w.status] || 'Mới'}</span>
+      </div>
       <div class="vdef">
-        <div style="color:#a6e3a1;font-weight:700;font-size:13.5px;margin-bottom:2px">🇻🇳 ${esc(m)}</div>
+        <div style="color:#a6e3a1;font-weight:700;font-size:13px;margin-bottom:3px">🇻🇳 ${esc(m)}</div>
         ${defVi ? `<div style="font-size:12px;color:#bac2de;line-height:1.4">${esc(defVi)}</div>` : ''}
       </div>
       <div class="vacts">

@@ -18,7 +18,7 @@ body {
 .header {
   background: #181825;
   border-bottom: 1px solid #313244;
-  padding: 10px 12px 0;
+  padding: 10px 8px 0;
   flex-shrink: 0;
 }
 
@@ -27,6 +27,7 @@ body {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
+  padding: 0 4px;
 }
 
 .logo { font-size: 14px; font-weight: 700; color: #cba6f7; }
@@ -45,24 +46,32 @@ body {
   gap: 2px;
   overflow-x: auto;
   scrollbar-width: none;
+  width: 100%;
 }
 .tabs::-webkit-scrollbar { display: none; }
 
 .tab {
+  flex: 1 1 0;
+  min-width: 0;
   background: none;
   border: none;
   color: #6c7086;
-  padding: 7px 9px;
+  padding: 7px 3px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 500;
   border-bottom: 2px solid transparent;
   white-space: nowrap;
   transition: all 0.2s;
   border-radius: 4px 4px 0 0;
   font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
 }
 .tab:hover { color: #bac2de; background: #31324420; }
-.tab.active { color: #89b4fa; border-bottom-color: #89b4fa; }
+.tab.active { color: #89b4fa; border-bottom-color: #89b4fa; font-weight: 600; }
 
 /* ── Main content ── */
 main {

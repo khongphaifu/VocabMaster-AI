@@ -443,23 +443,39 @@ function streamTypewriter(element, fullText, speed = 20, onComplete = null) {
   }, speed);
 }
 
+function formatErrorContent(msg) {
+  const safe = escHtml(msg || '');
+  const withLinks = safe.replace(/(https?:\/\/[^\s<]+)/g, (url) => {
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#89b4fa;text-decoration:underline;font-weight:600;word-break:break-all;">${url}</a>`;
+  });
+  return withLinks.replace(/\n/g, '<br>');
+}
+
 function showErrorTooltip(msg, anchorRect, retryFn = null) {
   if (!tooltip || isExitingTooltip) {
     hideTooltip(true);
     tooltip = createTooltipBase();
     document.body.appendChild(tooltip);
   }
+
+  const isGeminiBlocked = msg && (msg.includes('Generative Language API') || msg.includes('Google Cloud Project'));
+
   tooltip.innerHTML = `
-    <div class="vm-card" style="padding: 10px 14px; min-width: 220px; max-width: 340px;">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 6px;">
-        <span style="color:#f38ba8; font-weight:700; font-size:12.5px;">⚠️ Thông báo</span>
+    <div class="vm-card" style="padding: 12px 14px; min-width: 260px; max-width: 380px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px;">
+        <span style="color:#f38ba8; font-weight:700; font-size:12.5px;">⚠️ Thông báo kết nối</span>
         <button type="button" class="vm-tool-btn vm-close-btn" title="Đóng">${ICONS.close}</button>
       </div>
-      <div class="vm-error" style="margin-bottom: ${retryFn ? '8px' : '0'}; line-height: 1.4; font-size: 12.5px;">
-        ${escHtml(msg)}
+      <div class="vm-error" style="margin-bottom: ${(retryFn || isGeminiBlocked) ? '10px' : '0'}; line-height: 1.5; font-size: 12px;">
+        ${formatErrorContent(msg)}
       </div>
+      ${isGeminiBlocked ? `
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;justify-content:center;gap:6px;background:#a6e3a1;color:#11111b;font-weight:700;font-size:12px;padding:7px 12px;border-radius:6px;text-decoration:none;margin-bottom:6px;transition:0.15s;text-align:center;">
+          ✨ Mở Google AI Studio (Tạo Key Mới Tự Bật)
+        </a>
+      ` : ''}
       ${retryFn ? `
-        <button type="button" class="vm-retry-btn" style="appearance:none; -webkit-appearance:none; border:none; background:#89b4fa; color:#11111b; font-weight:700; font-size:12px; padding:6px 12px; border-radius:6px; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:6px; transition:0.15s;">
+        <button type="button" class="vm-retry-btn" style="appearance:none; -webkit-appearance:none; border:none; background:#89b4fa; color:#11111b; font-weight:700; font-size:12px; padding:7px 12px; border-radius:6px; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:6px; transition:0.15s;">
           🔄 Thử lại ngay
         </button>
       ` : ''}
