@@ -284,6 +284,388 @@ export const CORE_OFFLINE_DICT = {
       { phrase: 'ubiquitous presence', meaning_vi: 'sự hiện diện khắp nơi' }
     ],
     synonyms: ['omnipresent', 'pervasive', 'everywhere']
+  },
+  petrol: {
+    word_root: 'petrol',
+    ipa_uk: '/ˈpet.rəl/',
+    ipa_us: '/ˈpet.rəl/',
+    partOfSpeech: 'noun [U]',
+    level: 'B1',
+    meaning_vi: 'xăng, dầu xăng',
+    definition_vi: 'nhiên liệu lỏng chế từ dầu mỏ dùng chạy động cơ xe cộ',
+    definition_en: 'a liquid obtained from petroleum, used especially as a fuel for vehicles',
+    examples: [
+      'I need to put some petrol in the car.',
+      'He stopped at a petrol station to fill up.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'petrol station', meaning_vi: 'cây xăng, trạm xăng' },
+      { phrase: 'fill up with petrol', meaning_vi: 'đổ đầy xăng' }
+    ],
+    synonyms: ['gasoline', 'gas', 'fuel']
+  },
+  car: {
+    word_root: 'car',
+    ipa_uk: '/kɑːr/',
+    ipa_us: '/kɑːr/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'xe hơi, ô tô',
+    definition_vi: 'phương tiện giao thông bốn bánh có động cơ dùng để chở người',
+    definition_en: 'a road vehicle with four wheels and an engine that can carry a small number of passengers',
+    examples: [
+      'He parked his car in the garage.',
+      'She goes to work by car every morning.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'by car', meaning_vi: 'bằng ô tô, bằng xe hơi' },
+      { phrase: 'drive a car', meaning_vi: 'lái xe ô tô' }
+    ],
+    synonyms: ['automobile', 'motorcar', 'vehicle']
+  },
+  fuel: {
+    word_root: 'fuel',
+    ipa_uk: '/ˈfjuː.əl/',
+    ipa_us: '/ˈfjuː.əl/',
+    partOfSpeech: 'noun [C or U]',
+    level: 'B1',
+    meaning_vi: 'nhiên liệu, chất đốt',
+    definition_vi: 'chất đốt để sinh ra nhiệt hoặc năng lượng chạy máy móc',
+    definition_en: 'a substance that is burned to provide heat or power',
+    examples: [
+      'Wood, coal, oil, and gas are all different kinds of fuel.',
+      'The plane was carrying enough fuel for the journey.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'fossil fuel', meaning_vi: 'nhiên liệu hóa thạch' },
+      { phrase: 'fuel efficiency', meaning_vi: 'hiệu suất tiết kiệm nhiên liệu' }
+    ],
+    synonyms: ['energy', 'power']
+  },
+  gasoline: {
+    word_root: 'gasoline',
+    ipa_uk: '/ˈɡæs.əl.iːn/',
+    ipa_us: '/ˈɡæs.əl.iːn/',
+    partOfSpeech: 'noun [U]',
+    level: 'B1',
+    meaning_vi: 'xăng (tiếng Anh Mỹ)',
+    definition_vi: 'xăng dùng làm nhiên liệu cho xe cộ (tiếng Mỹ thường gọi là gas)',
+    definition_en: 'a liquid obtained from petroleum, used especially as a fuel for vehicles (US word for petrol)',
+    examples: [
+      'The price of gasoline has gone up.',
+      'He bought a gallon of gasoline.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'gasoline engine', meaning_vi: 'động cơ xăng' }
+    ],
+    synonyms: ['petrol', 'gas']
+  },
+  vehicle: {
+    word_root: 'vehicle',
+    ipa_uk: '/ˈvɪə.kəl/',
+    ipa_us: '/ˈviː.ə.kəl/',
+    partOfSpeech: 'noun [C]',
+    level: 'B1',
+    meaning_vi: 'phương tiện giao thông, xe cộ',
+    definition_vi: 'máy móc có bánh xe hoặc xích dùng để chở người hoặc hàng hóa',
+    definition_en: 'a machine, usually with wheels and an engine, used for transporting people or goods',
+    examples: [
+      'Motor vehicles are prohibited on this path.',
+      'The police are looking for the stolen vehicle.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'motor vehicle', meaning_vi: 'xe cơ giới' }
+    ],
+    synonyms: ['conveyance', 'transport']
+  },
+  engine: {
+    word_root: 'engine',
+    ipa_uk: '/ˈen.dʒɪn/',
+    ipa_us: '/ˈen.dʒɪn/',
+    partOfSpeech: 'noun [C]',
+    level: 'B1',
+    meaning_vi: 'động cơ, đầu máy',
+    definition_vi: 'bộ máy chuyển đổi năng lượng thành lực chuyển động',
+    definition_en: 'a machine that uses the energy from liquid fuel or steam to produce movement',
+    examples: [
+      'My car has a powerful engine.',
+      'Turn off the engine while waiting.'
+    ],
+    word_family: [
+      { pos: 'noun', word: 'engineer', meaning_vi: 'kỹ sư' }
+    ],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'start the engine', meaning_vi: 'khởi động động cơ' }
+    ],
+    synonyms: ['motor']
+  },
+  traffic: {
+    word_root: 'traffic',
+    ipa_uk: '/ˈtræf.ɪk/',
+    ipa_us: '/ˈtræf.ɪk/',
+    partOfSpeech: 'noun [U]',
+    level: 'A2',
+    meaning_vi: 'giao thông, xe cộ lưu thông',
+    definition_vi: 'số lượng xe cộ đang di chuyển trên đường',
+    definition_en: 'the number of vehicles moving along roads, or the amount of aircraft, trains, or ships moving along a route',
+    examples: [
+      'There is always heavy traffic in the city center.',
+      'We got stuck in traffic for an hour.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'heavy traffic', meaning_vi: 'giao thông đông đúc, kẹt xe' },
+      { phrase: 'traffic jam', meaning_vi: 'ùn tắc giao thông' }
+    ],
+    synonyms: []
+  },
+  driver: {
+    word_root: 'driver',
+    ipa_uk: '/ˈdraɪ.vər/',
+    ipa_us: '/ˈdraɪ.vɚ/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'tài xế, người lái xe',
+    definition_vi: 'người điều khiển xe ô tô, xe buýt hoặc phương tiện khác',
+    definition_en: 'someone who drives a vehicle',
+    examples: [
+      'The taxi driver was very polite.',
+      'He is a careful driver.'
+    ],
+    word_family: [
+      { pos: 'verb', word: 'drive', meaning_vi: 'lái xe' }
+    ],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'bus driver', meaning_vi: 'tài xế xe buýt' },
+      { phrase: 'taxi driver', meaning_vi: 'tài xế taxi' }
+    ],
+    synonyms: ['motorist', 'chauffeur']
+  },
+  bicycle: {
+    word_root: 'bicycle',
+    ipa_uk: '/ˈbaɪ.sɪ.kəl/',
+    ipa_us: '/ˈbaɪ.sə.kəl/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'xe đạp',
+    definition_vi: 'phương tiện hai bánh di chuyển bằng sức đạp chân',
+    definition_en: 'a two-wheeled vehicle that that you sit on and move by turning the two pedals',
+    examples: [
+      'He goes to school by bicycle.',
+      'She bought a new racing bicycle.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'ride a bicycle', meaning_vi: 'đi xe đạp' }
+    ],
+    synonyms: ['bike', 'cycle']
+  },
+  train: {
+    word_root: 'train',
+    ipa_uk: '/treɪn/',
+    ipa_us: '/treɪn/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'tàu hỏa, xe lửa',
+    definition_vi: 'đoàn tàu gồm các toa chạy trên đường ray',
+    definition_en: 'a railway engine connected to carriages for carrying people or to wheeled containers for carrying goods',
+    examples: [
+      'We took the train from London to Paris.',
+      'The train arrived on time.'
+    ],
+    word_family: [],
+    other_meanings: [
+      { pos: 'verb', meaning_vi: 'huấn luyện, đào tạo', definition_en: 'to teach or learn skills' }
+    ],
+    collocations: [
+      { phrase: 'catch a train', meaning_vi: 'bắt kịp tàu hỏa' },
+      { phrase: 'train station', meaning_vi: 'ga xe lửa' }
+    ],
+    synonyms: ['railway', 'locomotive']
+  },
+  plane: {
+    word_root: 'plane',
+    ipa_uk: '/pleɪn/',
+    ipa_us: '/pleɪn/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'máy bay',
+    definition_vi: 'phương tiện có cánh bay được trên không trung',
+    definition_en: 'a vehicle designed for air travel, with wings and one or more engines',
+    examples: [
+      'She boarded the plane to Tokyo.',
+      'The plane took off smoothly.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'by plane', meaning_vi: 'bằng máy bay' }
+    ],
+    synonyms: ['airplane', 'aircraft']
+  },
+  bus: {
+    word_root: 'bus',
+    ipa_uk: '/bʌs/',
+    ipa_us: '/bʌs/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'xe buýt',
+    definition_vi: 'phương tiện chở khách công cộng cỡ lớn chạy theo tuyến cố định',
+    definition_en: 'a large vehicle in which people are driven from one place to another',
+    examples: [
+      'I take the bus to work every day.',
+      'Wait for the bus at the bus stop.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'bus stop', meaning_vi: 'trạm xe buýt' },
+      { phrase: 'catch a bus', meaning_vi: 'bắt xe buýt' }
+    ],
+    synonyms: []
+  },
+  computer: {
+    word_root: 'computer',
+    ipa_uk: '/kəmˈpjuː.tər/',
+    ipa_us: '/kəmˈpjuː.t̬ɚ/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'máy vi tính, máy tính',
+    definition_vi: 'thiết bị điện tử dùng để lưu trữ và xử lý dữ liệu theo các chương trình',
+    definition_en: 'an electronic machine that can store and arrange large amounts of information, solve problems, and control other machines',
+    examples: [
+      'She works on her computer all day.',
+      'Turn on the computer and log in.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'personal computer', meaning_vi: 'máy tính cá nhân' },
+      { phrase: 'computer science', meaning_vi: 'khoa học máy tính' }
+    ],
+    synonyms: ['PC', 'laptop']
+  },
+  table: {
+    word_root: 'table',
+    ipa_uk: '/ˈteɪ.bəl/',
+    ipa_us: '/ˈteɪ.bəl/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'cái bàn',
+    definition_vi: 'đồ nội thất có mặt phẳng nằm ngang trên một hoặc nhiều chân',
+    definition_en: 'a flat horizontal surface supported by one or more legs, used for eating, writing, or working',
+    examples: [
+      'Put the book on the table.',
+      'They sat around the dinner table.'
+    ],
+    word_family: [],
+    other_meanings: [
+      { pos: 'noun', meaning_vi: 'bảng biểu dữ liệu', definition_en: 'an arrangement of facts and numbers in rows or blocks' }
+    ],
+    collocations: [
+      { phrase: 'round table', meaning_vi: 'bàn tròn' }
+    ],
+    synonyms: []
+  },
+  water: {
+    word_root: 'water',
+    ipa_uk: '/ˈwɔː.tər/',
+    ipa_us: '/ˈwɑː.t̬ɚ/',
+    partOfSpeech: 'noun [U]',
+    level: 'A1',
+    meaning_vi: 'nước',
+    definition_vi: 'chất lỏng trong suốt không màu không mùi cần thiết cho sự sống',
+    definition_en: 'a clear liquid, without colour or taste, that falls from the sky as rain',
+    examples: [
+      'Drink plenty of fresh water every day.',
+      'A glass of cold water.'
+    ],
+    word_family: [],
+    other_meanings: [
+      { pos: 'verb', meaning_vi: 'tưới nước', definition_en: 'to pour water on to plants' }
+    ],
+    collocations: [
+      { phrase: 'drink water', meaning_vi: 'uống nước' },
+      { phrase: 'bottle of water', meaning_vi: 'chai nước' }
+    ],
+    synonyms: []
+  },
+  apple: {
+    word_root: 'apple',
+    ipa_uk: '/ˈæp.əl/',
+    ipa_us: '/ˈæp.əl/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'quả táo',
+    definition_vi: 'loại quả tròn vỏ màu đỏ, xanh hoặc vàng, cùi thịt màu trắng',
+    definition_en: 'a round fruit with firm, white flesh and a green, red, or yellow skin',
+    examples: [
+      'She took a bite of the juicy red apple.',
+      'An apple a day keeps the doctor away.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'apple pie', meaning_vi: 'bánh táo' }
+    ],
+    synonyms: []
+  },
+  house: {
+    word_root: 'house',
+    ipa_uk: '/haʊs/',
+    ipa_us: '/haʊs/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'ngôi nhà, căn nhà',
+    definition_vi: 'tòa nhà được xây dựng cho người ở',
+    definition_en: 'a building that people, usually one family, live in',
+    examples: [
+      'They bought a new house near the beach.',
+      'Welcome to my house!'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'move house', meaning_vi: 'chuyển nhà' }
+    ],
+    synonyms: ['home', 'residence']
+  },
+  book: {
+    word_root: 'book',
+    ipa_uk: '/bʊk/',
+    ipa_us: '/bʊk/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'quyển sách',
+    definition_vi: 'tập hợp các trang giấy được in chữ hoặc tranh ảnh và đóng lại với nhau',
+    definition_en: 'a written text that can be published in printed or electronic form',
+    examples: [
+      'He loves reading books in his free time.',
+      'She opened the book and began to read.'
+    ],
+    word_family: [],
+    other_meanings: [
+      { pos: 'verb', meaning_vi: 'đặt chỗ, đặt vé', definition_en: 'to arrange to have a seat, room, etc. at a particular time' }
+    ],
+    collocations: [
+      { phrase: 'read a book', meaning_vi: 'đọc sách' },
+      { phrase: 'book a ticket', meaning_vi: 'đặt vé' }
+    ],
+    synonyms: ['volume', 'novel']
   }
 };
 

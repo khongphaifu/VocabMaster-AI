@@ -20,10 +20,14 @@ chrome.runtime.onInstalled.addListener((details) => {
       for (const k of Object.keys(dict_cache)) {
         const item = dict_cache[k];
         const m = item?.word?.meaning_vi?.toLowerCase();
+        const hasVerifiedSource = item?.source === 'cambridge' || item?.source === 'dictionary';
         if (
           !m ||
+          !hasVerifiedSource ||
           isPlaceholderText(m) ||
           m === 'tựa ứng' ||
+          m === 'nơn' ||
+          m === 'máy xe' ||
           item?.word?.ipa_uk?.includes('sə\'fər') ||
           item?.word?.ipa_us?.includes('sə\'fər')
         ) {
@@ -148,13 +152,17 @@ async function getCachedTranslation(key, cleanText) {
     if (cached.type === 'word') {
       const w = cached.word;
       const m = w?.meaning_vi?.toLowerCase();
+      const hasVerifiedSource = cached.source === 'cambridge' || cached.source === 'dictionary';
       if (
         !w ||
         typeof w !== 'object' ||
+        !hasVerifiedSource ||
         w.meaning_vi === cleanText ||
         !w.meaning_vi ||
         isPlaceholderText(w.meaning_vi) ||
         m === 'tựa ứng' ||
+        m === 'nơn' ||
+        m === 'máy xe' ||
         w.ipa_uk?.includes('sə\'fər') ||
         w.ipa_us?.includes('sə\'fər')
       ) {

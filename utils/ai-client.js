@@ -370,17 +370,22 @@ TUYỆT ĐỐI KHÔNG tự sáng tác nghĩa khác ngoài "${dictContext.meaning
 `;
   }
 
-  return `Bạn là hệ thống từ điển Anh - Việt theo chuẩn Cambridge English-Vietnamese Dictionary (dictionary.cambridge.org).
-Hãy tra cứu từ tiếng Anh "${word}" và trả về mục từ điển CHÍNH XÁC như cách Cambridge Dictionary trình bày.
+  return `Bạn là hệ thống từ điển Anh - Việt cao cấp theo chuẩn Cambridge English-Vietnamese Dictionary (dictionary.cambridge.org).
+Hãy tra cứu từ tiếng Anh "${word}" và trả về mục từ điển CHÍNH XÁC, TỰ NHIÊN NHẤT như cách Cambridge Dictionary trình bày.
 ${groundTruthBlock}
-CÁCH DỊCH CHUẨN CAMBRIDGE:
-- "meaning_vi" phải là bản dịch NGẮN GỌN, SÁT NGHĨA giống hệt cách Cambridge English-Vietnamese hiển thị.
-  Ví dụ: "abandon" → "từ bỏ" (KHÔNG phải "sự bỏ rơi, sự từ bỏ hoàn toàn")
-  Ví dụ: "table" → "cái bàn" (KHÔNG phải "một bề mặt phẳng có chân dùng để đặt đồ")
+TIÊU CHUẨN DỊCH NGHĨA VIỆT NAM (BẮT BUỘC):
+- "meaning_vi" PHẢI là từ/cụm từ tiếng Việt phổ thông, tự nhiên và chính xác nhất mà người Việt dùng hàng ngày:
+  Ví dụ: "car" → "xe hơi, ô tô" (TUYỆT ĐỐI KHÔNG dịch là "máy xe")
+  Ví dụ: "petrol" → "xăng, dầu xăng" (TUYỆT ĐỐI KHÔNG dịch là "nơn" hay bịa từ)
+  Ví dụ: "software" → "phần mềm" (TUYỆT ĐỐI KHÔNG dịch là "tựa ứng")
+  Ví dụ: "abandon" → "từ bỏ, bỏ rơi"
+  Ví dụ: "table" → "cái bàn"
   Ví dụ: "become" → "trở thành, trở nên"
   Ví dụ: "significant" → "đáng kể, quan trọng"
+- TUYỆT ĐỐI KHÔNG tự chế từ ghép vô nghĩa, không dùng từ Hán-Việt cổ tối nghĩa, không dùng từ địa phương hiếm gặp.
 - meaning_vi là TỪ/CỤM TỪ TIẾNG VIỆT tương đương, KHÔNG phải câu giải thích dài.
 - "definition_vi" mới là phần giải thích chi tiết hơn bằng tiếng Việt.
+- "definition_en" là định nghĩa tiếng Anh chuẩn Cambridge.
 
 TIÊU CHUẨN MỤC TỪ ĐIỂN:
 1. "word_root": Dạng nguyên thể (lemma) của "${word}".
@@ -771,9 +776,11 @@ export function safeParseJSON(rawText, isWord, originalText, dictContext = null)
     }
 
     // 1. Sanitize meaning_vi
-    let isMeaningBad = isPlaceholderText(w.meaning_vi) ||
-      w.meaning_vi.trim().toLowerCase() === originalText.trim().toLowerCase() ||
-      w.meaning_vi.trim().toLowerCase() === cleanRoot;
+    const mViStr = typeof w.meaning_vi === 'string' ? w.meaning_vi.trim().toLowerCase() : '';
+    const origStr = typeof originalText === 'string' ? originalText.trim().toLowerCase() : '';
+    let isMeaningBad = !mViStr || isPlaceholderText(w.meaning_vi) ||
+      (origStr && mViStr === origStr) ||
+      (cleanRoot && mViStr === cleanRoot);
 
     if (isMeaningBad) {
       if (fallbackData?.meaning_vi) {
@@ -1192,10 +1199,10 @@ async function getActiveGroqModels(apiKey) {
         );
 
       active.sort((a, b) => {
-        if (a.includes('3.1-8b-instant')) return -1;
-        if (b.includes('3.1-8b-instant')) return 1;
         if (a.includes('3.3-70b')) return -1;
         if (b.includes('3.3-70b')) return 1;
+        if (a.includes('3.1-8b-instant')) return -1;
+        if (b.includes('3.1-8b-instant')) return 1;
         if (a.includes('gemma2')) return -1;
         if (b.includes('gemma2')) return 1;
         return 0;
@@ -1210,8 +1217,8 @@ async function getActiveGroqModels(apiKey) {
   } catch (_) {}
 
   return [
-    'llama-3.1-8b-instant',
     'llama-3.3-70b-versatile',
+    'llama-3.1-8b-instant',
     'gemma2-9b-it'
   ];
 }
