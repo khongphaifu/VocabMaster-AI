@@ -750,7 +750,154 @@ export function cleanWikitext(str) {
     .trim();
 }
 
+export function isStandardIpa(str) {
+  if (!str || typeof str !== 'string') return false;
+  const clean = str.replace(/^\/+|\/+$/g, '').trim();
+  if (!clean || clean.length > 50) return false;
+  // If it has uppercase ASCII letters (like SH, TH, ZH, CH) -> American Heritage/Merriam-Webster ASCII, NOT IPA!
+  if (/[A-Z]/.test(clean)) return false;
+  // If it has macrons or non-IPA umlauts (ä, ā, ō, ē, ū) -> American Heritage, NOT IPA!
+  if (/[äāōēū]/.test(clean)) return false;
+  // If it has parentheses like (ə) -> non-standard phonetic respelling
+  if (/\([^\)]+\)/.test(clean)) return false;
+  // Must contain valid IPA symbols
+  return /[ˈˌəæɑɒɔɪʊʌeɪaʊoʊθðʃʒtʃdʒŋɡː]/.test(clean) || /^[a-zːˈˌ\.\s]+$/.test(clean);
+}
+
+export function ensureNounForm(text, word, pos) {
+  if (!pos || !pos.toLowerCase().includes('noun')) return text;
+  if (!text || typeof text !== 'string') return text;
+  let clean = text.trim().normalize('NFC');
+  const lower = clean.toLowerCase();
+
+  // If already starts with a Vietnamese noun classifier or marker, keep it
+  if (/^(sự|cuộc|việc|phép|quá trình|tính|khả năng|bài|lời|mẫu|người|vật|tác phẩm|kết quả|hiện tượng|phương pháp|hệ|bộ)\s+/i.test(lower)) {
+    return clean;
+  }
+
+  // Common action verbs in Vietnamese that are mistakenly used as translations of English nominalized verbs
+  const actionVerbs = [
+    'quan sát', 'điều tra', 'đo lường', 'phân tích', 'đánh giá',
+    'phân loại', 'dự đoán', 'tối ưu hóa', 'nghiên cứu', 'sáng tạo',
+    'thay đổi', 'biến đổi', 'ước tính', 'ước lượng', 'chuyển đổi',
+    'kết nối', 'thực thi', 'áp dụng', 'giới thiệu', 'mô tả',
+    'thông báo', 'quản lý', 'vận hành', 'mở rộng', 'phục hồi',
+    'đóng góp', 'phản ánh', 'tương tác', 'xác thực', 'nhận dạng',
+    'khám phá', 'tính toán', 'giải thích', 'hồi phục', 'định nghĩa',
+    'phát hiện', 'phát minh', 'tổ chức', 'phát triển'
+  ];
+
+  const matchedVerb = actionVerbs.find(v => lower === v || lower.startsWith(v + ',') || lower.startsWith(v + ';') || lower.startsWith(v + ' '));
+  if (matchedVerb) {
+    if (matchedVerb === 'điều tra') return 'cuộc điều tra, sự điều tra';
+    if (matchedVerb === 'đo lường') return 'phép đo, sự đo lường';
+    if (matchedVerb === 'nghiên cứu') return 'công trình nghiên cứu, sự nghiên cứu';
+    if (matchedVerb === 'quan sát') return 'sự quan sát, nhận xét; (Toán/AI) mẫu quan sát';
+    if (matchedVerb === 'định nghĩa') return 'định nghĩa, sự xác định';
+    if (matchedVerb === 'tính toán') return 'phép tính, sự tính toán';
+    return `sự ${clean}`;
+  }
+
+  return clean;
+}
+
 const IRREGULAR_WORD_FAMILIES = {
+  observation: [
+    { pos: 'verb', word: 'observe', meaning_vi: 'quan sát, theo dõi' },
+    { pos: 'noun', word: 'observer', meaning_vi: 'người quan sát, quan sát viên' },
+    { pos: 'adj', word: 'observational', meaning_vi: 'thuộc về quan sát' },
+    { pos: 'adj', word: 'observant', meaning_vi: 'tinh ý, chú ý quan sát' }
+  ],
+  investigation: [
+    { pos: 'verb', word: 'investigate', meaning_vi: 'điều tra, nghiên cứu kỹ' },
+    { pos: 'noun', word: 'investigator', meaning_vi: 'điều tra viên' },
+    { pos: 'adj', word: 'investigative', meaning_vi: 'thuộc về điều tra' }
+  ],
+  decision: [
+    { pos: 'verb', word: 'decide', meaning_vi: 'quyết định' },
+    { pos: 'adj', word: 'decisive', meaning_vi: 'quyết đoán, mang tính quyết định' },
+    { pos: 'adv', word: 'decisively', meaning_vi: 'một cách dứt khoát' }
+  ],
+  development: [
+    { pos: 'verb', word: 'develop', meaning_vi: 'phát triển' },
+    { pos: 'noun', word: 'developer', meaning_vi: 'nhà phát triển' },
+    { pos: 'adj', word: 'developmental', meaning_vi: 'thuộc về phát triển' }
+  ],
+  measurement: [
+    { pos: 'verb', word: 'measure', meaning_vi: 'đo lường' },
+    { pos: 'adj', word: 'measurable', meaning_vi: 'có thể đo lường được' }
+  ],
+  creation: [
+    { pos: 'verb', word: 'create', meaning_vi: 'tạo ra, sáng tạo' },
+    { pos: 'noun', word: 'creator', meaning_vi: 'người sáng tạo' },
+    { pos: 'adj', word: 'creative', meaning_vi: 'sáng tạo' }
+  ],
+  production: [
+    { pos: 'verb', word: 'produce', meaning_vi: 'sản xuất, tạo ra' },
+    { pos: 'noun', word: 'producer', meaning_vi: 'nhà sản xuất' },
+    { pos: 'adj', word: 'productive', meaning_vi: 'năng suất, hiệu quả' }
+  ],
+  reduction: [
+    { pos: 'verb', word: 'reduce', meaning_vi: 'giảm bớt, thu nhỏ' },
+    { pos: 'adj', word: 'reducible', meaning_vi: 'có thể giảm bớt' }
+  ],
+  distribution: [
+    { pos: 'verb', word: 'distribute', meaning_vi: 'phân phối, phân tán' },
+    { pos: 'noun', word: 'distributor', meaning_vi: 'nhà phân phối' },
+    { pos: 'adj', word: 'distributive', meaning_vi: 'có tính phân phối' }
+  ],
+  conclusion: [
+    { pos: 'verb', word: 'conclude', meaning_vi: 'kết luận, kết thúc' },
+    { pos: 'adj', word: 'conclusive', meaning_vi: 'mang tính thuyết phục, kết luận' }
+  ],
+  definition: [
+    { pos: 'verb', word: 'define', meaning_vi: 'định nghĩa, xác định' },
+    { pos: 'adj', word: 'definitive', meaning_vi: 'cuối cùng, dứt khoát' }
+  ],
+  description: [
+    { pos: 'verb', word: 'describe', meaning_vi: 'mô tả, miêu tả' },
+    { pos: 'adj', word: 'descriptive', meaning_vi: 'mang tính miêu tả' }
+  ],
+  explanation: [
+    { pos: 'verb', word: 'explain', meaning_vi: 'giải thích' },
+    { pos: 'adj', word: 'explanatory', meaning_vi: 'có tính giải thích' }
+  ],
+  application: [
+    { pos: 'verb', word: 'apply', meaning_vi: 'áp dụng, ứng tuyển' },
+    { pos: 'noun', word: 'applicant', meaning_vi: 'người nộp đơn' },
+    { pos: 'adj', word: 'applicable', meaning_vi: 'có thể áp dụng' }
+  ],
+  optimization: [
+    { pos: 'verb', word: 'optimize', meaning_vi: 'tối ưu hóa' },
+    { pos: 'noun', word: 'optimizer', meaning_vi: 'thuật toán / bộ tối ưu' },
+    { pos: 'adj', word: 'optimal', meaning_vi: 'tối ưu' }
+  ],
+  classification: [
+    { pos: 'verb', word: 'classify', meaning_vi: 'phân loại' },
+    { pos: 'noun', word: 'classifier', meaning_vi: 'bộ phân loại' },
+    { pos: 'adj', word: 'classified', meaning_vi: 'đã được phân loại' }
+  ],
+  prediction: [
+    { pos: 'verb', word: 'predict', meaning_vi: 'dự đoán, dự báo' },
+    { pos: 'adj', word: 'predictable', meaning_vi: 'có thể đoán trước' }
+  ],
+  evaluation: [
+    { pos: 'verb', word: 'evaluate', meaning_vi: 'đánh giá, định giá' },
+    { pos: 'noun', word: 'evaluator', meaning_vi: 'người đánh giá' }
+  ],
+  estimation: [
+    { pos: 'verb', word: 'estimate', meaning_vi: 'ước tính, ước lượng' },
+    { pos: 'noun', word: 'estimator', meaning_vi: 'bộ ước lượng' }
+  ],
+  transformation: [
+    { pos: 'verb', word: 'transform', meaning_vi: 'chuyển đổi, biến đổi' },
+    { pos: 'noun', word: 'transformer', meaning_vi: 'máy biến áp / kiến trúc transformer' },
+    { pos: 'adj', word: 'transformative', meaning_vi: 'có tính cải biến sâu sắc' }
+  ],
+  performance: [
+    { pos: 'verb', word: 'perform', meaning_vi: 'biểu diễn, thực hiện' },
+    { pos: 'noun', word: 'performer', meaning_vi: 'người biểu diễn' }
+  ],
   parameter: [
     { pos: 'adj', word: 'parametric', meaning_vi: 'thuộc về tham số / thông số' },
     { pos: 'noun', word: 'parameters', meaning_vi: 'các tham số, giới hạn' }
@@ -761,6 +908,10 @@ const IRREGULAR_WORD_FAMILIES = {
   ],
   sustainable: [
     { pos: 'noun', word: 'sustainability', meaning_vi: 'sự bền vững' },
+    { pos: 'adv', word: 'sustainably', meaning_vi: 'một cách bền vững' }
+  ],
+  sustainability: [
+    { pos: 'adj', word: 'sustainable', meaning_vi: 'bền vững' },
     { pos: 'adv', word: 'sustainably', meaning_vi: 'một cách bền vững' }
   ],
   resilience: [
@@ -783,7 +934,7 @@ export async function translateDefinition(text) {
     clearTimeout(timeoutId);
     if (res.ok) {
       const data = await res.json();
-      return data[0]?.map(x => x[0]).join('').trim() || '';
+      return (data[0]?.map(x => x[0]).join('').trim() || '').normalize('NFC');
     }
   } catch (_) {}
   return '';
@@ -817,15 +968,15 @@ export function generateFallbackExamples(word, pos, meaningVi = '') {
   ];
 }
 
-export function generateFallbackCollocations(word, pos, synonyms = [], meaningVi = '') {
+export function generateFallbackCollocations(word, pos, synonyms = [], meaningVi = '', adjectiveCollocations = []) {
   const p = (pos || 'noun').toLowerCase();
   const w = (word || '').trim();
-  const cleanM = (meaningVi || word).split(/[,;]/)[0].trim().toLowerCase();
+  const cleanM = (meaningVi || word).replace(/^(sự|cuộc|việc|phép|quá trình)\s+/i, '').split(/[,;]/)[0].trim().toLowerCase();
 
   if (p.includes('verb')) {
     return [
-      { phrase: `${w} effectively`, meaning_vi: `${cleanM} một cách hiệu quả` },
-      { phrase: `${w} properly`, meaning_vi: `${cleanM} đúng phương pháp` }
+      { phrase: `${w} carefully`, meaning_vi: `${cleanM} một cách cẩn thận` },
+      { phrase: `${w} effectively`, meaning_vi: `${cleanM} một cách hiệu quả` }
     ];
   }
   if (p.includes('adj')) {
@@ -834,15 +985,56 @@ export function generateFallbackCollocations(word, pos, synonyms = [], meaningVi
       { phrase: `remain ${w}`, meaning_vi: `vẫn giữ tính chất ${cleanM}` }
     ];
   }
+
+  // If we have native adjective collocations from Datamuse (e.g. ['direct', 'careful', 'close'])
+  if (Array.isArray(adjectiveCollocations) && adjectiveCollocations.length >= 2) {
+    const adjMap = {
+      direct: 'trực tiếp',
+      personal: 'cá nhân',
+      careful: 'kỹ lưỡng / cẩn thận',
+      close: 'chặt chẽ',
+      clinical: 'lâm sàng',
+      empirical: 'thực nghiệm',
+      scientific: 'khoa học',
+      thorough: 'toàn diện / kỹ lưỡng',
+      preliminary: 'sơ bộ',
+      final: 'cuối cùng',
+      accurate: 'chính xác',
+      precise: 'chuẩn xác',
+      important: 'quan trọng',
+      key: 'then chốt',
+      critical: 'trọng yếu',
+      major: 'chủ chốt',
+      simple: 'đơn giản',
+      genetic: 'di truyền',
+      efficient: 'hiệu quả',
+      neural: 'nơ-ron',
+      social: 'xã hội',
+      central: 'trung tâm',
+      raw: 'thô'
+    };
+    const colList = [];
+    for (const adj of adjectiveCollocations.slice(0, 3)) {
+      if (adj && adj !== w && !colList.some(c => c.phrase.startsWith(adj))) {
+        const viAdj = adjMap[adj.toLowerCase()] || adj;
+        colList.push({
+          phrase: `${adj} ${w}`,
+          meaning_vi: `${cleanM} ${viAdj}`
+        });
+      }
+    }
+    if (colList.length >= 2) return colList;
+  }
+
   return [
-    { phrase: `key ${w}`, meaning_vi: `${cleanM} then chốt / quan trọng` },
-    { phrase: `standard ${w}`, meaning_vi: `${cleanM} tiêu chuẩn` }
+    { phrase: `direct ${w}`, meaning_vi: `${cleanM} trực tiếp` },
+    { phrase: `key ${w}`, meaning_vi: `${cleanM} then chốt / quan trọng` }
   ];
 }
 
 export function generateFallbackFamily(word, pos, meaningVi = '') {
   const cleanWord = (word || '').trim().toLowerCase();
-  const cleanM = (meaningVi || word).split(/[,;]/)[0].trim().toLowerCase();
+  const cleanM = (meaningVi || word).replace(/^(sự|cuộc|việc|phép|quá trình)\s+/i, '').split(/[,;]/)[0].trim().toLowerCase();
 
   if (IRREGULAR_WORD_FAMILIES[cleanWord]) {
     return [...IRREGULAR_WORD_FAMILIES[cleanWord]];
@@ -850,19 +1042,81 @@ export function generateFallbackFamily(word, pos, meaningVi = '') {
 
   const p = (pos || 'noun').toLowerCase();
   const list = [];
-  const rootWithoutE = cleanWord.endsWith('e') ? cleanWord.slice(0, -1) : cleanWord;
 
+  // 1. Nominalized Nouns ending in -tion / -sion
+  if (cleanWord.endsWith('tion') || cleanWord.endsWith('sion')) {
+    let verb = '';
+    if (cleanWord.endsWith('ization')) {
+      verb = cleanWord.slice(0, -7) + 'ize';
+    } else if (cleanWord.endsWith('ication')) {
+      verb = cleanWord.slice(0, -7) + 'y';
+    } else if (cleanWord.endsWith('vation')) {
+      verb = cleanWord.slice(0, -6) + 've';
+    } else if (cleanWord.endsWith('ration')) {
+      verb = cleanWord.slice(0, -5) + 're';
+    } else if (cleanWord.endsWith('ction')) {
+      verb = cleanWord.slice(0, -3);
+    } else if (cleanWord.endsWith('ssion')) {
+      verb = cleanWord.slice(0, -4) + 'mit';
+    } else if (cleanWord.endsWith('sion')) {
+      verb = cleanWord.slice(0, -4) + 'de';
+    } else if (cleanWord.endsWith('ation')) {
+      verb = cleanWord.slice(0, -5) + 'e';
+    }
+
+    if (verb && verb !== cleanWord) {
+      list.push({ pos: 'verb', word: verb, meaning_vi: cleanM });
+      list.push({ pos: 'noun', word: verb.endsWith('e') ? verb.slice(0, -1) + 'er' : verb + 'er', meaning_vi: 'người/thiết bị ' + cleanM });
+    }
+    list.push({ pos: 'adj', word: cleanWord + 'al', meaning_vi: 'thuộc về ' + cleanM });
+    return list;
+  }
+
+  // 2. Nouns ending in -ment
+  if (cleanWord.endsWith('ment')) {
+    const verb = cleanWord.slice(0, -4);
+    list.push({ pos: 'verb', word: verb, meaning_vi: cleanM });
+    list.push({ pos: 'adj', word: cleanWord + 'al', meaning_vi: 'thuộc về ' + cleanM });
+    return list;
+  }
+
+  // 3. Nouns ending in -ance / -ence
+  if (cleanWord.endsWith('ance') || cleanWord.endsWith('ence')) {
+    const adj = cleanWord.slice(0, -4) + (cleanWord.endsWith('ance') ? 'ant' : 'ent');
+    list.push({ pos: 'adj', word: adj, meaning_vi: 'có tính ' + cleanM });
+    const verb = cleanWord.slice(0, -4);
+    if (verb.length >= 3) list.push({ pos: 'verb', word: verb, meaning_vi: cleanM });
+    return list;
+  }
+
+  // 4. Nouns ending in -ity
+  if (cleanWord.endsWith('ity')) {
+    let adj = cleanWord.slice(0, -3);
+    if (cleanWord.endsWith('bility')) adj = cleanWord.slice(0, -5) + 'ble';
+    list.push({ pos: 'adj', word: adj, meaning_vi: 'mang tính ' + cleanM });
+    return list;
+  }
+
+  // 5. Nouns ending in -ness
+  if (cleanWord.endsWith('ness')) {
+    const adj = cleanWord.slice(0, -4);
+    list.push({ pos: 'adj', word: adj, meaning_vi: 'có tính ' + cleanM });
+    return list;
+  }
+
+  // 6. Generic nouns
   if (p.includes('noun')) {
     if (cleanWord.endsWith('meter')) {
       list.push({ pos: 'adj', word: `${cleanWord.slice(0, -5)}metric`, meaning_vi: `thuộc về ${cleanM}` });
     } else {
-      list.push({ pos: 'adj', word: `${rootWithoutE}ed`, meaning_vi: `mang tính ${cleanM}` });
+      list.push({ pos: 'adj', word: `${cleanWord}al`, meaning_vi: `thuộc về ${cleanM}` });
     }
-    list.push({ pos: 'verb', word: cleanWord, meaning_vi: `xử lý ${cleanM}` });
   } else if (p.includes('verb')) {
+    const rootWithoutE = cleanWord.endsWith('e') ? cleanWord.slice(0, -1) : cleanWord;
     list.push({ pos: 'noun', word: `${rootWithoutE}er`, meaning_vi: `người/thiết bị ${cleanM}` });
     list.push({ pos: 'noun', word: `${rootWithoutE}ing`, meaning_vi: `hoạt động ${cleanM}` });
   } else if (p.includes('adj')) {
+    const rootWithoutE = cleanWord.endsWith('e') ? cleanWord.slice(0, -1) : cleanWord;
     const advForm = cleanWord.endsWith('ic') ? `${cleanWord}ally` : (cleanWord.endsWith('le') ? `${rootWithoutE}y` : `${cleanWord}ly`);
     list.push({ pos: 'adv', word: advForm, meaning_vi: `một cách ${cleanM}` });
     list.push({ pos: 'noun', word: `${cleanWord}ness`, meaning_vi: `tính chất ${cleanM}` });
@@ -1124,6 +1378,22 @@ export async function fetchPhoneticData(word) {
     } catch (_) {}
   }
 
+  // 4. Try Datamuse Adjective Collocations (rel_jjb) for nouns
+  results.adjectiveCollocations = [];
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const jjbUrl = `https://api.datamuse.com/words?rel_jjb=${encodeURIComponent(cleanWord)}&max=5`;
+    const jjbRes = await fetch(jjbUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (jjbRes.ok) {
+      const jjbJson = await jjbRes.json();
+      if (Array.isArray(jjbJson) && jjbJson.length > 0) {
+        results.adjectiveCollocations = jjbJson.map(s => s.word).filter(Boolean);
+      }
+    }
+  } catch (_) {}
+
   return results;
 }
 
@@ -1205,25 +1475,37 @@ export async function resolveDictionaryWord(word) {
     const otherMeanings = [];
     const synonyms = [];
 
+    // For nouns: check if Wiktionary has a dedicated nominal headword (starting with Sự, Cuộc, Phép...)
+    if (pos.toLowerCase().includes('noun') && Array.isArray(wiktionaryDict?.headwords)) {
+      const nounHw = wiktionaryDict.headwords.find(h => h.pos === 'noun' && /^(Sự|Cuộc|Việc|Phép|Quá trình|Khả năng|Tính|Lời|Bài)/i.test(h.text));
+      if (nounHw) {
+        primaryMeaning = nounHw.text.split(/[,;]/)[0].trim().normalize('NFC');
+      }
+    }
+
     // Prioritize Google Dictionary for concise Vietnamese headword
-    if (gDict?.meaning_vi && !isDescriptiveSentence(gDict.meaning_vi)) {
-      primaryMeaning = gDict.meaning_vi;
+    if (!primaryMeaning && gDict?.meaning_vi && !isDescriptiveSentence(gDict.meaning_vi)) {
+      primaryMeaning = ensureNounForm(gDict.meaning_vi, cleanWord, pos);
     }
 
     // Fallback to Wiktionary headwords if Google Dict didn't yield a concise word
     if (!primaryMeaning && wiktionaryDict?.headwords?.length) {
-      primaryMeaning = wiktionaryDict.headwords[0].text;
+      primaryMeaning = ensureNounForm(wiktionaryDict.headwords[0].text.split(/[,;]/)[0].trim(), cleanWord, pos);
+    }
+
+    if (primaryMeaning) {
+      primaryMeaning = ensureNounForm(primaryMeaning, cleanWord, pos);
     }
 
     // Handle definition_vi: prioritize Wiktionary descriptive definitions or translated Oxford definition
     if (wiktionaryDict?.definitions?.length) {
-      definitionVi = wiktionaryDict.definitions[0].text;
+      definitionVi = wiktionaryDict.definitions[0].text.normalize('NFC');
     } else if (gDict?.definition_vi) {
-      definitionVi = gDict.definition_vi;
+      definitionVi = gDict.definition_vi.normalize('NFC');
     } else if (gDict?.definition_en) {
-      definitionVi = await translateDefinition(gDict.definition_en);
+      definitionVi = (await translateDefinition(gDict.definition_en)).normalize('NFC');
     } else if (phoneticData?.definition_en) {
-      definitionVi = await translateDefinition(phoneticData.definition_en);
+      definitionVi = (await translateDefinition(phoneticData.definition_en)).normalize('NFC');
     } else if (primaryMeaning) {
       definitionVi = primaryMeaning;
     }
@@ -1231,16 +1513,22 @@ export async function resolveDictionaryWord(word) {
     // Populate other_meanings
     if (gDict?.other_meanings) {
       for (const m of gDict.other_meanings) {
-        if (!otherMeanings.some(om => om.meaning_vi.toLowerCase() === m.meaning_vi.toLowerCase())) {
-          otherMeanings.push(m);
+        const cleanMeaningVi = String(m.meaning_vi || '')
+          .normalize('NFC')
+          .replace(/được\s+quan sát\s+được/gi, 'quan sát được')
+          .replace(/được\s+([a-zà-ỹ\s]+)\s+được/gi, '$1 được')
+          .trim();
+        if (cleanMeaningVi && !otherMeanings.some(om => om.meaning_vi.toLowerCase() === cleanMeaningVi.toLowerCase())) {
+          otherMeanings.push({ pos: m.pos, meaning_vi: cleanMeaningVi });
         }
       }
     }
     if (wiktionaryDict?.headwords) {
       for (const hw of wiktionaryDict.headwords) {
-        if (hw.text.toLowerCase() !== primaryMeaning.toLowerCase() &&
-            !otherMeanings.some(om => om.meaning_vi.toLowerCase() === hw.text.toLowerCase())) {
-          otherMeanings.push({ pos: hw.pos, meaning_vi: hw.text });
+        const cleanHwText = hw.text.normalize('NFC');
+        if (cleanHwText.toLowerCase() !== primaryMeaning.toLowerCase() &&
+            !otherMeanings.some(om => om.meaning_vi.toLowerCase() === cleanHwText.toLowerCase())) {
+          otherMeanings.push({ pos: hw.pos, meaning_vi: cleanHwText });
         }
       }
     }
@@ -1270,10 +1558,17 @@ export async function resolveDictionaryWord(word) {
     }
 
     if (primaryMeaning) {
-      // Prioritize natural IPA from Oxford translit if it contains standard phonetics, else CMU IPA
-      let ipa = (gDict?.translit && /[ˈˌəæɑɔɪʊ]/.test(gDict.translit))
-        ? gDict.translit
-        : (phoneticData?.ipa || gDict?.translit || '');
+      // Prioritize natural IPA: strictly validate that it does NOT contain American Heritage ASCII (SH, macrons ä/ā)
+      let ipa = '';
+      if (gDict?.translit && isStandardIpa(gDict.translit)) {
+        ipa = gDict.translit;
+      } else if (phoneticData?.ipa && isStandardIpa(phoneticData.ipa)) {
+        ipa = phoneticData.ipa;
+      } else if (phoneticData?.ipa) {
+        ipa = phoneticData.ipa;
+      } else if (gDict?.translit && !/[A-Zäāōēū]/.test(gDict.translit)) {
+        ipa = gDict.translit;
+      }
       if (ipa && !ipa.startsWith('/')) ipa = `/${ipa}/`;
 
       const defEn = gDict?.definition_en || phoneticData?.definition_en || '';
@@ -1296,7 +1591,13 @@ export async function resolveDictionaryWord(word) {
         ? realExamples.slice(0, 3)
         : [...realExamples, ...generateFallbackExamples(cleanWord, pos, primaryMeaning)].slice(0, 3);
 
-      const collocations = generateFallbackCollocations(cleanWord, pos, synonyms, primaryMeaning);
+      const collocations = generateFallbackCollocations(
+        cleanWord,
+        pos,
+        synonyms,
+        primaryMeaning,
+        phoneticData?.adjectiveCollocations || []
+      );
       const wordFamily = generateFallbackFamily(cleanWord, pos, primaryMeaning);
 
       return {
