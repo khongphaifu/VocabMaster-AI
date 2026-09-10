@@ -889,21 +889,27 @@ export async function resolveDictionaryWord(word) {
     };
   }
 
-  // 2. ATTEMPT CAMBRIDGE DICTIONARY ONLINE
+  // 2. ULTRA-FAST PARALLEL RESOLVER: Cambridge + Wiktionary + Google Dict + Phonetics in parallel
   try {
-    const cambridgeRes = await fetchFromCambridge(cleanWord);
-    if (cambridgeRes && cambridgeRes.word?.meaning_vi) {
-      return cambridgeRes;
-    }
-  } catch (_) {}
-
-  // 3. MULTI-SOURCE DYNAMIC DICTIONARY RESOLVER (Wiktionary + Google Dict + Phonetics)
-  try {
-    const [wiktionaryDict, gDict, phoneticData] = await Promise.all([
+    const [cambridgeRes, wiktionaryDict, gDict, phoneticData] = await Promise.all([
+      fetchFromCambridge(cleanWord).catch(() => null),
       fetchWiktionary(cleanWord).catch(() => null),
       fetchGoogleDictionary(cleanWord).catch(() => null),
       fetchPhoneticData(cleanWord).catch(() => null)
     ]);
+
+    // If Cambridge succeeded with rich Vietnamese meaning, use it as primary base
+    if (cambridgeRes && cambridgeRes.word?.meaning_vi) {
+      if (wiktionaryDict && Array.isArray(wiktionaryDict.other_meanings)) {
+        cambridgeRes.word.other_meanings = cambridgeRes.word.other_meanings || [];
+        for (const om of wiktionaryDict.other_meanings) {
+          if (!cambridgeRes.word.other_meanings.some(m => m.meaning_vi?.toLowerCase() === om.meaning_vi?.toLowerCase())) {
+            cambridgeRes.word.other_meanings.push(om);
+          }
+        }
+      }
+      return cambridgeRes;
+    }
 
     // Wiktionary has human-curated Vietnamese terms (e.g. "Bữa tiệc, yến tiệc" for "feast")
     // Google Dict has Oxford headwords

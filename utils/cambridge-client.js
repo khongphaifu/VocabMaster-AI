@@ -393,7 +393,7 @@ export function parseCambridgeHTML(html, originalWord) {
 }
 
 /**
- * Fetch word from Cambridge Dictionary Online with reliable timeout (3.5s)
+ * Fetch word from Cambridge Dictionary Online with fast timeout (1.2s)
  * Tests candidate lemmas if the exact form is not found (e.g. "becomes" -> "become")
  */
 export async function fetchFromCambridge(word) {
@@ -403,63 +403,41 @@ export async function fetchFromCambridge(word) {
   }
 
   const lemmas = getCandidateLemmas(cleanWord);
+  const targetLemmas = lemmas.slice(0, 2); // Only test top 2 lemmas to keep it fast
 
-  // Strategy: try english-vietnamese first for all lemmas, then english-only as final fallback
-  // This avoids wasting time on english-only when english-vietnamese usually works
-  const primaryUrls = lemmas.map(l => ({
-    lemma: l,
-    url: `${CAMBRIDGE_BASE}/dictionary/english-vietnamese/${encodeURIComponent(l)}`
-  }));
+  for (const lemma of targetLemmas) {
+    const url = `${CAMBRIDGE_BASE}/dictionary/english-vietnamese/${encodeURIComponent(lemma)}`;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1200); // 1.2s max
 
-  // English-only as last resort (only for the first lemma)
-  const fallbackUrls = [{
-    lemma: lemmas[0],
-    url: `${CAMBRIDGE_BASE}/dictionary/english/${encodeURIComponent(lemmas[0])}`
-  }];
-
-  const allAttempts = [...primaryUrls, ...fallbackUrls];
-
-  for (const { lemma, url } of allAttempts) {
-    // Retry up to 2 times per URL
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeoutMs = attempt === 0 ? 5000 : 4000; // 5s first, 4s retry
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-        const resp = await fetch(url, {
-          signal: controller.signal,
-          credentials: 'include',
-          headers: {
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-            'Cache-Control': 'no-cache'
-          }
-        });
-        clearTimeout(timeoutId);
-
-        if (resp.status === 403) {
-          // Cloudflare Bot Management Challenge detected - bail out immediately
-          return null;
+      const resp = await fetch(url, {
+        signal: controller.signal,
+        credentials: 'include',
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+          'Cache-Control': 'no-cache'
         }
+      });
+      clearTimeout(timeoutId);
 
-        if (!resp.ok) break; // Don't retry 404s etc, move to next URL
-
-        const html = await resp.text();
-        const parsed = parseCambridgeHTML(html, cleanWord);
-        if (parsed && (parsed.word?.meaning_vi || parsed.word?.definition_en)) {
-          if (lemma !== cleanWord) {
-            parsed.word.word_root = lemma;
-          }
-          return parsed;
-        }
-        break; // Page loaded but no valid entry, don't retry, move to next
-      } catch (e) {
-        // On timeout (AbortError), retry once; on other errors, move to next
-        if (e.name !== 'AbortError' || attempt >= 1) break;
-        // Will retry on next loop iteration
+      if (resp.status === 403 || !resp.ok) {
+        return null;
       }
+
+      const html = await resp.text();
+      const parsed = parseCambridgeHTML(html, cleanWord);
+      if (parsed && (parsed.word?.meaning_vi || parsed.word?.definition_en)) {
+        if (lemma !== cleanWord) {
+          parsed.word.word_root = lemma;
+        }
+        return parsed;
+      }
+    } catch (_) {
+      // Abort or network error - fail fast
+      return null;
     }
   }
 

@@ -361,19 +361,28 @@ export function buildFallbackWordResponse(originalText, fbData) {
 const WORD_PROMPT_EN_VI = (word, dictContext = null) => {
   let groundTruthBlock = '';
   if (dictContext && dictContext.meaning_vi) {
+    let otherMeaningsStr = '';
+    if (Array.isArray(dictContext.other_meanings) && dictContext.other_meanings.length > 0) {
+      otherMeaningsStr = '\n- CÁC NGHĨA KHÁC ĐÃ ĐƯỢC CHỨNG THỰC:\n' +
+        dictContext.other_meanings.slice(0, 5).map(m => `  * [${m.pos || 'nghĩa'}] ${m.meaning_vi}${m.definition_en ? ` (${m.definition_en})` : ''}`).join('\n');
+    }
+
     groundTruthBlock = `
-DỮ LIỆU TỪ ĐIỂN CHUẨN XÁC ĐÃ ĐƯỢC XÁC THỰC (BẮT BUỘC TUÂN THỦ 100%):
-- "meaning_vi" BẮT BUỘC LÀ: "${dictContext.meaning_vi}"
-${dictContext.ipa ? `- Phiên âm IPA chuẩn: "${dictContext.ipa}"` : ''}
-${dictContext.partOfSpeech ? `- Từ loại chuẩn: "${dictContext.partOfSpeech}"` : ''}
-TUYỆT ĐỐI KHÔNG tự sáng tác nghĩa khác ngoài "${dictContext.meaning_vi}". Dùng dữ liệu này để hoàn thiện mục từ điển theo chuẩn Cambridge.
+DỮ LIỆU TỪ ĐIỂN MẪU ĐÃ ĐƯỢC XÁC THỰC (TỪ ĐIỂN CAMBRIDGE & WIKTIONARY - BẮT BUỘC TUÂN THỦ 100%):
+- "meaning_vi" CHÍNH: "${dictContext.meaning_vi}"
+${dictContext.ipa_uk || dictContext.ipa ? `- Phiên âm IPA UK: "${dictContext.ipa_uk || dictContext.ipa}"` : ''}
+${dictContext.ipa_us ? `- Phiên âm IPA US: "${dictContext.ipa_us}"` : ''}
+${dictContext.partOfSpeech ? `- Từ loại: "${dictContext.partOfSpeech}"` : ''}
+${dictContext.definition_en ? `- Định nghĩa Cambridge: "${dictContext.definition_en}"` : ''}
+${otherMeaningsStr}
+BẮT BUỘC: Sử dụng "meaning_vi": "${dictContext.meaning_vi}" làm nghĩa chính. Dùng dữ liệu này để hoàn thiện đầy đủ các trường của mục từ điển theo chuẩn Cambridge.
 `;
   }
 
   return `Bạn là hệ thống từ điển Anh - Việt cao cấp theo chuẩn Cambridge English-Vietnamese Dictionary (dictionary.cambridge.org).
-Hãy tra cứu từ tiếng Anh "${word}" và trả về mục từ điển CHÍNH XÁC, TỰ NHIÊN NHẤT như cách Cambridge Dictionary trình bày.
+Hãy tra cứu từ tiếng Anh "${word}" và trả về mục từ điển CHÍNH XÁC, THUẦN VIỆT, TỰ NHIÊN NHẤT như cách Cambridge Dictionary trình bày.
 ${groundTruthBlock}
-TIÊU CHUẨN DỊCH NGHĨA VIỆT NAM (BẮT BUỘC - CHUẨN TỪ ĐIỂN CAMBRIDGE & OXFORD):
+TIÊU CHUẨN DỊCH NGHĨA THUẦN VIỆT (BẮT BUỘC - CHUẨN TỪ ĐIỂN CAMBRIDGE & OXFORD):
 1. "meaning_vi" LÀ TỪ TƯƠNG ĐƯƠNG CHÍNH DANH (LEXICAL EQUIVALENT):
    - Phải là từ hoặc ngữ tiếng Việt chuẩn mực, ngắn gọn (1-3 từ), tự nhiên và chính xác nhất mà người Việt dùng làm tên gọi cho sự vật/hành động.
    - TUYỆT ĐỐI KHÔNG DỊCH CỤM ĐỊNH NGHĨA TIẾNG ANH (Definition Glossing) THÀNH "meaning_vi":
@@ -392,24 +401,30 @@ TIÊU CHUẨN DỊCH NGHĨA VIỆT NAM (BẮT BUỘC - CHUẨN TỪ ĐIỂN CAMB
      * "table" → "cái bàn"!
      * "become" → "trở thành, trở nên"!
      * "significant" → "đáng kể, quan trọng"!
-2. TUYỆT ĐỐI KHÔNG tự chế từ ghép vô nghĩa, không dùng từ Hán-Việt cổ tối nghĩa, không dùng từ địa phương hiếm gặp.
-3. "definition_vi": ĐÂY MỚI LÀ NƠI giải thích câu định nghĩa chi tiết (1 câu ngắn gọn, súc tích).
+     * "compromise" → "thỏa hiệp, dàn xếp; làm tổn hại"!
+     * "deadline" → "hạn chót, thời hạn"!
+     * "resilience" → "sự kiên cường, khả năng phục hồi"!
+     * "sustainable" → "bền vững"!
+2. NGUYÊN TẮC THUẦN VIỆT:
+   - Dùng từ ngữ tự nhiên, phổ biến trong tiếng Việt hiện đại. Tuyệt đối không dịch máy móc thô ráp (word-by-word), không bịa từ, không dùng từ Hán-Việt tối nghĩa nếu đã có từ thuần Việt tương đương.
+3. "definition_vi": Giải thích câu định nghĩa chi tiết bằng tiếng Việt (1 câu ngắn gọn, chuẩn xác ngữ nghĩa).
 4. "definition_en": Định nghĩa tiếng Anh chuẩn Cambridge Learner's Dictionary.
 
-TIÊU CHUẨN MỤC TỪ ĐIỂN:
+TIÊU CHUẨN MỤC TỪ ĐIỂN (GIỮ NGUYÊN ĐẦY ĐỦ CẤU TRÚC):
 1. "word_root": Dạng nguyên thể (lemma) của "${word}".
 2. "ipa_uk": Phiên âm UK chuẩn Cambridge, ví dụ "/teɪ.bəl/".
 3. "ipa_us": Phiên âm US chuẩn Cambridge, ví dụ "/teɪ.bəl/".
 4. "partOfSpeech": Từ loại chuẩn Cambridge ("noun [C]", "verb [T]", "adjective"...).
 5. "level": Cấp độ CEFR (A1, A2, B1, B2, C1, C2).
-6. "meaning_vi": Bản dịch tiếng Việt NGẮN GỌN, SÁT NGHĨA theo chuẩn Cambridge (xem ví dụ ở trên). TUYỆT ĐỐI KHÔNG trả về "nghĩa tiếng Việt" hay khuôn mẫu!
+6. "meaning_vi": Bản dịch tiếng Việt NGẮN GỌN, SÁT NGHĨA, THUẦN VIỆT theo chuẩn Cambridge (xem ví dụ ở trên). TUYỆT ĐỐI KHÔNG trả về "nghĩa tiếng Việt" hay khuôn mẫu!
 7. "definition_vi": Giải thích nghĩa bằng tiếng Việt (1-2 câu ngắn).
 8. "definition_en": Định nghĩa tiếng Anh ngắn gọn theo Cambridge.
 9. "examples": 2 câu ví dụ tiếng Anh tự nhiên.
-10. "word_family": Từ cùng gốc [{\"pos\": \"...\", \"word\": \"...\", \"meaning_vi\": \"...\"}]. Mảng rỗng [] nếu không có. KHÔNG lặp "${word}", KHÔNG tự chế từ.
-11. "other_meanings": Các nghĩa khác [{\"pos\": \"...\", \"meaning_vi\": \"bản dịch ngắn gọn\", \"definition_en\": \"English definition\"}].
-12. "collocations": 2-3 cụm từ thông dụng [{\"phrase\": \"...\", \"meaning_vi\": \"...\"}].
+10. "word_family": Từ cùng gốc [{"pos": "...", "word": "...", "meaning_vi": "..."}]. Mảng rỗng [] nếu không có. KHÔNG lặp "${word}", KHÔNG tự chế từ.
+11. "other_meanings": Các nghĩa khác [{"pos": "...", "meaning_vi": "bản dịch ngắn gọn", "definition_en": "English definition"}].
+12. "collocations": 2-3 cụm từ thông dụng [{"phrase": "...", "meaning_vi": "..."}].
 13. "synonyms": 2-4 từ đồng nghĩa TIẾNG ANH. KHÔNG dùng tiếng Việt.
+14. "antonyms": 1-3 từ trái nghĩa TIẾNG ANH (nếu có, hoặc [] nếu không có).
 
 MẪU THAM KHẢO (từ "abandon"):
 {
@@ -769,18 +784,38 @@ export function safeParseJSON(rawText, isWord, originalText, dictContext = null)
     // STRICT GROUND-TRUTH ENFORCEMENT:
     // If verified dictionary data was provided, strictly enforce meaning_vi and IPA
     // to prevent any AI hallucination from leaking to the user!
-    if (dictContext && dictContext.meaning_vi) {
-      w.meaning_vi = dictContext.meaning_vi;
-      if (dictContext.ipa) {
-        w.ipa_uk = dictContext.ipa;
-        w.ipa_us = dictContext.ipa;
-        w.ipa = dictContext.ipa;
+    if (dictContext) {
+      if (dictContext.meaning_vi && !isPlaceholderText(dictContext.meaning_vi)) {
+        w.meaning_vi = dictContext.meaning_vi;
       }
-      if (dictContext.partOfSpeech) {
+      if (dictContext.ipa_uk && (!w.ipa_uk || isPlaceholderText(w.ipa_uk))) {
+        w.ipa_uk = dictContext.ipa_uk;
+      }
+      if (dictContext.ipa_us && (!w.ipa_us || isPlaceholderText(w.ipa_us))) {
+        w.ipa_us = dictContext.ipa_us;
+      }
+      if (dictContext.ipa && (!w.ipa || isPlaceholderText(w.ipa))) {
+        w.ipa = dictContext.ipa;
+        if (!w.ipa_uk) w.ipa_uk = dictContext.ipa;
+        if (!w.ipa_us) w.ipa_us = dictContext.ipa;
+      }
+      if (dictContext.partOfSpeech && (!w.partOfSpeech || isPlaceholderText(w.partOfSpeech))) {
         w.partOfSpeech = dictContext.partOfSpeech;
       }
       if (dictContext.definition_en && (!w.definition_en || isPlaceholderText(w.definition_en))) {
         w.definition_en = dictContext.definition_en;
+      }
+      if (dictContext.definition_vi && (!w.definition_vi || isPlaceholderText(w.definition_vi))) {
+        w.definition_vi = dictContext.definition_vi;
+      }
+      if ((!w.other_meanings || w.other_meanings.length === 0) && Array.isArray(dictContext.other_meanings) && dictContext.other_meanings.length > 0) {
+        w.other_meanings = [...dictContext.other_meanings];
+      }
+      if ((!w.examples || w.examples.length === 0) && Array.isArray(dictContext.examples) && dictContext.examples.length > 0) {
+        w.examples = [...dictContext.examples];
+      }
+      if ((!w.collocations || w.collocations.length === 0) && Array.isArray(dictContext.collocations) && dictContext.collocations.length > 0) {
+        w.collocations = [...dictContext.collocations];
       }
     }
 
@@ -1122,7 +1157,7 @@ async function executeGeminiGeneration(apiKey, modelName, prompt, isWord) {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.1,
-          maxOutputTokens: isWord ? 2048 : 3000
+          maxOutputTokens: isWord ? 1000 : 1800
         }
       })
     });
@@ -1298,66 +1333,17 @@ async function executeGeminiGeneration(apiKey, modelName, prompt, isWord) {
   }
 }
 
-let cachedActiveGroqModels = null;
-let cachedActiveGroqModelsTimestamp = 0;
-
-async function getActiveGroqModels(apiKey) {
-  if (cachedActiveGroqModels && (Date.now() - cachedActiveGroqModelsTimestamp < 3600000)) {
-    return cachedActiveGroqModels;
-  }
-
-  try {
-    const res = await fetch('https://api.groq.com/openai/v1/models', {
-      headers: { 'Authorization': `Bearer ${apiKey.trim()}` },
-      signal: AbortSignal.timeout(3000)
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const active = (data.data || [])
-        .map(m => m.id)
-        .filter(id =>
-          !id.includes('whisper') &&
-          !id.includes('guard') &&
-          !id.includes('audio') &&
-          !id.includes('vision') &&
-          !id.includes('safeguard') &&
-          !id.includes('mixtral') &&
-          !id.includes('llama3-8b') &&
-          !id.includes('llama3-70b') &&
-          !id.includes('llama-4') &&
-          !id.includes('preview')
-        );
-
-      active.sort((a, b) => {
-        if (a.includes('3.3-70b')) return -1;
-        if (b.includes('3.3-70b')) return 1;
-        if (a.includes('3.1-8b-instant')) return -1;
-        if (b.includes('3.1-8b-instant')) return 1;
-        if (a.includes('gemma2')) return -1;
-        if (b.includes('gemma2')) return 1;
-        return 0;
-      });
-
-      if (active.length > 0) {
-        cachedActiveGroqModels = active;
-        cachedActiveGroqModelsTimestamp = Date.now();
-        return active;
-      }
-    }
-  } catch (_) {}
-
-  return [
-    'llama-3.3-70b-versatile',
-    'llama-3.1-8b-instant',
-    'gemma2-9b-it'
-  ];
-}
+const GROQ_CANDIDATE_MODELS = [
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant'
+];
 
 let cachedGroqModel = null;
 
 async function callGroq(apiKey, prompt, isWord) {
   const cleanKey = apiKey.trim();
 
+  // 1. Try cached working model first (0ms discovery overhead)
   if (cachedGroqModel) {
     try {
       const res = await executeGroqGeneration(cleanKey, cachedGroqModel, prompt, isWord);
@@ -1367,10 +1353,8 @@ async function callGroq(apiKey, prompt, isWord) {
     }
   }
 
-  const modelsToTry = await getActiveGroqModels(cleanKey);
-
   let lastErr = null;
-  for (const model of modelsToTry) {
+  for (const model of GROQ_CANDIDATE_MODELS) {
     try {
       const result = await executeGroqGeneration(cleanKey, model, prompt, isWord);
       if (result && result.trim()) {
@@ -1379,12 +1363,18 @@ async function callGroq(apiKey, prompt, isWord) {
       }
     } catch (err) {
       lastErr = err;
+      // On 404, 429 (rate limit), 413, or 400 (decommissioned/unsupported model), try next model
       if (
         err.status === 404 ||
         err.status === 429 ||
         err.status === 413 ||
         err.message?.includes('rỗng') ||
-        (err.status === 400 && (err.message?.toLowerCase().includes('model') || err.message?.toLowerCase().includes('decommissioned') || err.message?.toLowerCase().includes('rate limit') || err.message?.toLowerCase().includes('too large')))
+        (err.status === 400 && (
+          err.message?.toLowerCase().includes('model') ||
+          err.message?.toLowerCase().includes('decommissioned') ||
+          err.message?.toLowerCase().includes('rate limit') ||
+          err.message?.toLowerCase().includes('not supported')
+        ))
       ) {
         continue;
       }
@@ -1397,7 +1387,7 @@ async function callGroq(apiKey, prompt, isWord) {
 
 async function executeGroqGeneration(apiKey, model, prompt, isWord) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 14000);
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -1413,13 +1403,13 @@ async function executeGroqGeneration(apiKey, model, prompt, isWord) {
           {
             role: 'system',
             content: isWord
-              ? "You are an elite bilingual lexicographer for Cambridge English-Vietnamese Dictionary. Provide authentic, natural, culturally idiomatic Vietnamese translations ('thuần Việt') matching Cambridge and Oxford published dictionaries. Crucial rule: In 'meaning_vi', ALWAYS provide the concise lexical headword equivalent (e.g. 'feast' -> 'bữa tiệc, yến tiệc', never 'bữa ăn lớn'; 'drought' -> 'hạn hán', never 'thời kỳ khô hạn'). Never translate the English definition phrase literally into 'meaning_vi'. Output ONLY a valid JSON object matching the requested schema."
-              : 'You are an elite English-Vietnamese translator and linguist. Produce the most natural, idiomatic, culturally authentic Vietnamese translations possible (thuần Việt, mượt mà). Extract key vocabulary in the sentence. All explanations, linguistic analysis, and vocabulary meanings MUST be written 100% in VIETNAMESE, never in English. Output ONLY a valid JSON object matching the requested schema.'
+              ? "You are an elite bilingual lexicographer for Cambridge English-Vietnamese Dictionary. Provide authentic, natural, culturally idiomatic Vietnamese translations ('thuần Việt') matching Cambridge and Oxford published dictionaries. Crucial rule: In 'meaning_vi', ALWAYS provide the concise lexical headword equivalent (e.g. 'feast' -> 'bữa tiệc, yến tiệc', never 'bữa ăn lớn'; 'drought' -> 'hạn hán', never 'thời kỳ khô hạn'; 'sibling' -> 'anh chị em ruột'). Never translate the English definition phrase literally into 'meaning_vi'. Output ONLY a valid JSON object matching the requested schema."
+              : 'You are an elite English-Vietnamese translator and linguist. Produce the most natural, idiomatic, culturally authentic Vietnamese translations possible (thuần Việt, mượt mà, thoát ý). Extract key vocabulary in the sentence. All explanations, linguistic analysis, and vocabulary meanings MUST be written 100% in VIETNAMESE, never in English. Output ONLY a valid JSON object matching the requested schema.'
           },
           { role: 'user', content: prompt }
         ],
         temperature: 0.1,
-        max_tokens: isWord ? 2048 : 3000
+        max_tokens: isWord ? 1000 : 1800
       })
     });
 
@@ -1471,7 +1461,7 @@ async function callOpenAI(apiKey, prompt, isWord) {
           { role: 'user', content: prompt }
         ],
         temperature: 0.1,
-        max_tokens: isWord ? 2048 : 3000
+        max_tokens: isWord ? 1000 : 1800
       })
     });
 
@@ -1516,7 +1506,7 @@ async function callClaude(apiKey, prompt, isWord) {
           : 'You are an elite English-Vietnamese translator and linguist. Translate into authentic, natural Vietnamese (thuần Việt). Extract key vocabulary. All explanations and vocabulary meanings MUST be 100% in VIETNAMESE. Output ONLY valid JSON matching the schema.',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.1,
-        max_tokens: isWord ? 2048 : 3000
+        max_tokens: isWord ? 1000 : 1800
       })
     });
 
@@ -1591,9 +1581,9 @@ export async function testDirectAI(provider, apiKey) {
       return {
         success: true,
         provider: 'groq',
-        model: 'llama-3.3-70b-versatile',
+        model: cachedGroqModel || 'llama-3.3-70b-versatile',
         latencyMs,
-        message: `Kết nối thành công! Groq AI phản hồi sau ${latencyMs}ms.`
+        message: `Kết nối thành công! Groq AI (${cachedGroqModel || 'llama-3.3-70b-versatile'}) phản hồi sau ${latencyMs}ms.`
       };
     } catch (err) {
       return {
