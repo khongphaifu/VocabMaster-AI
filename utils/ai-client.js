@@ -618,6 +618,9 @@ function repairAndParseJSON(rawStr) {
     return JSON.parse(cleaned);
   } catch (_) {}
 
+  // Strip dangling unclosed keys or values at the end of truncated JSON
+  cleaned = cleaned.replace(/,\s*"?[a-zA-Z0-9_]*"?\s*(?::\s*"?[^"]*)?$/, '').trim();
+
   // Balance unclosed quotes, brackets, and braces
   let inString = false, escape = false;
   let openBraces = 0, openBrackets = 0;
@@ -643,6 +646,25 @@ function repairAndParseJSON(rawStr) {
     return JSON.parse(cleaned);
   } catch (_) {}
 
+  // Deep cutback: find last valid comma before truncation and close braces
+  const lastComma = cleaned.lastIndexOf(',');
+  if (lastComma > 0) {
+    const sub = cleaned.slice(0, lastComma);
+    let subBraces = 0, subBrackets = 0;
+    for (const c of sub) {
+      if (c === '{') subBraces++;
+      else if (c === '}') subBraces--;
+      else if (c === '[') subBrackets++;
+      else if (c === ']') subBrackets--;
+    }
+    let subCleaned = sub;
+    while (subBrackets > 0) { subCleaned += ']'; subBrackets--; }
+    while (subBraces > 0) { subCleaned += '}'; subBraces--; }
+    try {
+      return JSON.parse(subCleaned);
+    } catch (_) {}
+  }
+
   return null;
 }
 
@@ -651,7 +673,12 @@ export function safeParseJSON(rawText, isWord, originalText, dictContext = null)
 
   if (!rawText || !rawText.trim()) {
     if (isWord && dictContext && dictContext.meaning_vi) {
-      return dictContext;
+      return {
+        type: 'word',
+        source: 'dictionary',
+        original: originalText,
+        word: { ...dictContext }
+      };
     }
     if (isWord && initialFallback) {
       return buildFallbackWordResponse(originalText, initialFallback);
@@ -1108,8 +1135,36 @@ export function safeParseJSON(rawText, isWord, originalText, dictContext = null)
     };
   }
 
-  if (isWord && fbData) {
-    return buildFallbackWordResponse(originalText, fbData);
+  if (isWord) {
+    if (dictContext && dictContext.meaning_vi) {
+      return {
+        type: 'word',
+        source: 'dictionary',
+        original: originalText,
+        word: { ...dictContext }
+      };
+    }
+    if (fbData) {
+      return buildFallbackWordResponse(originalText, fbData);
+    }
+    return {
+      type: 'word',
+      source: 'dictionary',
+      original: originalText,
+      word: {
+        word_root: cleanWordRoot || originalText,
+        meaning_vi: meaningViMatch ? meaningViMatch[1] : (defViMatch ? defViMatch[1] : originalText),
+        partOfSpeech: posMatch ? posMatch[1] : 'word',
+        ipa_uk: ipaUkMatch ? ipaUkMatch[1] : '',
+        ipa_us: ipaUsMatch ? ipaUsMatch[1] : '',
+        definition_vi: defViMatch ? defViMatch[1] : (meaningViMatch ? meaningViMatch[1] : originalText),
+        definition_en: defEnMatch ? defEnMatch[1] : '',
+        examples: [],
+        collocations: [],
+        word_family: [],
+        synonyms: []
+      }
+    };
   }
 
   return {
@@ -1199,7 +1254,7 @@ async function executeGeminiGeneration(apiKey, modelName, prompt, isWord) {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.1,
-          maxOutputTokens: isWord ? 1000 : 1800
+          maxOutputTokens: isWord ? 3500 : 4096
         }
       })
     });
@@ -1510,7 +1565,7 @@ async function executeGroqGeneration(apiKey, model, prompt, isWord) {
           { role: 'user', content: prompt }
         ],
         temperature: 0.1,
-        max_tokens: isWord ? 1000 : 1800
+        max_tokens: isWord ? 2500 : 3500
       })
     });
 

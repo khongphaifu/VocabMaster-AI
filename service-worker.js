@@ -260,6 +260,15 @@ async function handleTranslate(text, isWord, direction = 'auto') {
   try {
     const result = await callAI(aiProvider, apiKey, cleanText, isWord, direction, dictResult?.word || null);
     if (result) {
+      // SAFETY CHECK: If this is a word lookup, result MUST be type 'word'
+      if (isWord && result.type !== 'word') {
+        console.warn('AI returned non-word response for word lookup. Reverting to verified dictionary result.');
+        if (dictResult && dictResult.word?.meaning_vi) {
+          await setCachedTranslation(cacheKey, dictResult);
+          return dictResult;
+        }
+      }
+
       // Retain verified dictionary source badge and official audio
       if (dictResult) {
         result.source = dictResult.source || 'dictionary';

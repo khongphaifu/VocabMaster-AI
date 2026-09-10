@@ -801,7 +801,71 @@ export function ensureNounForm(text, word, pos) {
   return clean;
 }
 
+const IRREGULAR_VERBS = {
+  meant: { root: 'mean', form: 'quá khứ & phân từ II của mean', meaning_vi: 'có nghĩa là, có ý định' },
+  went: { root: 'go', form: 'quá khứ của go', meaning_vi: 'đi' },
+  gone: { root: 'go', form: 'phân từ II của go', meaning_vi: 'đã đi, biến mất' },
+  bought: { root: 'buy', form: 'quá khứ & phân từ II của buy', meaning_vi: 'mua' },
+  brought: { root: 'bring', form: 'quá khứ & phân từ II của bring', meaning_vi: 'mang lại, đem đến' },
+  thought: { root: 'think', form: 'quá khứ & phân từ II của think', meaning_vi: 'suy nghĩ, ngẫm nghĩ' },
+  taught: { root: 'teach', form: 'quá khứ & phân từ II của teach', meaning_vi: 'dạy học' },
+  caught: { root: 'catch', form: 'quá khứ & phân từ II của catch', meaning_vi: 'bắt, nắm lấy' },
+  felt: { root: 'feel', form: 'quá khứ & phân từ II của feel', meaning_vi: 'cảm thấy' },
+  found: { root: 'find', form: 'quá khứ & phân từ II của find', meaning_vi: 'tìm thấy, nhận thấy' },
+  left: { root: 'leave', form: 'quá khứ & phân từ II của leave', meaning_vi: 'rời đi, để lại' },
+  lost: { root: 'lose', form: 'quá khứ & phân từ II của lose', meaning_vi: 'đánh mất, thua' },
+  paid: { root: 'pay', form: 'quá khứ & phân từ II của pay', meaning_vi: 'chi trả, trả tiền' },
+  said: { root: 'say', form: 'quá khứ & phân từ II của say', meaning_vi: 'nói, bảo' },
+  made: { root: 'make', form: 'quá khứ & phân từ II của make', meaning_vi: 'làm, chế tạo' },
+  heard: { root: 'hear', form: 'quá khứ & phân từ II của hear', meaning_vi: 'nghe thấy' },
+  stood: { root: 'stand', form: 'quá khứ & phân từ II của stand', meaning_vi: 'đứng, chịu đựng' },
+  understood: { root: 'understand', form: 'quá khứ & phân từ II của understand', meaning_vi: 'hiểu' },
+  sat: { root: 'sit', form: 'quá khứ & phân từ II của sit', meaning_vi: 'ngồi' },
+  ran: { root: 'run', form: 'quá khứ của run', meaning_vi: 'chạy' },
+  came: { root: 'come', form: 'quá khứ của come', meaning_vi: 'đến' },
+  became: { root: 'become', form: 'quá khứ của become', meaning_vi: 'trở thành' },
+  began: { root: 'begin', form: 'quá khứ của begin', meaning_vi: 'bắt đầu' },
+  broke: { root: 'break', form: 'quá khứ của break', meaning_vi: 'làm vỡ, gãy' },
+  broken: { root: 'break', form: 'phân từ II của break', meaning_vi: 'bị vỡ, hỏng' },
+  chose: { root: 'choose', form: 'quá khứ của choose', meaning_vi: 'chọn lựa' },
+  chosen: { root: 'choose', form: 'phân từ II của choose', meaning_vi: 'được chọn' },
+  drove: { root: 'drive', form: 'quá khứ của drive', meaning_vi: 'lái xe' },
+  driven: { root: 'drive', form: 'phân từ II của drive', meaning_vi: 'bị thúc đẩy' },
+  fell: { root: 'fall', form: 'quá khứ của fall', meaning_vi: 'rơi, ngã' },
+  fallen: { root: 'fall', form: 'phân từ II của fall', meaning_vi: 'bị ngã, sa sút' },
+  gave: { root: 'give', form: 'quá khứ của give', meaning_vi: 'cho, tặng' },
+  given: { root: 'give', form: 'phân từ II của give', meaning_vi: 'được cho' },
+  grew: { root: 'grow', form: 'quá khứ của grow', meaning_vi: 'phát triển, lớn lên' },
+  grown: { root: 'grow', form: 'phân từ II của grow', meaning_vi: 'trưởng thành' },
+  knew: { root: 'know', form: 'quá khứ của know', meaning_vi: 'biết' },
+  known: { root: 'know', form: 'phân từ II của know', meaning_vi: 'được biết đến' },
+  rose: { root: 'rise', form: 'quá khứ của rise', meaning_vi: 'tăng lên, nổi dậy' },
+  risen: { root: 'rise', form: 'phân từ II của rise', meaning_vi: 'đã gia tăng' },
+  saw: { root: 'see', form: 'quá khứ của see', meaning_vi: 'nhìn thấy' },
+  seen: { root: 'see', form: 'phân từ II của see', meaning_vi: 'được thấy' },
+  took: { root: 'take', form: 'quá khứ của take', meaning_vi: 'cầm, lấy' },
+  taken: { root: 'take', form: 'phân từ II của take', meaning_vi: 'đã lấy' },
+  wore: { root: 'wear', form: 'quá khứ của wear', meaning_vi: 'mặc, đeo' },
+  worn: { root: 'wear', form: 'phân từ II của wear', meaning_vi: 'bị mòn, cũ' },
+  wrote: { root: 'write', form: 'quá khứ của write', meaning_vi: 'viết' },
+  written: { root: 'write', form: 'phân từ II của write', meaning_vi: 'bằng văn bản' },
+  spoke: { root: 'speak', form: 'quá khứ của speak', meaning_vi: 'nói chuyện' },
+  spoken: { root: 'speak', form: 'phân từ II của speak', meaning_vi: 'bằng lời nói' }
+};
+
 const IRREGULAR_WORD_FAMILIES = {
+  meant: [
+    { pos: 'verb', word: 'mean', meaning_vi: 'nguyên mẫu: có nghĩa là, có ý định' },
+    { pos: 'noun', word: 'meaning', meaning_vi: 'ý nghĩa, hàm ý' },
+    { pos: 'adj', word: 'meaningful', meaning_vi: 'có ý nghĩa, đầy ý nghĩa' },
+    { pos: 'adj', word: 'meaningless', meaning_vi: 'vô nghĩa' }
+  ],
+  mean: [
+    { pos: 'noun', word: 'meaning', meaning_vi: 'ý nghĩa, hàm ý' },
+    { pos: 'adj', word: 'meaningful', meaning_vi: 'có ý nghĩa, đầy ý nghĩa' },
+    { pos: 'adj', word: 'meaningless', meaning_vi: 'vô nghĩa' },
+    { pos: 'noun', word: 'meanness', meaning_vi: 'tính bủn xỉn, sự ích kỷ' }
+  ],
   observation: [
     { pos: 'verb', word: 'observe', meaning_vi: 'quan sát, theo dõi' },
     { pos: 'noun', word: 'observer', meaning_vi: 'người quan sát, quan sát viên' },
@@ -1038,6 +1102,9 @@ export function generateFallbackFamily(word, pos, meaningVi = '') {
 
   if (IRREGULAR_WORD_FAMILIES[cleanWord]) {
     return [...IRREGULAR_WORD_FAMILIES[cleanWord]];
+  }
+  if (IRREGULAR_VERBS[cleanWord] && IRREGULAR_WORD_FAMILIES[IRREGULAR_VERBS[cleanWord].root]) {
+    return [...IRREGULAR_WORD_FAMILIES[IRREGULAR_VERBS[cleanWord].root]];
   }
 
   const p = (pos || 'noun').toLowerCase();
@@ -1408,6 +1475,9 @@ export async function resolveDictionaryWord(word) {
   const cleanWord = (word || '').trim().toLowerCase();
   if (!cleanWord || cleanWord.length > 45) return null;
 
+  const irreg = IRREGULAR_VERBS[cleanWord];
+  const rootLemma = irreg?.root || cleanWord;
+
   // 1. FAST OFFLINE CHECK (emergency fallback)
   if (CORE_OFFLINE_DICT[cleanWord]) {
     const offline = { ...CORE_OFFLINE_DICT[cleanWord] };
@@ -1446,6 +1516,13 @@ export async function resolveDictionaryWord(word) {
 
     // If Cambridge succeeded with rich Vietnamese meaning and it is NOT a descriptive sentence
     if (cambridgeRes && cambridgeRes.word?.meaning_vi && !isDescriptiveSentence(cambridgeRes.word.meaning_vi)) {
+      if (irreg) {
+        cambridgeRes.word.word_root = irreg.root;
+        cambridgeRes.word.partOfSpeech = `verb (${irreg.form})`;
+        if (!cambridgeRes.word.meaning_vi || isDescriptiveSentence(cambridgeRes.word.meaning_vi)) {
+          cambridgeRes.word.meaning_vi = irreg.meaning_vi;
+        }
+      }
       if (wiktionaryDict && Array.isArray(wiktionaryDict.headwords)) {
         cambridgeRes.word.other_meanings = cambridgeRes.word.other_meanings || [];
         for (const hw of wiktionaryDict.headwords) {
@@ -1458,7 +1535,7 @@ export async function resolveDictionaryWord(word) {
         cambridgeRes.word.synonyms = phoneticData.synonyms;
       }
       if (!cambridgeRes.word.collocations || cambridgeRes.word.collocations.length < 2) {
-        const extraCol = generateFallbackCollocations(cleanWord, cambridgeRes.word.partOfSpeech, cambridgeRes.word.synonyms, cambridgeRes.word.meaning_vi);
+        const extraCol = generateFallbackCollocations(rootLemma, cambridgeRes.word.partOfSpeech, cambridgeRes.word.synonyms, cambridgeRes.word.meaning_vi);
         cambridgeRes.word.collocations = [...(cambridgeRes.word.collocations || []), ...extraCol].slice(0, 3);
       }
       if (!cambridgeRes.word.word_family?.length) {
@@ -1471,7 +1548,7 @@ export async function resolveDictionaryWord(word) {
     // 1. Primary Meaning: MUST be concise lexical headword (1-3 words)
     let primaryMeaning = '';
     let definitionVi = '';
-    let pos = gDict?.partOfSpeech || wiktionaryDict?.partOfSpeech || 'noun';
+    let pos = irreg ? `verb (${irreg.form})` : (gDict?.partOfSpeech || wiktionaryDict?.partOfSpeech || 'noun');
     const otherMeanings = [];
     const synonyms = [];
 
@@ -1592,7 +1669,7 @@ export async function resolveDictionaryWord(word) {
         : [...realExamples, ...generateFallbackExamples(cleanWord, pos, primaryMeaning)].slice(0, 3);
 
       const collocations = generateFallbackCollocations(
-        cleanWord,
+        rootLemma,
         pos,
         synonyms,
         primaryMeaning,
@@ -1608,7 +1685,7 @@ export async function resolveDictionaryWord(word) {
         audioUk: audio,
         audioUs: audio,
         word: {
-          word_root: cleanWord,
+          word_root: rootLemma,
           ipa_uk: ipa,
           ipa_us: ipa,
           partOfSpeech: pos,

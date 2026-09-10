@@ -163,17 +163,18 @@ async function doTranslate(text, anchorRect) {
   if (isProcessing) return;
   isProcessing = true;
 
-  const isWord = !text.includes(' ') && text.length < 35;
+  const cleanText = (text || '').replace(/[\s\u00A0]+/g, ' ').trim();
+  const isWord = !cleanText.includes(' ') && cleanText.length < 35;
   const anchor = anchorRect || currentAnchorRect;
   if (anchor) currentAnchorRect = anchor;
 
   // Instant Shell (0ms): render card shell immediately with word header and AI shimmer skeleton
-  showStreamingTooltip(text, isWord, anchor);
+  showStreamingTooltip(cleanText, isWord, anchor);
 
   try {
     const sendPromise = chrome.runtime.sendMessage({
       type: 'TRANSLATE',
-      text,
+      text: cleanText,
       isWord,
     });
 
@@ -519,7 +520,38 @@ function showResultTooltip(data, anchorRect) {
     document.body.appendChild(tooltip);
   }
 
-  tooltip.innerHTML = data.type === 'word' ? buildWordHTML(data) : buildPhraseHTML(data);
+  let isWord = data.type === 'word' || (data.word && typeof data.word === 'object');
+
+  // Emergency safety check: if data arrived marked as phrase, but original was a single word
+  // and translation contains raw JSON artifacts (e.g. "type: word" or "word_root:"):
+  if (!isWord && !data.original?.includes(' ') && (data.original?.length || 0) < 35) {
+    const trans = String(data.translation || '');
+    if (trans.includes('type: word') || trans.includes('word_root:') || trans.includes('"word":') || trans.startsWith('{')) {
+      console.warn('Detected leaked raw JSON in phrase translation. Converting to word card.');
+      const mMatch = trans.match(/meaning_vi[":\s]+([^,\n\r"}]+)/i);
+      const meaning = mMatch ? mMatch[1].trim() : data.original;
+      data = {
+        type: 'word',
+        original: data.original,
+        word: {
+          word_root: data.original,
+          meaning_vi: meaning,
+          partOfSpeech: 'word',
+          ipa_uk: '',
+          ipa_us: '',
+          definition_vi: meaning,
+          definition_en: '',
+          examples: [],
+          collocations: [],
+          word_family: [],
+          synonyms: []
+        }
+      };
+      isWord = true;
+    }
+  }
+
+  tooltip.innerHTML = isWord ? buildWordHTML(data) : buildPhraseHTML(data);
 
   // Position immediately with full rendered contents
   smartPositionTooltip(anchorRect);
