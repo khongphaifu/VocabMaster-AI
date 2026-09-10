@@ -202,7 +202,13 @@ function renderResult(data, isWord, originalText) {
       cleanMeaning = w.definition_vi || w.definition_en || orig;
     }
 
-    const cleanDefVi = (w.definition_vi && !w.definition_vi.includes('...') && w.definition_vi !== cleanMeaning) ? w.definition_vi : '';
+    const isBoilerplateDef = (str) => {
+      if (!str || typeof str !== 'string') return true;
+      const s = str.trim().toLowerCase();
+      return s.includes('trong tiếng việt có nghĩa là') || s.includes('giải thích chi tiết ý nghĩa');
+    };
+
+    const cleanDefVi = (w.definition_vi && !w.definition_vi.includes('...') && !isBoilerplateDef(w.definition_vi) && w.definition_vi !== cleanMeaning) ? w.definition_vi : '';
     const cleanDefEn = (w.definition_en && !w.definition_en.includes('...')) ? w.definition_en : '';
 
     const wordHtml = `
@@ -212,7 +218,13 @@ function renderResult(data, isWord, originalText) {
           <div class="headword-wrap">
             <span class="headword-text">${esc(orig)}</span>
             ${rootWord ? `<span class="root-tag" title="Từ nguyên thể">➔ ${esc(rootWord)}</span>` : ''}
-            ${data.source === 'cambridge' ? `<span style="font-size:10px;font-weight:700;color:#fab387;background:rgba(250,179,135,0.15);border:1px solid rgba(250,179,135,0.3);padding:1px 6px;border-radius:4px;">📚 Cambridge</span>` : ''}
+            ${data.source === 'cambridge'
+              ? `<span style="font-size:10px;font-weight:700;color:#fab387;background:rgba(250,179,135,0.15);border:1px solid rgba(250,179,135,0.3);padding:1px 6px;border-radius:4px;">📚 Cambridge</span>`
+              : (data.aiWarning
+                ? `<span style="font-size:10px;font-weight:700;color:#f9e2af;background:rgba(249,226,175,0.15);border:1px solid rgba(249,226,175,0.4);padding:1px 6px;border-radius:4px;" title="${esc(data.aiWarning)}">📖 Từ điển chuẩn</span>`
+                : (data.source === 'dictionary'
+                  ? `<span style="font-size:10px;font-weight:700;color:#89b4fa;background:rgba(137,180,250,0.15);border:1px solid rgba(137,180,250,0.3);padding:1px 6px;border-radius:4px;">📚 Từ điển chuẩn</span>`
+                  : ''))}
           </div>
           <div style="display:flex;gap:4px;align-items:center;">
             <a href="${data.cambridgeUrl || `https://dictionary.cambridge.org/dictionary/english-vietnamese/${encodeURIComponent(orig.toLowerCase())}`}" target="_blank" rel="noopener noreferrer" class="icon-btn" title="Xem trên Cambridge Dictionary Online" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;color:#89b4fa;font-size:11px;">📖</a>
@@ -260,18 +272,11 @@ function renderResult(data, isWord, originalText) {
           ` : ''}
         </div>
 
-        <!-- Examples -->
-        ${(w.examples && w.examples.length) ? `
-          <div class="dict-section">
-            <div class="section-label">📝 VÍ DỤ / EXAMPLES</div>
-            <div class="examples-list">
-              ${w.examples.slice(0, 2).map(ex => `
-                <div class="example-item">
-                  <span style="color:#89b4fa;">•</span>
-                  <span>${esc(ex)}</span>
-                </div>
-              `).join('')}
-            </div>
+        <!-- Synonyms - Prominently right below meanings -->
+        ${(w.synonyms && w.synonyms.length) ? `
+          <div class="synonyms-bar" style="margin-top:8px;">
+            <span style="font-size:11px;color:#6c7086;font-weight:600;">Đồng nghĩa:</span>
+            ${w.synonyms.slice(0, 4).map(s => `<span class="word-tag">${esc(s)}</span>`).join('')}
           </div>
         ` : ''}
 
@@ -284,22 +289,6 @@ function renderResult(data, isWord, originalText) {
                 <div class="colloc-item">
                   <b style="color:#fab387;">${esc(c.phrase || '')}</b>
                   ${c.meaning_vi ? `<span style="color:#a6adc8;">: ${esc(c.meaning_vi)}</span>` : ''}
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        ` : ''}
-
-        <!-- Word Family -->
-        ${(w.word_family && w.word_family.length) ? `
-          <div class="dict-section">
-            <div class="section-label">🌱 CÁC DẠNG TỪ LIÊN QUAN (WORD FAMILY)</div>
-            <div class="family-list">
-              ${w.word_family.map(f => `
-                <div class="family-row">
-                  <span class="family-pos">${esc(f.pos || '')}</span>
-                  <span class="family-word">${esc(f.word || '')}:</span>
-                  <span class="family-meaning">${esc(f.meaning_vi || '')}</span>
                 </div>
               `).join('')}
             </div>
@@ -321,11 +310,34 @@ function renderResult(data, isWord, originalText) {
           </div>
         ` : ''}
 
-        <!-- Synonyms -->
-        ${(w.synonyms && w.synonyms.length) ? `
-          <div class="synonyms-bar">
-            <span style="font-size:11px;color:#6c7086;font-weight:600;">Đồng nghĩa:</span>
-            ${w.synonyms.slice(0, 4).map(s => `<span class="word-tag">${esc(s)}</span>`).join('')}
+        <!-- Examples -->
+        ${(w.examples && w.examples.length) ? `
+          <div class="dict-section">
+            <div class="section-label">📝 VÍ DỤ / EXAMPLES</div>
+            <div class="examples-list">
+              ${w.examples.slice(0, 2).map(ex => `
+                <div class="example-item">
+                  <span style="color:#89b4fa;">•</span>
+                  <span>${esc(ex)}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Word Family -->
+        ${(w.word_family && w.word_family.length) ? `
+          <div class="dict-section">
+            <div class="section-label">🌱 CÁC DẠNG TỪ LIÊN QUAN (WORD FAMILY)</div>
+            <div class="family-list">
+              ${w.word_family.map(f => `
+                <div class="family-row">
+                  <span class="family-pos">${esc(f.pos || '')}</span>
+                  <span class="family-word">${esc(f.word || '')}:</span>
+                  <span class="family-meaning">${esc(f.meaning_vi || '')}</span>
+                </div>
+              `).join('')}
+            </div>
           </div>
         ` : ''}
 

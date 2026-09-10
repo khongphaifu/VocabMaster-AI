@@ -33,6 +33,10 @@ export function convertCmuToIpa(cmuStr) {
     let symbol = CMU_TO_IPA[phone] || phone.toLowerCase();
     if (phone === 'AH' && stress === '0') {
       symbol = 'ə';
+    } else if (phone === 'ER' && stress === '0') {
+      symbol = 'ər';
+    } else if (phone === 'IH' && stress === '0') {
+      symbol = 'ɪ';
     }
 
     if (stress === '1') {
@@ -746,63 +750,122 @@ export function cleanWikitext(str) {
     .trim();
 }
 
-export function generateFallbackExamples(word, pos) {
+const IRREGULAR_WORD_FAMILIES = {
+  parameter: [
+    { pos: 'adj', word: 'parametric', meaning_vi: 'thuộc về tham số / thông số' },
+    { pos: 'noun', word: 'parameters', meaning_vi: 'các tham số, giới hạn' }
+  ],
+  hyperparameter: [
+    { pos: 'adj', word: 'hyperparametric', meaning_vi: 'thuộc về siêu tham số' },
+    { pos: 'noun', word: 'hyperparameters', meaning_vi: 'các siêu tham số' }
+  ],
+  sustainable: [
+    { pos: 'noun', word: 'sustainability', meaning_vi: 'sự bền vững' },
+    { pos: 'adv', word: 'sustainably', meaning_vi: 'một cách bền vững' }
+  ],
+  resilience: [
+    { pos: 'adj', word: 'resilient', meaning_vi: 'kiên cường, có khả năng phục hồi' }
+  ],
+  algorithm: [
+    { pos: 'adj', word: 'algorithmic', meaning_vi: 'thuộc về thuật toán' },
+    { pos: 'adv', word: 'algorithmically', meaning_vi: 'bằng thuật toán' }
+  ]
+};
+
+export async function translateDefinition(text) {
+  const clean = (text || '').trim();
+  if (!clean || clean.length > 400) return '';
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1800);
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&q=${encodeURIComponent(clean)}`;
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (res.ok) {
+      const data = await res.json();
+      return data[0]?.map(x => x[0]).join('').trim() || '';
+    }
+  } catch (_) {}
+  return '';
+}
+
+export function generateFallbackExamples(word, pos, meaningVi = '') {
   const p = (pos || 'noun').toLowerCase();
+  const w = (word || '').trim();
+
   if (p.includes('verb')) {
     return [
-      `They decided to ${word} the project carefully before the deadline.`,
-      `You should always ${word} all requirements to avoid any mistakes.`
+      `Researchers must carefully ${w} all variables to guarantee precise outcomes.`,
+      `The engineering team decided to ${w} the entire process for better efficiency.`
     ];
   }
   if (p.includes('adj')) {
     return [
-      `The team developed a highly ${word} strategy to achieve the goal.`,
-      `It is crucial to maintain a ${word} environment for the study.`
+      `This model provides a highly ${w} approach for modern scientific research.`,
+      `It is essential to maintain a ${w} condition during the testing phase.`
+    ];
+  }
+  if (p.includes('adv')) {
+    return [
+      `The system operates ${w} under standard laboratory conditions.`,
+      `They approached the complex challenge ${w} to avoid unforeseen errors.`
     ];
   }
   return [
-    `The ${word} is clearly visible on the front of the package.`,
-    `She carefully checked the ${word} before making her decision.`
+    `The concept of ${w} plays a fundamental role in understanding the system.`,
+    `Engineers need to carefully adjust the primary ${w} to optimize performance.`
   ];
 }
 
 export function generateFallbackCollocations(word, pos, synonyms = [], meaningVi = '') {
   const p = (pos || 'noun').toLowerCase();
-  const m = (meaningVi || word).trim();
+  const w = (word || '').trim();
+  const cleanM = (meaningVi || word).split(/[,;]/)[0].trim().toLowerCase();
+
   if (p.includes('verb')) {
     return [
-      { phrase: `${word} carefully`, meaning_vi: `${m} một cách cẩn thận` },
-      { phrase: `${word} properly`, meaning_vi: `${m} đúng cách` }
+      { phrase: `${w} effectively`, meaning_vi: `${cleanM} một cách hiệu quả` },
+      { phrase: `${w} properly`, meaning_vi: `${cleanM} đúng phương pháp` }
     ];
   }
   if (p.includes('adj')) {
     return [
-      { phrase: `highly ${word}`, meaning_vi: `rất ${m}` },
-      { phrase: `remain ${word}`, meaning_vi: `vẫn giữ tính chất ${m}` }
+      { phrase: `highly ${w}`, meaning_vi: `rất ${cleanM}` },
+      { phrase: `remain ${w}`, meaning_vi: `vẫn giữ tính chất ${cleanM}` }
     ];
   }
   return [
-    { phrase: `standard ${word}`, meaning_vi: `${m} tiêu chuẩn` },
-    { phrase: `official ${word}`, meaning_vi: `${m} chính thức` }
+    { phrase: `key ${w}`, meaning_vi: `${cleanM} then chốt / quan trọng` },
+    { phrase: `standard ${w}`, meaning_vi: `${cleanM} tiêu chuẩn` }
   ];
 }
 
 export function generateFallbackFamily(word, pos, meaningVi = '') {
+  const cleanWord = (word || '').trim().toLowerCase();
+  const cleanM = (meaningVi || word).split(/[,;]/)[0].trim().toLowerCase();
+
+  if (IRREGULAR_WORD_FAMILIES[cleanWord]) {
+    return [...IRREGULAR_WORD_FAMILIES[cleanWord]];
+  }
+
   const p = (pos || 'noun').toLowerCase();
-  const m = (meaningVi || word).trim();
   const list = [];
-  const rootWithoutE = word.endsWith('e') ? word.slice(0, -1) : word;
+  const rootWithoutE = cleanWord.endsWith('e') ? cleanWord.slice(0, -1) : cleanWord;
 
   if (p.includes('noun')) {
-    list.push({ pos: 'verb', word: `${word}`, meaning_vi: `gắn hoặc xử lý ${m}` });
-    list.push({ pos: 'adj', word: `${rootWithoutE}ed`, meaning_vi: `có tính ${m}` });
+    if (cleanWord.endsWith('meter')) {
+      list.push({ pos: 'adj', word: `${cleanWord.slice(0, -5)}metric`, meaning_vi: `thuộc về ${cleanM}` });
+    } else {
+      list.push({ pos: 'adj', word: `${rootWithoutE}ed`, meaning_vi: `mang tính ${cleanM}` });
+    }
+    list.push({ pos: 'verb', word: cleanWord, meaning_vi: `xử lý ${cleanM}` });
   } else if (p.includes('verb')) {
-    list.push({ pos: 'noun', word: `${rootWithoutE}er`, meaning_vi: `người/thiết bị ${m}` });
-    list.push({ pos: 'noun', word: `${rootWithoutE}ing`, meaning_vi: `hoạt động ${m}` });
+    list.push({ pos: 'noun', word: `${rootWithoutE}er`, meaning_vi: `người/thiết bị ${cleanM}` });
+    list.push({ pos: 'noun', word: `${rootWithoutE}ing`, meaning_vi: `hoạt động ${cleanM}` });
   } else if (p.includes('adj')) {
-    const advForm = word.endsWith('ic') ? `${word}ally` : (word.endsWith('le') ? `${rootWithoutE}y` : `${word}ly`);
-    list.push({ pos: 'adv', word: advForm, meaning_vi: `một cách ${m}` });
-    list.push({ pos: 'noun', word: `${word}ness`, meaning_vi: `tính chất ${m}` });
+    const advForm = cleanWord.endsWith('ic') ? `${cleanWord}ally` : (cleanWord.endsWith('le') ? `${rootWithoutE}y` : `${cleanWord}ly`);
+    list.push({ pos: 'adv', word: advForm, meaning_vi: `một cách ${cleanM}` });
+    list.push({ pos: 'noun', word: `${cleanWord}ness`, meaning_vi: `tính chất ${cleanM}` });
   }
   return list;
 }
@@ -815,7 +878,7 @@ export async function fetchGoogleDictionary(word) {
   const cleanWord = (word || '').trim();
   if (!cleanWord) return null;
 
-  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&dt=bd&dt=rm&dt=md&dt=ss&q=${encodeURIComponent(cleanWord)}`;
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&dt=bd&dt=rm&dt=md&dt=ss&dt=ex&q=${encodeURIComponent(cleanWord)}`;
 
   try {
     const controller = new AbortController();
@@ -839,6 +902,28 @@ export async function fetchGoogleDictionary(word) {
     // Extract POS and definition_en from dt=md (data[12]) or data[1]
     const detectedPos = data[12]?.[0]?.[0] || data[1]?.[0]?.[0] || 'noun';
     const defEn = data[12]?.[0]?.[1]?.[0]?.[0] || '';
+
+    // Extract real Oxford example sentences from data[12]
+    const oxfordExamples = [];
+    if (Array.isArray(data[12])) {
+      for (const group of data[12]) {
+        if (Array.isArray(group[1])) {
+          for (const item of group[1]) {
+            if (typeof item[2] === 'string' && item[2].trim()) {
+              const ex = item[2].trim();
+              const cleanEx = ex.charAt(0).toUpperCase() + ex.slice(1) + (ex.endsWith('.') ? '' : '.');
+              if (!oxfordExamples.includes(cleanEx)) oxfordExamples.push(cleanEx);
+            }
+          }
+        }
+      }
+    }
+
+    // Translate English definition to Vietnamese
+    let translatedDefVi = '';
+    if (defEn) {
+      translatedDefVi = await translateDefinition(defEn);
+    }
 
     // Extract other meanings, parts of speech, and English reverse synonyms
     const otherMeanings = [];
@@ -891,6 +976,8 @@ export async function fetchGoogleDictionary(word) {
       meaning_vi: directTrans,
       partOfSpeech: detectedPos,
       definition_en: defEn,
+      definition_vi: translatedDefVi,
+      examples: oxfordExamples,
       translit: translit ? `/${translit}/` : '',
       other_meanings: otherMeanings.slice(0, 5),
       synonyms: synonyms.slice(0, 6)
@@ -1128,11 +1215,17 @@ export async function resolveDictionaryWord(word) {
       primaryMeaning = wiktionaryDict.headwords[0].text;
     }
 
-    // Handle definition_vi: If Wiktionary has a descriptive sentence, put it here!
+    // Handle definition_vi: prioritize Wiktionary descriptive definitions or translated Oxford definition
     if (wiktionaryDict?.definitions?.length) {
       definitionVi = wiktionaryDict.definitions[0].text;
+    } else if (gDict?.definition_vi) {
+      definitionVi = gDict.definition_vi;
+    } else if (gDict?.definition_en) {
+      definitionVi = await translateDefinition(gDict.definition_en);
+    } else if (phoneticData?.definition_en) {
+      definitionVi = await translateDefinition(phoneticData.definition_en);
     } else if (primaryMeaning) {
-      definitionVi = `${cleanWord} trong tiếng Việt có nghĩa là "${primaryMeaning}".`;
+      definitionVi = primaryMeaning;
     }
 
     // Populate other_meanings
@@ -1177,12 +1270,32 @@ export async function resolveDictionaryWord(word) {
     }
 
     if (primaryMeaning) {
-      const ipa = phoneticData?.ipa || gDict?.translit || '';
+      // Prioritize natural IPA from Oxford translit if it contains standard phonetics, else CMU IPA
+      let ipa = (gDict?.translit && /[ˈˌəæɑɔɪʊ]/.test(gDict.translit))
+        ? gDict.translit
+        : (phoneticData?.ipa || gDict?.translit || '');
+      if (ipa && !ipa.startsWith('/')) ipa = `/${ipa}/`;
+
       const defEn = gDict?.definition_en || phoneticData?.definition_en || '';
       const audio = phoneticData?.audio || '';
-      const examples = (phoneticData?.examples?.length >= 2)
-        ? phoneticData.examples
-        : generateFallbackExamples(cleanWord, pos);
+
+      // Prioritize authentic Oxford examples from gDict.examples
+      const realExamples = [];
+      if (Array.isArray(gDict?.examples)) {
+        for (const ex of gDict.examples) {
+          if (ex && !realExamples.includes(ex)) realExamples.push(ex);
+        }
+      }
+      if (Array.isArray(phoneticData?.examples)) {
+        for (const ex of phoneticData.examples) {
+          if (ex && !realExamples.includes(ex)) realExamples.push(ex);
+        }
+      }
+
+      const examples = realExamples.length >= 2
+        ? realExamples.slice(0, 3)
+        : [...realExamples, ...generateFallbackExamples(cleanWord, pos, primaryMeaning)].slice(0, 3);
+
       const collocations = generateFallbackCollocations(cleanWord, pos, synonyms, primaryMeaning);
       const wordFamily = generateFallbackFamily(cleanWord, pos, primaryMeaning);
 

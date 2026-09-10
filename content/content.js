@@ -705,6 +705,8 @@ function buildWordHTML(data) {
            s === 'nghĩa thuần việt chuẩn xác' ||
            s.includes('nghĩa thuần việt') ||
            s.includes('nghĩa tiếng việt') ||
+           s.includes('trong tiếng việt có nghĩa là') ||
+           s.includes('giải thích chi tiết ý nghĩa') ||
            s === 'bàn điệt' ||
            s.includes('bàn điệt') ||
            s === 'từ liên quan' ||
@@ -735,7 +737,13 @@ function buildWordHTML(data) {
         <div class="vm-word-wrap">
           <span class="vm-word">${escHtml(orig)}</span>
           ${rootWord ? `<span class="vm-root-tag vm-cascade-item vm-cascade-delay-1" title="Từ nguyên thể">➔ ${escHtml(rootWord)}</span>` : ''}
-          ${data.source === 'cambridge' ? `<span class="vm-source-tag vm-cascade-item vm-cascade-delay-1" title="Bản dịch trực tiếp từ Cambridge Dictionary Online">📚 Cambridge</span>` : (data.source === 'dictionary' ? `<span class="vm-source-tag vm-cascade-item vm-cascade-delay-1" title="Bản dịch chuẩn từ điển đã xác thực">📚 Từ điển chuẩn</span>` : '')}
+          ${data.source === 'cambridge'
+            ? `<span class="vm-source-tag vm-cascade-item vm-cascade-delay-1" title="Bản dịch trực tiếp từ Cambridge Dictionary Online">📚 Cambridge</span>`
+            : (data.aiWarning
+              ? `<span class="vm-source-tag vm-cascade-item vm-cascade-delay-1" style="background:rgba(249,226,175,0.18);color:#f9e2af;border:1px solid rgba(249,226,175,0.4);" title="${escHtml(data.aiWarning)}">📖 Từ điển chuẩn</span>`
+              : (data.source === 'dictionary'
+                ? `<span class="vm-source-tag vm-cascade-item vm-cascade-delay-1" title="Bản dịch chuẩn từ điển đã xác thực">📚 Từ điển chuẩn</span>`
+                : ''))}
         </div>
         <div class="vm-header-tools">
           <button type="button" class="vm-tool-btn vm-copy-btn" title="Sao chép từ & nghĩa">${ICONS.copy}</button>
@@ -784,9 +792,69 @@ function buildWordHTML(data) {
         </div>
       ` : ''}
 
+      <!-- Đồng nghĩa (Synonyms) - High priority right below definitions -->
+      ${(w.synonyms && w.synonyms.length) ? (() => {
+        const seenSyn = new Set();
+        const validSynonyms = w.synonyms
+          .map(s => String(s || '').trim())
+          .filter(s => {
+            if (!s || s.length < 2) return false;
+            if (isPlaceholder(s)) return false;
+            if (VIETNAMESE_REGEX.test(s)) return false; // Must be English
+            const lower = s.toLowerCase();
+            if (lower === orig.toLowerCase() || lower === (rootWord || '').toLowerCase()) return false;
+            if (seenSyn.has(lower)) return false;
+            seenSyn.add(lower);
+            return true;
+          })
+          .slice(0, 4);
+        return validSynonyms.length ? `
+          <div class="vm-synonyms-row vm-cascade-item vm-cascade-delay-3">
+            <span class="vm-syn-label">Đồng nghĩa:</span>
+            ${validSynonyms.map(s => `<span class="vm-syn-tag">${escHtml(s)}</span>`).join('')}
+          </div>
+        ` : '';
+      })() : ''}
+
+      <!-- 🔗 Cụm từ thông dụng (Collocations) -->
+      ${(w.collocations && w.collocations.length) ? (() => {
+        const validColloc = w.collocations.filter(c => c && c.phrase && !isPlaceholder(c.phrase) && !isPlaceholder(c.meaning_vi));
+        return validColloc.length ? `
+          <div class="vm-section vm-cascade-item vm-cascade-delay-4">
+            <div class="vm-section-title">🔗 Cụm từ thông dụng (Collocations)</div>
+            <div class="vm-colloc-list">
+              ${validColloc.map(c => `
+                <div class="vm-colloc-item">
+                  <b class="vm-colloc-phrase">${escHtml(c.phrase || '')}</b>
+                  ${c.meaning_vi ? `<span class="vm-colloc-meaning">: ${escHtml(c.meaning_vi)}</span>` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : '';
+      })() : ''}
+
+      <!-- 💡 Các cách dịch khác (Other Meanings) -->
+      ${(w.other_meanings && w.other_meanings.length) ? (() => {
+        const validOther = w.other_meanings.filter(m => m && m.meaning_vi && !isPlaceholder(m.meaning_vi));
+        return validOther.length ? `
+          <div class="vm-section vm-cascade-item vm-cascade-delay-4">
+            <div class="vm-section-title">💡 Các cách dịch khác</div>
+            <div class="vm-other-list">
+              ${validOther.map(m => `
+                <div class="vm-other-item">
+                  <span class="vm-family-pos">${escHtml(m.pos || '')}</span>
+                  <span class="vm-other-meaning">${escHtml(m.meaning_vi || '')}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : '';
+      })() : ''}
+
       <!-- 📝 Ví dụ (Examples) -->
       ${(w.examples && w.examples.length) ? `
-        <div class="vm-section vm-cascade-item vm-cascade-delay-4">
+        <div class="vm-section vm-cascade-item vm-cascade-delay-5">
           <div class="vm-section-title">📝 Ví dụ</div>
           <div class="vm-examples-list">
             ${w.examples.filter(ex => !isPlaceholder(ex) && !ex.includes('Example sentence')).slice(0, 3).map(ex =>
@@ -821,66 +889,6 @@ function buildWordHTML(data) {
                 </div>
               `).join('')}
             </div>
-          </div>
-        ` : '';
-      })() : ''}
-
-      <!-- 💡 Các cách dịch khác (Other Meanings) -->
-      ${(w.other_meanings && w.other_meanings.length) ? (() => {
-        const validOther = w.other_meanings.filter(m => m && m.meaning_vi && !isPlaceholder(m.meaning_vi));
-        return validOther.length ? `
-          <div class="vm-section vm-cascade-item vm-cascade-delay-5">
-            <div class="vm-section-title">💡 Các cách dịch khác</div>
-            <div class="vm-other-list">
-              ${validOther.map(m => `
-                <div class="vm-other-item">
-                  <span class="vm-family-pos">${escHtml(m.pos || '')}</span>
-                  <span class="vm-other-meaning">${escHtml(m.meaning_vi || '')}</span>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        ` : '';
-      })() : ''}
-
-      <!-- 🔗 Cụm từ thông dụng (Collocations) -->
-      ${(w.collocations && w.collocations.length) ? (() => {
-        const validColloc = w.collocations.filter(c => c && c.phrase && !isPlaceholder(c.phrase) && !isPlaceholder(c.meaning_vi));
-        return validColloc.length ? `
-          <div class="vm-section vm-cascade-item vm-cascade-delay-5">
-            <div class="vm-section-title">🔗 Cụm từ thông dụng (Collocations)</div>
-            <div class="vm-colloc-list">
-              ${validColloc.map(c => `
-                <div class="vm-colloc-item">
-                  <b class="vm-colloc-phrase">${escHtml(c.phrase || '')}</b>
-                  ${c.meaning_vi ? `<span class="vm-colloc-meaning">: ${escHtml(c.meaning_vi)}</span>` : ''}
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        ` : '';
-      })() : ''}
-
-      <!-- Đồng nghĩa -->
-      ${(w.synonyms && w.synonyms.length) ? (() => {
-        const seenSyn = new Set();
-        const validSynonyms = w.synonyms
-          .map(s => String(s || '').trim())
-          .filter(s => {
-            if (!s || s.length < 2) return false;
-            if (isPlaceholder(s)) return false;
-            if (VIETNAMESE_REGEX.test(s)) return false; // Must be English
-            const lower = s.toLowerCase();
-            if (lower === orig.toLowerCase() || lower === (rootWord || '').toLowerCase()) return false;
-            if (seenSyn.has(lower)) return false;
-            seenSyn.add(lower);
-            return true;
-          })
-          .slice(0, 4);
-        return validSynonyms.length ? `
-          <div class="vm-synonyms-row vm-cascade-item vm-cascade-delay-6">
-            <span class="vm-syn-label">Đồng nghĩa:</span>
-            ${validSynonyms.map(s => `<span class="vm-syn-tag">${escHtml(s)}</span>`).join('')}
           </div>
         ` : '';
       })() : ''}

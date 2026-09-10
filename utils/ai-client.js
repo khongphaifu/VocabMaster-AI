@@ -1133,9 +1133,10 @@ async function callGemini(apiKey, prompt, isWord) {
   }
 
   const candidateModels = [
+    'gemini-2.5-flash',
     'gemini-2.0-flash',
-    'gemini-1.5-flash',
-    'gemini-2.0-flash-lite'
+    'gemini-2.0-flash-lite',
+    'gemini-1.5-flash'
   ];
 
   let lastErr = null;
@@ -1374,10 +1375,67 @@ async function executeGeminiGeneration(apiKey, modelName, prompt, isWord) {
   }
 }
 
-const GROQ_CANDIDATE_MODELS = [
-  'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant'
+const GROQ_FALLBACK_CANDIDATES = [
+  'openai/gpt-oss-20b',
+  'openai/gpt-oss-120b',
+  'qwen/qwen3.6-27b',
+  'llama-3.2-3b-preview',
+  'llama-3.2-1b-preview',
+  'llama-3.3-70b-versatile'
 ];
+
+let dynamicGroqModels = null;
+let lastGroqModelFetch = 0;
+
+export async function getAvailableGroqModels(apiKey) {
+  const now = Date.now();
+  if (dynamicGroqModels && (now - lastGroqModelFetch < 3600000)) {
+    return dynamicGroqModels;
+  }
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const res = await fetch('https://api.groq.com/openai/v1/models', {
+      headers: {
+        'Authorization': `Bearer ${apiKey.trim()}`
+      },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.data)) {
+        const chatModels = data.data
+          .map(m => m.id)
+          .filter(id => !id.includes('whisper') && !id.includes('guard') && !id.includes('embed') && !id.includes('tts') && !id.includes('vision'));
+
+        const preferredOrder = [
+          'openai/gpt-oss-20b',
+          'openai/gpt-oss-120b',
+          'qwen/qwen3.6-27b',
+          'llama-3.2-3b-preview',
+          'llama-3.2-1b-preview',
+          'llama-3.3-70b-versatile'
+        ];
+        chatModels.sort((a, b) => {
+          const idxA = preferredOrder.indexOf(a);
+          const idxB = preferredOrder.indexOf(b);
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+          if (idxA !== -1) return -1;
+          if (idxB !== -1) return 1;
+          return 0;
+        });
+
+        if (chatModels.length > 0) {
+          dynamicGroqModels = chatModels;
+          lastGroqModelFetch = now;
+          return dynamicGroqModels;
+        }
+      }
+    }
+  } catch (_) {}
+  return GROQ_FALLBACK_CANDIDATES;
+}
 
 let cachedGroqModel = null;
 
@@ -1394,8 +1452,10 @@ async function callGroq(apiKey, prompt, isWord) {
     }
   }
 
+  const modelsToTry = await getAvailableGroqModels(cleanKey);
+
   let lastErr = null;
-  for (const model of GROQ_CANDIDATE_MODELS) {
+  for (const model of modelsToTry) {
     try {
       const result = await executeGroqGeneration(cleanKey, model, prompt, isWord);
       if (result && result.trim()) {
@@ -1619,12 +1679,13 @@ export async function testDirectAI(provider, apiKey) {
     try {
       await callGroq(cleanKey, 'Ping test. Output JSON: {"status": "ok"}', false);
       const latencyMs = Date.now() - startTime;
+      const displayModel = cachedGroqModel || 'openai/gpt-oss-20b';
       return {
         success: true,
         provider: 'groq',
-        model: cachedGroqModel || 'llama-3.3-70b-versatile',
+        model: displayModel,
         latencyMs,
-        message: `Kết nối thành công! Groq AI (${cachedGroqModel || 'llama-3.3-70b-versatile'}) phản hồi sau ${latencyMs}ms.`
+        message: `Kết nối thành công! Groq AI (${displayModel}) phản hồi sau ${latencyMs}ms.`
       };
     } catch (err) {
       return {

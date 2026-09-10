@@ -272,7 +272,13 @@ async function handleTranslate(text, isWord, direction = 'auto') {
     }
   } catch (aiErr) {
     console.warn('AI call failed, checking fallbacks:', aiErr);
+    if (!dictResult && isWord) {
+      try {
+        dictResult = await resolveDictionaryWord(cleanText);
+      } catch (_) {}
+    }
     if (dictResult && dictResult.word?.meaning_vi) {
+      dictResult.aiWarning = aiErr.message || 'AI đang bận, hiển thị từ điển chuẩn';
       await setCachedTranslation(cacheKey, dictResult);
       return dictResult;
     }
@@ -280,6 +286,7 @@ async function handleTranslate(text, isWord, direction = 'auto') {
       const fb = findFallbackData(cleanText);
       if (fb) {
         const resp = buildFallbackWordResponse(cleanText, fb);
+        resp.aiWarning = aiErr.message || 'AI đang bận, hiển thị từ điển chuẩn';
         await setCachedTranslation(cacheKey, resp);
         return resp;
       }
