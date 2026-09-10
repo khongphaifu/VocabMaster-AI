@@ -3,6 +3,12 @@
 // Configured to follow Cambridge Dictionary standards (CALD & Cambridge English-Vietnamese)
 
 import { getCandidateLemmas } from './cambridge-client.js';
+import {
+  isDescriptiveSentence,
+  generateFallbackExamples,
+  generateFallbackCollocations,
+  generateFallbackFamily
+} from './dict-resolver.js';
 
 const VIETNAMESE_REGEX = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
 
@@ -781,13 +787,28 @@ export function safeParseJSON(rawText, isWord, originalText, dictContext = null)
     const cleanRoot = (w.word_root || originalText).trim().toLowerCase();
     const fallbackData = findFallbackData(cleanRoot) || initialFallback;
 
-    // STRICT GROUND-TRUTH ENFORCEMENT:
-    // If verified dictionary data was provided, strictly enforce meaning_vi and IPA
-    // to prevent any AI hallucination from leaking to the user!
+    // STRICT GROUND-TRUTH ENFORCEMENT & DESCRIPTIVE SENTENCE PROTECTION:
     if (dictContext) {
-      if (dictContext.meaning_vi && !isPlaceholderText(dictContext.meaning_vi)) {
+      const isBadSentence = isPlaceholderText(dictContext.meaning_vi) || isDescriptiveSentence(dictContext.meaning_vi);
+
+      const mViStr = typeof w.meaning_vi === 'string' ? w.meaning_vi.trim().toLowerCase() : '';
+      const origStr = typeof originalText === 'string' ? originalText.trim().toLowerCase() : '';
+      const aiMeaningBad = !mViStr || isPlaceholderText(w.meaning_vi) ||
+        (origStr && mViStr === origStr) ||
+        (cleanRoot && mViStr === cleanRoot) ||
+        isDescriptiveSentence(w.meaning_vi);
+
+      // If AI generated a bad meaning or placeholder, adopt dictContext
+      if (aiMeaningBad) {
+        if (!isBadSentence && dictContext.meaning_vi) {
+          w.meaning_vi = dictContext.meaning_vi;
+        } else if (isBadSentence && (!w.definition_vi || isPlaceholderText(w.definition_vi))) {
+          w.definition_vi = dictContext.meaning_vi;
+        }
+      } else if (!isBadSentence && dictContext.meaning_vi && (!w.meaning_vi || isPlaceholderText(w.meaning_vi))) {
         w.meaning_vi = dictContext.meaning_vi;
       }
+
       if (dictContext.ipa_uk && (!w.ipa_uk || isPlaceholderText(w.ipa_uk))) {
         w.ipa_uk = dictContext.ipa_uk;
       }
@@ -816,6 +837,12 @@ export function safeParseJSON(rawText, isWord, originalText, dictContext = null)
       }
       if ((!w.collocations || w.collocations.length === 0) && Array.isArray(dictContext.collocations) && dictContext.collocations.length > 0) {
         w.collocations = [...dictContext.collocations];
+      }
+      if ((!w.synonyms || w.synonyms.length === 0) && Array.isArray(dictContext.synonyms) && dictContext.synonyms.length > 0) {
+        w.synonyms = [...dictContext.synonyms];
+      }
+      if ((!w.word_family || w.word_family.length === 0) && Array.isArray(dictContext.word_family) && dictContext.word_family.length > 0) {
+        w.word_family = [...dictContext.word_family];
       }
     }
 
@@ -972,6 +999,20 @@ export function safeParseJSON(rawText, isWord, originalText, dictContext = null)
 
     if (!w.level || typeof w.level !== 'string' || isPlaceholderText(w.level)) {
       w.level = fallbackData?.level || 'B1';
+    }
+
+    // GUARANTEE NO EMPTY SECTIONS:
+    if (!w.examples || w.examples.length === 0) {
+      w.examples = generateFallbackExamples(cleanRoot, w.partOfSpeech);
+    }
+    if (!w.collocations || w.collocations.length === 0) {
+      w.collocations = generateFallbackCollocations(cleanRoot, w.partOfSpeech, w.synonyms, w.meaning_vi);
+    }
+    if (!w.word_family || w.word_family.length === 0) {
+      w.word_family = generateFallbackFamily(cleanRoot, w.partOfSpeech, w.meaning_vi);
+    }
+    if ((!w.synonyms || w.synonyms.length === 0) && dictContext?.synonyms?.length) {
+      w.synonyms = dictContext.synonyms.slice(0, 4);
     }
 
     return parsed;

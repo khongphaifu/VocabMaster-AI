@@ -173,6 +173,11 @@ async function getCachedTranslation(key, cleanText) {
         m === 'nơn' ||
         m === 'máy xe' ||
         m === 'bữa ăn lớn' ||
+        m.includes('một miếng vật liệu') ||
+        m.length > 35 ||
+        m.startsWith('một ') ||
+        (!w.examples || w.examples.length === 0) ||
+        (!w.collocations || w.collocations.length === 0) ||
         w.ipa_uk?.includes('sə\'fər') ||
         w.ipa_us?.includes('sə\'fər')
       ) {
