@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>VocabMaster AI - iPad Edition</title>
+
+  <!-- Apple iOS & iPadOS Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VocabMaster">
+  <link rel="apple-touch-icon" href="../icons/icon-128.png">
+  <link rel="manifest" href="manifest.webmanifest">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dark-theme">
+  <div class="ipad-container">
+    <!-- HEADER CHO IPAD -->
+    <header class="ipad-header">
+      <div class="brand">
+        <span class="logo-icon">✨</span>
+        <div class="brand-text">
+          <span class="brand-name">VocabMaster</span>
+          <span class="brand-tag">iPad v1.0.19</span>
+        </div>
+      </div>
+
+      <!-- THANH ĐIỀU HƯỚNG DÀNH CHO IPAD (TỰ ĐỘNG CHUYỂN DẠNG KHI CHIA MÀN HÌNH SPLIT VIEW) -->
+      <nav class="ipad-nav" id="main-nav">
+        <button class="nav-tab active" data-tab="lookup">
+          <span class="tab-icon">🔍</span>
+          <span class="tab-label">Tra từ</span>
+        </button>
+        <button class="nav-tab" data-tab="library">
+          <span class="tab-icon">📖</span>
+          <span class="tab-label">Sổ từ</span>
+          <span class="tab-badge" id="nav-count">0</span>
+        </button>
+        <button class="nav-tab" data-tab="flashcard">
+          <span class="tab-icon">🃏</span>
+          <span class="tab-label">Flashcard</span>
+        </button>
+        <button class="nav-tab" data-tab="quiz">
+          <span class="tab-icon">🎯</span>
+          <span class="tab-label">Quiz</span>
+        </button>
+        <button class="nav-tab" data-tab="typing">
+          <span class="tab-icon">⌨️</span>
+          <span class="tab-label">Typing</span>
+        </button>
+        <button class="nav-tab" data-tab="settings">
+          <span class="tab-icon">⚙️</span>
+          <span class="tab-label">Cài đặt</span>
+        </button>
+      </nav>
+
+      <div class="header-right">
+        <button id="btn-theme" class="touch-btn-icon" title="Đổi giao diện">🌙</button>
+      </div>
+    </header>
+
+    <!-- NỘI DUNG CHÍNH (VUỐT CHẠM MƯỢT MÀ) -->
+    <main class="ipad-main">
+      <!-- TAB 1: TRA TỪ NHANH TRÊN IPAD -->
+      <section class="tab-pane active" id="pane-lookup">
+        <div class="lookup-box">
+          <div class="input-touch-wrap">
+            <span class="search-ico">🔍</span>
+            <input type="text" id="lookup-input" placeholder="Nhập từ vựng tiếng Anh..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <button id="btn-clear" class="btn-touch-clear">✕</button>
+            <button id="btn-search" class="btn-touch-primary">Tra</button>
+          </div>
+          <div class="lookup-hints">⚡ Cambridge Online & Danh từ hóa tiếng Việt chuẩn xác</div>
+        </div>
+
+        <div id="lookup-loading" class="state-box hidden">
+          <div class="ios-spinner"></div>
+          <p>Đang phân giải từ vựng chuẩn Cambridge & AI...</p>
+        </div>
+
+        <div id="lookup-result" class="result-card hidden">
+          <div class="result-top">
+            <div>
+              <h1 id="res-word" class="word-heading">Observation</h1>
+              <div class="tags-row">
+                <span id="res-pos" class="tag tag-pos">noun</span>
+                <span id="res-cefr" class="tag tag-cefr">B2</span>
+                <span class="tag tag-source">📖 Từ điển chuẩn</span>
+              </div>
+            </div>
+            <button id="btn-add-vocab" class="btn-touch-save">+ Lưu vào sổ</button>
+          </div>
+
+          <div class="ipa-bar">
+            <div class="ipa-item">
+              <span class="flag">🇬🇧 UK:</span>
+              <span id="res-ipa-uk" class="ipa-code">/ˌɒb.zəˈveɪ.ʃən/</span>
+              <button class="btn-touch-audio" id="btn-audio-uk">🔊</button>
+            </div>
+            <div class="ipa-item">
+              <span class="flag">🇺🇸 US:</span>
+              <span id="res-ipa-us" class="ipa-code">/ˌɑːb.zɚˈveɪ.ʃən/</span>
+              <button class="btn-touch-audio" id="btn-audio-us">🔊</button>
+            </div>
+          </div>
+
+          <div class="block-meaning">
+            <div class="block-label">Nghĩa tiếng Việt</div>
+            <div id="res-meaning-vi" class="meaning-highlight">Sự quan sát, nhận xét; (Toán/AI) mẫu quan sát</div>
+          </div>
+
+          <div class="block-section">
+            <div class="block-label">Định nghĩa</div>
+            <div id="res-def-vi" class="def-vi">Hành động quan sát ai đó hoặc cái gì một cách cẩn thận.</div>
+            <div id="res-def-en" class="def-en">The action or process of observing something carefully.</div>
+          </div>
+
+          <div class="block-section" id="block-synonyms">
+            <div class="block-label">Từ đồng nghĩa</div>
+            <div id="res-synonyms" class="chips-row"></div>
+          </div>
+
+          <div class="block-section" id="block-collocations">
+            <div class="block-label">Cụm từ thông dụng (Collocations)</div>
+            <div id="res-collocations" class="items-column"></div>
+          </div>
+
+          <div class="block-section" id="block-family">
+            <div class="block-label">Các dạng từ liên quan (Word Family)</div>
+            <div id="res-family" class="items-column"></div>
+          </div>
+
+          <div class="block-section" id="block-examples">
+            <div class="block-label">Ví dụ ngữ cảnh (Oxford & Cambridge)</div>
+            <div id="res-examples" class="items-column"></div>
+          </div>
+        </div>
+
+        <div id="lookup-empty" class="state-box">
+          <div class="state-ico">📱</div>
+          <h3>Tra cứu từ vựng trên iPad</h3>
+          <p>Hỗ trợ tuyệt vời khi mở song song với sách PDF hoặc trình duyệt ở chế độ <strong>Split View</strong>.</p>
+        </div>
+      </section>
+
+      <!-- TAB 2: SỔ TỪ VỰNG TRÊN IPAD -->
+      <section class="tab-pane" id="pane-library">
+        <div class="ipad-pane-header">
+          <h2>Sổ từ vựng của bạn</h2>
+          <div class="header-btns">
+            <button id="btn-export-csv" class="btn-touch-secondary">📥 Xuất CSV</button>
+            <button id="btn-clear-all" class="btn-touch-danger">Xóa hết</button>
+          </div>
+        </div>
+
+        <div class="ipad-filter-bar">
+          <input type="text" id="lib-search" placeholder="🔍 Lọc từ đã lưu...">
+          <select id="lib-status-filter">
+            <option value="all">Tất cả</option>
+            <option value="new">Từ mới</option>
+            <option value="learning">Đang học</option>
+            <option value="learned">Đã thuộc</option>
+          </select>
+        </div>
+
+        <div id="lib-grid" class="vocab-cards-grid"></div>
+        <div id="lib-empty" class="state-box hidden">
+          <div class="state-ico">📚</div>
+          <h3>Chưa có từ vựng nào</h3>
+          <p>Nhấn vào tab <strong>Tra từ</strong> và chọn <strong>"+ Lưu vào sổ"</strong> để thêm từ mới!</p>
+        </div>
+      </section>
+
+      <!-- TAB 3: FLASHCARDS VUỐT CHẠM CẢM ỨNG (TOUCH SWIPE) -->
+      <section class="tab-pane" id="pane-flashcard">
+        <div class="ipad-pane-header">
+          <h2>Luyện thẻ Flashcard</h2>
+          <span class="progress-pill" id="fc-counter">0 / 0</span>
+        </div>
+
+        <div class="fc-container">
+          <div class="fc-touch-card" id="fc-touch-card">
+            <div class="fc-touch-face fc-touch-front">
+              <span class="swipe-hint">Chạm để lật • Vuốt trái/phải để chuyển thẻ</span>
+              <h1 class="fc-touch-word" id="fc-word">observation</h1>
+              <div class="fc-touch-ipa" id="fc-ipa">/ɑːbzərvˈeɪʃən/</div>
+              <button class="btn-touch-speaker" id="fc-audio">🔊 Nghe âm</button>
+            </div>
+            <div class="fc-touch-face fc-touch-back">
+              <span class="tag tag-pos" id="fc-pos">noun</span>
+              <div class="fc-touch-meaning" id="fc-meaning">Sự quan sát, nhận xét; (Toán/AI) mẫu quan sát</div>
+              <div class="fc-touch-ex" id="fc-ex">"Direct observation is required."</div>
+            </div>
+          </div>
+
+          <div class="fc-action-bar">
+            <button id="fc-btn-prev" class="btn-touch-nav">‹ Trước</button>
+            <button id="fc-btn-learned" class="btn-touch-success">✓ Đã thuộc</button>
+            <button id="fc-btn-next" class="btn-touch-nav">Tiếp ›</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: TRẮC NGHIỆM QUIZ CHO MÀN HÌNH CHẠM -->
+      <section class="tab-pane" id="pane-quiz">
+        <div class="ipad-pane-header">
+          <h2>Trắc nghiệm nghĩa từ (Quiz)</h2>
+          <span class="progress-pill" id="quiz-points">Điểm: 0</span>
+        </div>
+
+        <div class="quiz-container">
+          <div class="quiz-touch-question">
+            <span class="prompt">Từ vựng sau có nghĩa tiếng Việt là gì?</span>
+            <h1 class="target-word" id="quiz-word">observation</h1>
+            <button class="btn-touch-speaker" id="quiz-audio">🔊</button>
+          </div>
+
+          <div class="quiz-touch-grid" id="quiz-opts"></div>
+          <div id="quiz-msg" class="touch-feedback hidden"></div>
+          <button id="quiz-next-btn" class="btn-touch-primary hidden">Câu tiếp theo ›</button>
+        </div>
+      </section>
+
+      <!-- TAB 5: LUYỆN GÕ TYPING TRÊN IPAD -->
+      <section class="tab-pane" id="pane-typing">
+        <div class="ipad-pane-header">
+          <h2>Luyện gõ từ (Typing Test)</h2>
+          <span class="progress-pill" id="typing-counter">Chuỗi đúng: 0</span>
+        </div>
+
+        <div class="typing-container">
+          <button class="btn-large-speaker" id="typing-audio">🔊 Nghe từ cần gõ</button>
+          <div class="typing-hint" id="typing-hint">Sự quan sát, nhận xét</div>
+
+          <div class="typing-box">
+            <input type="text" id="typing-input" placeholder="Gõ từ tiếng Anh vào đây..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <button id="typing-submit" class="btn-touch-primary">Kiểm tra</button>
+          </div>
+          <div id="typing-msg" class="touch-feedback hidden"></div>
+        </div>
+      </section>
+
+      <!-- TAB 6: CÀI ĐẶT IPAD -->
+      <section class="tab-pane" id="pane-settings">
+        <div class="ipad-pane-header">
+          <h2>Cài đặt Mô hình AI & Hệ thống</h2>
+        </div>
+
+        <div class="settings-card">
+          <div class="form-row">
+            <label>Mô hình AI ưu tiên:</label>
+            <select id="set-provider" class="touch-select">
+              <option value="gemini">Google Gemini 2.5 Flash (Khuyên dùng)</option>
+              <option value="groq">Groq Cloud (GPT-OSS 20B/120B)</option>
+              <option value="deepseek">DeepSeek AI</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <label>Google Gemini API Key:</label>
+            <input type="password" id="set-gemini-key" class="touch-input" placeholder="Nhập key AIzaSy...">
+          </div>
+
+          <div class="form-row">
+            <label>Groq API Key:</label>
+            <input type="password" id="set-groq-key" class="touch-input" placeholder="Nhập key gsk_...">
+          </div>
+
+          <div class="form-row">
+            <label>Tự động phát âm:</label>
+            <label class="switch-touch">
+              <input type="checkbox" id="set-auto-speech" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <button id="btn-save-settings" class="btn-touch-primary" style="margin-top: 14px;">Lưu cài đặt</button>
+          <div id="save-success-msg" class="touch-feedback hidden" style="color: var(--success);">✓ Đã lưu cài đặt thành công!</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="storage-adapter.js"></script>
+  <script type="module" src="app.js"></script>
+  <script>
+    // Đăng ký Service Worker cho iPad PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(err => {
+        console.warn('SW registration failed:', err);
+      });
+    }
+  </script>
+</body>
+</html>

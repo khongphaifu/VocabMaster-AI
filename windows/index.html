@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VocabMaster AI - Windows</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dark-theme">
+  <div class="app-layout">
+    <!-- SIDEBAR BÊN TRÁI -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo-icon">✨</div>
+        <div class="brand-text">
+          <span class="brand-name">VocabMaster</span>
+          <span class="brand-badge">Desktop v1.0.19</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" data-tab="lookup">
+          <span class="nav-icon">🔍</span>
+          <span class="nav-label">Tra từ nhanh</span>
+        </button>
+        <button class="nav-item" data-tab="library">
+          <span class="nav-icon">📖</span>
+          <span class="nav-label">Sổ từ vựng</span>
+          <span class="nav-counter" id="sidebar-word-count">0</span>
+        </button>
+        <button class="nav-item" data-tab="flashcard">
+          <span class="nav-icon">🃏</span>
+          <span class="nav-label">Flashcards</span>
+        </button>
+        <button class="nav-item" data-tab="quiz">
+          <span class="nav-icon">🎯</span>
+          <span class="nav-label">Trắc nghiệm Quiz</span>
+        </button>
+        <button class="nav-item" data-tab="typing">
+          <span class="nav-icon">⌨️</span>
+          <span class="nav-label">Luyện gõ từ</span>
+        </button>
+        <button class="nav-item" data-tab="stats">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Tiến độ học</span>
+        </button>
+        <button class="nav-item" data-tab="settings">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Cài đặt AI</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="hotkey-tip">
+          <span class="kbd">Ctrl</span>+<span class="kbd">Shift</span>+<span class="kbd">D</span>
+          <span class="tip-text">Bật/tắt nhanh</span>
+        </div>
+        <button id="theme-toggle" class="btn-icon" title="Đổi giao diện Sáng / Tối">🌙</button>
+      </div>
+    </aside>
+
+    <!-- KHÔNG GIAN NỘI DUNG CHÍNH BÊN PHẢI -->
+    <main class="main-content">
+      <!-- 1. TAB TRA TỪ NHANH -->
+      <section class="tab-pane active" id="pane-lookup">
+        <div class="search-hero">
+          <div class="search-bar-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="lookup-input" placeholder="Nhập từ tiếng Anh hoặc cụm từ cần tra (Ví dụ: observation, parameter)..." autofocus autocomplete="off">
+            <button id="btn-clear-search" class="btn-clear" title="Xóa">✕</button>
+            <button id="btn-do-search" class="btn-primary">Tra từ</button>
+          </div>
+          <div class="search-options">
+            <div class="lang-selector">
+              <label><input type="radio" name="lang-mode" value="auto" checked> 🌐 Tự động</label>
+              <label><input type="radio" name="lang-mode" value="en-vi"> 🇬🇧 Anh ➔ 🇻🇳 Việt</label>
+              <label><input type="radio" name="lang-mode" value="vi-en"> 🇻🇳 Việt ➔ 🇬🇧 Anh</label>
+            </div>
+            <div class="search-speed-tag">⚡ Cambridge + Oxford + AI Fallback</div>
+          </div>
+        </div>
+
+        <!-- Trạng thái Loading / Error -->
+        <div id="lookup-loading" class="lookup-state hidden">
+          <div class="spinner"></div>
+          <p id="loading-msg">Đang truy vấn Cambridge & phân giải từ điển thông minh...</p>
+        </div>
+
+        <!-- Khung Kết quả Tra từ vựng -->
+        <div id="lookup-result" class="lookup-card hidden">
+          <div class="result-header">
+            <div class="word-title-wrap">
+              <h1 id="res-word" class="word-title">Observation</h1>
+              <div class="word-badges">
+                <span id="res-pos" class="badge badge-pos">noun</span>
+                <span id="res-cefr" class="badge badge-cefr">B2</span>
+                <span id="res-source" class="badge badge-source">📖 Từ điển chuẩn</span>
+              </div>
+            </div>
+            <div class="action-buttons">
+              <button id="btn-save-vocab" class="btn-save">+ Lưu vào sổ từ</button>
+            </div>
+          </div>
+
+          <div class="phonetics-row">
+            <div class="phonetic-group" id="group-uk">
+              <span class="phonetic-flag">🇬🇧 UK:</span>
+              <span id="res-ipa-uk" class="phonetic-ipa">/ˌɒb.zəˈveɪ.ʃən/</span>
+              <button class="btn-audio" id="btn-audio-uk" title="Phát âm UK">🔊</button>
+            </div>
+            <div class="phonetic-group" id="group-us">
+              <span class="phonetic-flag">🇺🇸 US:</span>
+              <span id="res-ipa-us" class="phonetic-ipa">/ˌɑːb.zɚˈveɪ.ʃən/</span>
+              <button class="btn-audio" id="btn-audio-us" title="Phát âm US">🔊</button>
+            </div>
+          </div>
+
+          <div class="result-section meaning-highlight">
+            <div class="section-title">Nghĩa tiếng Việt chính danh</div>
+            <div id="res-meaning-vi" class="meaning-text">Sự quan sát, nhận xét; (Toán/AI) mẫu quan sát</div>
+          </div>
+
+          <div class="result-section">
+            <div class="section-title">Định nghĩa chi tiết</div>
+            <div id="res-def-vi" class="def-vi-text">Hành động hoặc quá trình quan sát một cái gì đó hoặc một ai đó một cách cẩn thận.</div>
+            <div id="res-def-en" class="def-en-text">The action or process of observing something or someone carefully.</div>
+          </div>
+
+          <div class="result-section" id="section-synonyms">
+            <div class="section-title">Từ đồng nghĩa (Synonyms)</div>
+            <div id="res-synonyms" class="chips-container"></div>
+          </div>
+
+          <div class="result-section" id="section-collocations">
+            <div class="section-title">Cụm từ thông dụng (Collocations)</div>
+            <div id="res-collocations" class="collocations-list"></div>
+          </div>
+
+          <div class="result-section" id="section-family">
+            <div class="section-title">Các dạng từ liên quan (Word Family)</div>
+            <div id="res-family" class="family-list"></div>
+          </div>
+
+          <div class="result-section" id="section-examples">
+            <div class="section-title">Ví dụ minh họa (Oxford & Cambridge)</div>
+            <div id="res-examples" class="examples-list"></div>
+          </div>
+        </div>
+
+        <div id="lookup-empty" class="empty-state">
+          <div class="empty-icon">📖</div>
+          <h3>Tra cứu từ vựng học thuật & chuẩn xác</h3>
+          <p>Nhập từ vựng ở thanh tìm kiếm phía trên hoặc nhấn <span class="kbd">Ctrl</span>+<span class="kbd">Shift</span>+<span class="kbd">D</span> từ bất cứ đâu trên màn hình máy tính.</p>
+        </div>
+      </section>
+
+      <!-- 2. TAB SỔ TỪ VỰNG -->
+      <section class="tab-pane" id="pane-library">
+        <div class="pane-header">
+          <div class="header-left">
+            <h2>Sổ từ vựng của bạn</h2>
+            <span class="header-desc">Quản lý và ôn tập các từ vựng đã lưu trong máy</span>
+          </div>
+          <div class="header-actions">
+            <button id="btn-export-excel" class="btn-secondary">📥 Xuất Excel (.csv)</button>
+            <button id="btn-clear-all-words" class="btn-danger-outline">Xóa tất cả</button>
+          </div>
+        </div>
+
+        <div class="filter-bar">
+          <input type="text" id="lib-search" placeholder="🔍 Tìm trong danh sách từ đã lưu...">
+          <select id="lib-filter-status">
+            <option value="all">Tất cả trạng thái</option>
+            <option value="new">Từ mới</option>
+            <option value="learning">Đang học</option>
+            <option value="learned">Đã thuộc</option>
+          </select>
+        </div>
+
+        <div id="library-container" class="vocab-grid"></div>
+        <div id="library-empty" class="empty-state hidden">
+          <div class="empty-icon">📚</div>
+          <h3>Chưa có từ vựng nào được lưu</h3>
+          <p>Hãy tra từ và nhấn <strong>"+ Lưu vào sổ từ"</strong> để xây dựng vốn từ của bạn!</p>
+        </div>
+      </section>
+
+      <!-- 3. TAB FLASHCARDS -->
+      <section class="tab-pane" id="pane-flashcard">
+        <div class="pane-header">
+          <h2>Ôn tập Flashcards</h2>
+          <div class="fc-counter" id="fc-progress-text">Thẻ 0 / 0</div>
+        </div>
+
+        <div class="flashcard-arena">
+          <div class="fc-card" id="fc-card">
+            <div class="fc-face fc-front">
+              <span class="fc-hint">Bấm hoặc nhấn Space để lật mặt</span>
+              <div class="fc-word" id="fc-word">observation</div>
+              <div class="fc-ipa" id="fc-ipa">/ɑːbzərvˈeɪʃən/</div>
+              <button class="btn-audio" id="fc-audio-btn">🔊 Nghe phát âm</button>
+            </div>
+            <div class="fc-face fc-back">
+              <span class="badge badge-pos" id="fc-pos">noun</span>
+              <div class="fc-meaning" id="fc-meaning">Sự quan sát, nhận xét; (Toán/AI) mẫu quan sát</div>
+              <div class="fc-example" id="fc-example">"Close observation of patients is necessary."</div>
+            </div>
+          </div>
+
+          <div class="fc-controls">
+            <button id="fc-prev" class="btn-secondary">‹ Thẻ trước</button>
+            <button id="fc-mark-learned" class="btn-success">✓ Đã thuộc</button>
+            <button id="fc-next" class="btn-primary">Thẻ tiếp ›</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. TAB TRẮC NGHIỆM QUIZ -->
+      <section class="tab-pane" id="pane-quiz">
+        <div class="pane-header">
+          <h2>Trắc nghiệm nghĩa từ (Quiz)</h2>
+          <div class="quiz-score" id="quiz-score">Điểm: 0</div>
+        </div>
+
+        <div class="quiz-arena">
+          <div class="quiz-question-box">
+            <span class="quiz-prompt">Từ vựng sau đây có nghĩa tiếng Việt là gì?</span>
+            <h1 class="quiz-word" id="quiz-word">observation</h1>
+            <button class="btn-audio" id="quiz-audio">🔊</button>
+          </div>
+
+          <div class="quiz-options-grid" id="quiz-options"></div>
+          <div id="quiz-feedback" class="quiz-feedback hidden"></div>
+          <button id="quiz-btn-next" class="btn-primary hidden">Câu tiếp theo ›</button>
+        </div>
+      </section>
+
+      <!-- 5. TAB LUYỆN GÕ TYPING -->
+      <section class="tab-pane" id="pane-typing">
+        <div class="pane-header">
+          <h2>Luyện gõ từ vựng (Typing Test)</h2>
+          <div class="typing-streak" id="typing-streak">Chuỗi đúng: 0</div>
+        </div>
+
+        <div class="typing-arena">
+          <div class="typing-hint-box">
+            <button class="btn-audio-large" id="typing-audio-btn">🔊 Nghe từ để gõ lại</button>
+            <div class="typing-meaning-hint" id="typing-meaning-hint">Sự quan sát, nhận xét</div>
+          </div>
+
+          <div class="typing-input-wrap">
+            <input type="text" id="typing-input" placeholder="Gõ từ tiếng Anh chuẩn xác..." autocomplete="off" spellcheck="false">
+            <button id="typing-check-btn" class="btn-primary">Kiểm tra (Enter)</button>
+          </div>
+          <div id="typing-feedback" class="typing-feedback hidden"></div>
+        </div>
+      </section>
+
+      <!-- 6. TAB TIẾN ĐỘ THỐNG KÊ -->
+      <section class="tab-pane" id="pane-stats">
+        <div class="pane-header">
+          <h2>Tiến độ & Thống kê học tập</h2>
+        </div>
+
+        <div class="stats-overview">
+          <div class="stat-card">
+            <div class="stat-number" id="stat-total">0</div>
+            <div class="stat-label">Tổng số từ đã lưu</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number color-new" id="stat-new">0</div>
+            <div class="stat-label">Từ mới lưu</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number color-learning" id="stat-learning">0</div>
+            <div class="stat-label">Đang luyện tập</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number color-learned" id="stat-learned">0</div>
+            <div class="stat-label">Đã ghi nhớ vững</div>
+          </div>
+        </div>
+
+        <div class="stats-card-full">
+          <h3>Tỷ lệ ghi nhớ từ vựng</h3>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="stat-mastery-bar" style="width: 0%;"></div>
+          </div>
+          <div class="progress-bar-text" id="stat-mastery-text">0% từ vựng đã ghi nhớ</div>
+        </div>
+      </section>
+
+      <!-- 7. TAB CÀI ĐẶT -->
+      <section class="tab-pane" id="pane-settings">
+        <div class="pane-header">
+          <h2>Cài đặt Mô hình AI & Hệ thống</h2>
+          <span class="header-desc">Cấu hình API Key để kích hoạt dịch sâu chuyên ngành và các tính năng AI</span>
+        </div>
+
+        <div class="settings-form">
+          <div class="setting-group">
+            <label class="setting-label" for="setting-ai-provider">Nhà cung cấp AI ưu tiên</label>
+            <select id="setting-ai-provider" class="form-control">
+              <option value="gemini">Google Gemini (Gemini 2.5 Flash / 2.0 - Khuyên dùng)</option>
+              <option value="groq">Groq Cloud (GPT-OSS 20B / Qwen - Siêu tốc miễn phí)</option>
+              <option value="openai">OpenAI (GPT-4o Mini / GPT-4o)</option>
+              <option value="deepseek">DeepSeek AI (DeepSeek V3 / R1)</option>
+            </select>
+          </div>
+
+          <div class="setting-group">
+            <label class="setting-label" for="setting-gemini-key">Google Gemini API Key</label>
+            <input type="password" id="setting-gemini-key" class="form-control" placeholder="Nhập API key Gemini (bắt đầu bằng AIzaSy...)">
+            <span class="setting-help">Lấy key miễn phí tại: <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a></span>
+          </div>
+
+          <div class="setting-group">
+            <label class="setting-label" for="setting-groq-key">Groq Cloud API Key</label>
+            <input type="password" id="setting-groq-key" class="form-control" placeholder="Nhập API key Groq (bắt đầu bằng gsk_...)">
+            <span class="setting-help">Lấy key miễn phí tại: <a href="https://console.groq.com/keys" target="_blank">Groq Console</a></span>
+          </div>
+
+          <div class="setting-group">
+            <label class="setting-label" for="setting-deepseek-key">DeepSeek API Key</label>
+            <input type="password" id="setting-deepseek-key" class="form-control" placeholder="Nhập API key DeepSeek...">
+          </div>
+
+          <div class="setting-group">
+            <label class="setting-label">Tùy chọn tra từ</label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="setting-auto-speech" checked> Tự động phát âm khi hiển thị từ vựng
+            </label>
+          </div>
+
+          <div class="settings-actions">
+            <button id="btn-save-settings" class="btn-primary">Lưu cấu hình</button>
+            <span id="settings-status" class="settings-saved-text hidden">✓ Đã lưu cài đặt thành công!</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Nạp scripts điều khiển -->
+  <script type="module" src="storage-adapter.js"></script>
+  <script type="module" src="renderer.js"></script>
+</body>
+</html>

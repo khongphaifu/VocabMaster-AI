@@ -1,0 +1,52 @@
+{
+  "name": "vocabmaster-ai-windows",
+  "productName": "VocabMaster AI",
+  "version": "1.0.19",
+  "description": "Ứng dụng tra cứu từ điển và học từ vựng thông minh đa AI trên Windows",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win portable",
+    "dist:installer": "electron-builder --win nsis"
+  },
+  "keywords": [
+    "dictionary",
+    "vocabulary",
+    "ai",
+    "electron",
+    "windows",
+    "cambridge",
+    "flashcards"
+  ],
+  "author": "VocabMaster AI Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.vocabmaster.ai",
+    "productName": "VocabMaster AI",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "portable",
+        "nsis"
+      ],
+      "icon": "../icons/icon-128.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "portable": {
+      "artifactName": "VocabMaster-AI-Windows-Portable-${version}.${ext}"
+    }
+  }
+}

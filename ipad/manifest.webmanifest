@@ -1,0 +1,22 @@
+{
+  "name": "VocabMaster AI - Trợ lý Từ vựng Thông minh",
+  "short_name": "VocabMaster",
+  "description": "Ứng dụng tra cứu từ điển học thuật và học từ vựng thông minh đa AI trên iPad",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "../icons/icon-48.png",
+      "sizes": "48x48",
+      "type": "image/png"
+    },
+    {
+      "src": "../icons/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    }
+  ]
+}
