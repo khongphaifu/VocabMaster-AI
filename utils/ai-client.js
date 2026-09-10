@@ -1057,10 +1057,9 @@ async function callGemini(apiKey, prompt, isWord) {
   }
 
   const candidateModels = [
-    'gemini-2.5-flash',
     'gemini-2.0-flash',
-    'gemini-2.5-flash-lite',
-    'gemini-1.5-flash'
+    'gemini-1.5-flash',
+    'gemini-2.0-flash-lite'
   ];
 
   let lastErr = null;
@@ -1073,7 +1072,14 @@ async function callGemini(apiKey, prompt, isWord) {
       }
     } catch (err) {
       lastErr = err;
-      if (err.status === 401 || err.message?.includes('API_KEY_SERVICE_BLOCKED') || err.message?.includes('API Key không hợp lệ')) {
+      if (
+        err.status === 401 ||
+        err.status === 400 ||
+        err.reason === 'API_KEY_SERVICE_BLOCKED' ||
+        err.reason === 'SERVICE_DISABLED' ||
+        err.message?.includes('Google Cloud Project') ||
+        err.message?.includes('API Key')
+      ) {
         throw err;
       }
       // On 404, 429, 503, empty response, or timeouts, continue to next model
@@ -1126,32 +1132,143 @@ async function executeGeminiGeneration(apiKey, modelName, prompt, isWord) {
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
       const rawMsg = errData.error?.message || '';
-      const reason = errData.error?.details?.[0]?.reason || '';
 
-      if (reason === 'API_KEY_SERVICE_BLOCKED' || rawMsg.includes('has not been used in project') || rawMsg.includes('disabled')) {
-        const linkMatch = rawMsg.match(/https:\/\/console\.developers\.google\.com\/[^\s\)]+/i) ||
-                          rawMsg.match(/https:\/\/console\.cloud\.google\.com\/[^\s\)]+/i);
-        const directLink = linkMatch ? linkMatch[0] : 'https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com';
-        const err = new Error(`Google Cloud Project của key này chưa bật Generative Language API.\n\n👉 Cách sửa nhanh nhất (15s): Vào https://aistudio.google.com/app/apikey và bấm "Create API key in new project" (Project mới sẽ được Google tự động bật sẵn 100%).\n\nHoặc bấm link để Bật API cho project hiện tại: ${directLink}`);
+      // Deeply search details array for reason, help links, and project info
+      let reason = '';
+      let projectId = '';
+      let helpUrl = '';
+
+      if (Array.isArray(errData.error?.details)) {
+        for (const item of errData.error.details) {
+          if (item.reason && !reason) reason = item.reason;
+          if (item.metadata?.consumer && !projectId) {
+            const m = item.metadata.consumer.match(/projects\/(.+)/);
+            if (m) projectId = m[1];
+          }
+          if (Array.isArray(item.links)) {
+            for (const link of item.links) {
+              if (link.url && !helpUrl) helpUrl = link.url;
+            }
+          }
+        }
+      }
+
+      if (!projectId) {
+        const pMatch = rawMsg.match(/project[=\s/]+([0-9a-zA-Z\-_]+)/i);
+        if (pMatch) projectId = pMatch[1];
+      }
+
+      if (!helpUrl) {
+        const urlMatch = rawMsg.match(/https:\/\/[^\s\)]+/i);
+        if (urlMatch) helpUrl = urlMatch[0];
+      }
+
+      const directActivationUrl = helpUrl || (projectId
+        ? `https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com?project=${projectId}`
+        : 'https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com');
+
+      const credentialsUrl = projectId
+        ? `https://console.cloud.google.com/apis/credentials?project=${projectId}`
+        : 'https://console.cloud.google.com/apis/credentials';
+
+      // 1. API Disabled in Google Cloud Project
+      if (reason === 'SERVICE_DISABLED' || rawMsg.includes('has not been used in project') || rawMsg.includes('disabled')) {
+        const projectDesc = projectId ? `Project ID #${projectId}` : 'Google Cloud Project';
+        const err = new Error(
+          `Google Cloud Project (${projectDesc}) chưa BẬT Generative Language API.\n\n` +
+          `👉 Bước 1: Mở link sau để BẬT ngay cho đúng project:\n${directActivationUrl}\n\n` +
+          `👉 Bước 2: Bấm nút "ENABLE" (BẬT).\n\n` +
+          `👉 Bước 3: Đợi 2-3 phút để Google đồng bộ hệ thống trước khi thử lại.\n` +
+          `(Lưu ý: Nếu đăng nhập nhiều tài khoản Google, hãy kiểm tra góc trên bên phải Google Cloud xem đúng Gmail tạo key chưa).`
+        );
         err.status = res.status;
-        err.activationUrl = directLink;
+        err.reason = 'SERVICE_DISABLED';
+        err.projectId = projectId;
+        err.activationUrl = directActivationUrl;
+        err.credentialsUrl = credentialsUrl;
+        err.rawMsg = rawMsg;
+        err.rawJson = errData;
         throw err;
       }
 
+      // 2. API Key is restricted in Credentials
+      if (reason === 'API_KEY_SERVICE_BLOCKED' || rawMsg.includes('blocked')) {
+        const err = new Error(
+          `API Key này đang bị Google Cloud CHẶN do thiết lập hạn chế (API restrictions).\n\n` +
+          `👉 Cách sửa triệt để (1 phút):\n` +
+          `1. Vào trang Quản lý Key: ${credentialsUrl}\n` +
+          `2. Bấm vào tên API Key của bạn để mở cài đặt.\n` +
+          `3. Tại mục "API restrictions" (Hạn chế API) -> Chọn "Don't restrict key" (Không hạn chế khóa), hoặc tích chọn thêm "Generative Language API".\n` +
+          `4. Bấm "Save" (Lưu) ở dưới cùng rồi thử lại sau 1-2 phút.`
+        );
+        err.status = res.status;
+        err.reason = 'API_KEY_SERVICE_BLOCKED';
+        err.projectId = projectId;
+        err.activationUrl = directActivationUrl;
+        err.credentialsUrl = credentialsUrl;
+        err.rawMsg = rawMsg;
+        err.rawJson = errData;
+        throw err;
+      }
+
+      // 3. API Key Invalid
+      if (res.status === 400 || reason === 'API_KEY_INVALID' || rawMsg.includes('API key not valid')) {
+        const err = new Error('API Key không hợp lệ. Vui lòng kiểm tra lại key đã sao chép từ Google AI Studio (không thừa khoảng trắng hoặc thiếu ký tự).');
+        err.status = 400;
+        err.reason = 'API_KEY_INVALID';
+        err.rawMsg = rawMsg;
+        err.rawJson = errData;
+        throw err;
+      }
+
+      // 4. Unauthorized / Invalid auth method
       if (res.status === 401 || reason === 'ACCESS_TOKEN_TYPE_UNSUPPORTED') {
-        const err = new Error('API Key không hợp lệ hoặc sai loại xác thực. Vui lòng kiểm tra lại key.');
+        const err = new Error('API Key sai hoặc không được cấp quyền (401). Vui lòng kiểm tra lại key.');
         err.status = 401;
+        err.reason = 'UNAUTHORIZED';
+        err.rawMsg = rawMsg;
+        err.rawJson = errData;
         throw err;
       }
 
+      // 5. Rate limit / Quota exceeded
+      if (res.status === 429 || reason === 'RESOURCE_EXHAUSTED') {
+        const err = new Error('Đã vượt quá hạn ngạch gọi miễn phí của Gemini (Rate limit 429). Vui lòng đợi 1 phút hoặc chuyển sang Groq.');
+        err.status = 429;
+        err.reason = 'RESOURCE_EXHAUSTED';
+        err.rawMsg = rawMsg;
+        err.rawJson = errData;
+        throw err;
+      }
+
+      // 6. Model Not Found
       if (res.status === 404) {
         const err = new Error(`Model ${cleanModel} không tìm thấy (404)`);
         err.status = 404;
+        err.reason = 'NOT_FOUND';
+        err.rawMsg = rawMsg;
+        err.rawJson = errData;
+        throw err;
+      }
+
+      // 7. General Permission Denied (e.g. Workspace Org Policy)
+      if (res.status === 403) {
+        const err = new Error(
+          `Google từ chối quyền truy cập (403 Forbidden). ` +
+          `Nếu bạn dùng email trường học (@edu) hoặc công ty, quản trị viên có thể đã chặn dịch vụ AI. ` +
+          `Vui lòng thử dùng tài khoản Gmail cá nhân (@gmail.com) để lấy API key.`
+        );
+        err.status = 403;
+        err.reason = 'PERMISSION_DENIED';
+        err.rawMsg = rawMsg;
+        err.rawJson = errData;
         throw err;
       }
 
       const err = new Error(`Gemini API lỗi ${res.status}: ${rawMsg || 'Lỗi HTTP'}`);
       err.status = res.status;
+      err.rawMsg = rawMsg;
+      err.rawJson = errData;
       throw err;
     }
 
@@ -1422,3 +1539,119 @@ async function callClaude(apiKey, prompt, isWord) {
     throw e;
   }
 }
+
+/**
+ * Diagnostic helper: directly tests an AI provider connection and returns
+ * structured status, error reason, project info, and actionable resolution links.
+ */
+export async function testDirectAI(provider, apiKey) {
+  const cleanKey = (apiKey || '').trim();
+  if (!cleanKey) {
+    return {
+      success: false,
+      provider,
+      status: 400,
+      message: `Chưa nhập API Key cho ${provider}. Vui lòng nhập key trước khi kiểm tra.`
+    };
+  }
+
+  const startTime = Date.now();
+
+  if (provider === 'gemini') {
+    try {
+      const result = await callGemini(cleanKey, 'Ping test. Output JSON: {"status": "ok"}', false);
+      const latencyMs = Date.now() - startTime;
+      return {
+        success: true,
+        provider: 'gemini',
+        model: cachedGeminiModel || 'gemini-2.0-flash',
+        latencyMs,
+        message: `Kết nối thành công! Google Gemini (${cachedGeminiModel || 'gemini-2.0-flash'}) phản hồi sau ${latencyMs}ms.`
+      };
+    } catch (err) {
+      return {
+        success: false,
+        provider: 'gemini',
+        status: err.status || 500,
+        reason: err.reason || 'UNKNOWN_ERROR',
+        projectId: err.projectId || '',
+        activationUrl: err.activationUrl || '',
+        credentialsUrl: err.credentialsUrl || '',
+        message: err.message || 'Lỗi không xác định khi gọi Gemini API',
+        rawMsg: err.rawMsg || '',
+        rawJson: err.rawJson || null
+      };
+    }
+  }
+
+  if (provider === 'groq') {
+    try {
+      await callGroq(cleanKey, 'Ping test. Output JSON: {"status": "ok"}', false);
+      const latencyMs = Date.now() - startTime;
+      return {
+        success: true,
+        provider: 'groq',
+        model: 'llama-3.3-70b-versatile',
+        latencyMs,
+        message: `Kết nối thành công! Groq AI phản hồi sau ${latencyMs}ms.`
+      };
+    } catch (err) {
+      return {
+        success: false,
+        provider: 'groq',
+        status: err.status || 500,
+        message: err.message || 'Lỗi kết nối Groq API'
+      };
+    }
+  }
+
+  if (provider === 'openai') {
+    try {
+      await callOpenAI(cleanKey, 'Ping test. Output JSON: {"status": "ok"}', false);
+      const latencyMs = Date.now() - startTime;
+      return {
+        success: true,
+        provider: 'openai',
+        model: 'gpt-4o-mini',
+        latencyMs,
+        message: `Kết nối thành công! OpenAI GPT-4o Mini phản hồi sau ${latencyMs}ms.`
+      };
+    } catch (err) {
+      return {
+        success: false,
+        provider: 'openai',
+        status: err.status || 500,
+        message: err.message || 'Lỗi kết nối OpenAI API'
+      };
+    }
+  }
+
+  if (provider === 'claude') {
+    try {
+      await callClaude(cleanKey, 'Ping test. Output JSON: {"status": "ok"}', false);
+      const latencyMs = Date.now() - startTime;
+      return {
+        success: true,
+        provider: 'claude',
+        model: 'claude-3-5-haiku',
+        latencyMs,
+        message: `Kết nối thành công! Anthropic Claude phản hồi sau ${latencyMs}ms.`
+      };
+    } catch (err) {
+      return {
+        success: false,
+        provider: 'claude',
+        status: err.status || 500,
+        message: err.message || 'Lỗi kết nối Claude API'
+      };
+    }
+  }
+
+  return {
+    success: false,
+    provider,
+    status: 400,
+    message: `Provider không được hỗ trợ: ${provider}`
+  };
+}
+

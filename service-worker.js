@@ -2,7 +2,7 @@
 // Service Worker (MV3) - routes messages, calls AI, manages vocabulary storage
 // Static import is required - dynamic import() is NOT allowed in service workers
 
-import { callAI, isPlaceholderText, findFallbackData, buildFallbackWordResponse } from './utils/ai-client.js';
+import { callAI, testDirectAI, isPlaceholderText, findFallbackData, buildFallbackWordResponse } from './utils/ai-client.js';
 import { fetchFromCambridge } from './utils/cambridge-client.js';
 import { resolveDictionaryWord } from './utils/dict-resolver.js';
 
@@ -112,6 +112,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (tab) await chrome.sidePanel.open({ windowId: tab.windowId });
         sendResponse({ success: true });
 
+      } else if (message.type === 'OPEN_OPTIONS') {
+        chrome.runtime.openOptionsPage();
+        sendResponse({ success: true });
+
       } else if (message.type === 'GET_STATS') {
         const { vocabulary = [] } = await chrome.storage.local.get('vocabulary');
         sendResponse({
@@ -123,6 +127,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             new: vocabulary.filter(w => w.status === 'new').length,
           }
         });
+
+      } else if (message.type === 'TEST_AI_CONNECTION') {
+        const testResult = await testDirectAI(message.provider, message.apiKey);
+        sendResponse(testResult);
 
       } else {
         sendResponse({ success: false, error: 'Unknown message type' });
@@ -258,7 +266,7 @@ async function handleTranslate(text, isWord, direction = 'auto') {
       return result;
     }
   } catch (aiErr) {
-    console.warn('AI call failed, returning verified dictionary data:', aiErr);
+    console.warn('AI call failed, checking fallbacks:', aiErr);
     if (dictResult && dictResult.word?.meaning_vi) {
       await setCachedTranslation(cacheKey, dictResult);
       return dictResult;
@@ -271,7 +279,57 @@ async function handleTranslate(text, isWord, direction = 'auto') {
         return resp;
       }
     }
+    // For phrases/sentences: fallback to Google Translate so user is never blocked
+    if (!isWord) {
+      try {
+        const gTrans = await fetchGoogleTranslatePhrase(cleanText, direction);
+        if (gTrans) {
+          const fallbackPhrase = {
+            type: 'phrase',
+            original: cleanText,
+            translation: gTrans,
+            explanation: aiErr.message ? `⚠️ [Chế độ dự phòng] ${aiErr.message}` : '',
+            fallbackSource: 'google_translate',
+            aiError: {
+              status: aiErr.status,
+              reason: aiErr.reason,
+              projectId: aiErr.projectId,
+              activationUrl: aiErr.activationUrl,
+              credentialsUrl: aiErr.credentialsUrl
+            }
+          };
+          return fallbackPhrase;
+        }
+      } catch (_) {}
+    }
     throw aiErr;
+  }
+}
+
+async function fetchGoogleTranslatePhrase(text, direction = 'auto') {
+  const clean = (text || '').trim();
+  if (!clean) return null;
+  const isVi = direction === 'vi-en' || (direction === 'auto' && /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(clean));
+  const sl = isVi ? 'vi' : 'en';
+  const tl = isVi ? 'en' : 'vi';
+
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURIComponent(clean)}`;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!res.ok) return null;
+    const data = await res.json();
+    let trans = '';
+    if (Array.isArray(data[0])) {
+      for (const seg of data[0]) {
+        if (seg[0]) trans += seg[0];
+      }
+    }
+    return trans.trim() || null;
+  } catch (_) {
+    return null;
   }
 }
 

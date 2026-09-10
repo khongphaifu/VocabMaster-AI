@@ -115,8 +115,18 @@ async function saveAI() {
   showMsg('msg-ai', '✅ Đã lưu! Bôi đen văn bản tiếng Anh để bắt đầu dịch.', 'ok');
 }
 
+function escHtml(str) {
+  return (str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 async function testAIConnection() {
   const btn = document.getElementById('btn-test-ai');
+  const diagEl = document.getElementById('diagnostic-panel');
   const apiKeys = {
     gemini: document.getElementById('key-gemini')?.value.trim() || '',
     groq: document.getElementById('key-groq')?.value.trim() || '',
@@ -126,30 +136,121 @@ async function testAIConnection() {
   const apiKey = apiKeys[selectedProvider];
   if (!apiKey) {
     showMsg('msg-ai', `❌ Vui lòng nhập API key cho ${selectedProvider} trước khi kiểm tra`, 'err');
+    if (diagEl) diagEl.style.display = 'none';
     return;
   }
 
-  btn.textContent = '⏳ Đang kiểm tra...';
+  btn.textContent = '⏳ Đang kiểm tra & chẩn đoán...';
   btn.disabled = true;
+
+  if (diagEl) {
+    diagEl.style.display = 'block';
+    diagEl.innerHTML = `
+      <div style="background:#1e1e2e;border:1px solid #45475a;border-radius:8px;padding:12px;font-size:12px;color:#cdd6f4;">
+        ⏳ Đang kết nối trực tiếp đến <b>${selectedProvider.toUpperCase()}</b> để kiểm tra...
+      </div>
+    `;
+  }
 
   // Save first
   await chrome.storage.sync.set({ aiProvider: selectedProvider, apiKey, apiKeys });
 
   try {
     const response = await chrome.runtime.sendMessage({
-      type: 'TRANSLATE',
-      text: 'welcome',
-      isWord: true
+      type: 'TEST_AI_CONNECTION',
+      provider: selectedProvider,
+      apiKey
     });
 
-    if (response?.success && response.data) {
-      const def = response.data.word?.definition_vi || 'thành công';
-      showMsg('msg-ai', `✅ Kết nối AI (${selectedProvider}) thành công! Dịch thử từ "welcome": "${def}"`, 'ok');
+    if (response?.success) {
+      showMsg('msg-ai', `✅ ${response.message}`, 'ok');
+      if (diagEl) {
+        diagEl.innerHTML = `
+          <div style="background:#a6e3a118;border:1px solid #a6e3a160;border-radius:8px;padding:12px 14px;font-size:12.5px;color:#a6e3a1;line-height:1.5;">
+            <div style="font-weight:700;margin-bottom:4px;font-size:13px;">✅ Kết nối ${selectedProvider.toUpperCase()} thành công 100%!</div>
+            <div style="color:#cdd6f4;font-size:12px;">Model: <b>${escHtml(response.model)}</b> · Độ trễ: <b>${response.latencyMs}ms</b></div>
+            <div style="color:#bac2de;font-size:11.5px;margin-top:4px;">VocabMaster AI đã sẵn sàng hoạt động. Bạn có thể bôi đen văn bản trên web để tra cứu.</div>
+          </div>
+        `;
+      }
     } else {
-      showMsg('msg-ai', `❌ Lỗi kết nối: ${response?.error || 'Không nhận được phản hồi'}`, 'err');
+      const isBlocked = response?.reason === 'API_KEY_SERVICE_BLOCKED';
+      const isDisabled = response?.reason === 'SERVICE_DISABLED';
+
+      showMsg('msg-ai', `❌ Kết nối thất bại: ${response?.reason || response?.message || 'Lỗi không xác định'}`, 'err');
+
+      if (diagEl) {
+        let actionHtml = '';
+        if (isDisabled && response?.activationUrl) {
+          actionHtml = `
+            <div style="margin: 10px 0;">
+              <a href="${response.activationUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#89b4fa;color:#11111b;font-weight:700;padding:8px 14px;border-radius:6px;text-decoration:none;font-size:12.5px;box-shadow:0 2px 4px rgba(0,0,0,0.2);">
+                👉 Bấm vào đây để BẬT API cho đúng Project này (1-Click)
+              </a>
+            </div>
+            <div style="font-size:11.5px;color:#bac2de;line-height:1.5;margin-top:6px;background:#313244;padding:8px 10px;border-radius:6px;">
+              <b>📌 Các lưu ý sống còn để kích hoạt thành công:</b><br>
+              1. <b>Kiểm tra tài khoản Gmail:</b> Nếu bạn đăng nhập nhiều Gmail trên trình duyệt, khi trang Google Cloud mở ra, hãy nhìn vào <i>góc trên cùng bên phải</i> xem đã chọn đúng tài khoản đã tạo API key chưa.<br>
+              2. <b>Bấm ENABLE:</b> Bấm nút "ENABLE" màu xanh trên trang đó.<br>
+              3. <b>Đợi 2-3 phút:</b> Google cần 2-3 phút để phân phối quyền đến edge cache toàn cầu. Đừng vội nản lòng, đợi 2 phút rồi bấm lại nút "Kiểm tra kết nối AI"!
+            </div>
+          `;
+        } else if (isBlocked) {
+          const credUrl = response?.credentialsUrl || 'https://console.cloud.google.com/apis/credentials';
+          actionHtml = `
+            <div style="margin: 10px 0;">
+              <a href="${credUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#f9e2af;color:#11111b;font-weight:700;padding:8px 14px;border-radius:6px;text-decoration:none;font-size:12.5px;box-shadow:0 2px 4px rgba(0,0,0,0.2);">
+                👉 Mở trang Quản lý Key để Gỡ hạn chế (Don't restrict key)
+              </a>
+            </div>
+            <div style="font-size:11.5px;color:#bac2de;line-height:1.5;margin-top:6px;background:#313244;padding:8px 10px;border-radius:6px;">
+              <b>📌 Cách sửa nhanh trong 1 phút:</b><br>
+              1. Bấm nút phía trên để mở danh sách Credentials trên Google Cloud.<br>
+              2. Bấm vào tên API Key mà bạn đang sử dụng.<br>
+              3. Cuộn xuống mục <b>API restrictions</b> (Hạn chế API) -> Chọn <b>"Don't restrict key"</b> (Không hạn chế khóa), hoặc tích chọn thêm <b>"Generative Language API"</b>.<br>
+              4. Bấm <b>Save</b> (Lưu) ở cuối trang rồi thử lại sau 1 phút.
+            </div>
+          `;
+        }
+
+        diagEl.innerHTML = `
+          <div style="background:#f38ba812;border:1px solid #f38ba850;border-radius:8px;padding:14px;font-size:12px;color:#cdd6f4;line-height:1.5;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <span style="color:#f38ba8;font-weight:700;font-size:13px;">❌ Chẩn đoán lỗi: ${escHtml(response?.reason || ('Mã lỗi ' + (response?.status || '500')))}</span>
+              <span style="background:#f38ba830;color:#f38ba8;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">HTTP ${response?.status || 500}</span>
+            </div>
+
+            ${response?.projectId ? `
+              <div style="background:#313244;padding:7px 10px;border-radius:6px;font-size:12px;margin-bottom:8px;border-left:3px solid #89b4fa;">
+                🏷️ <b>Mã Google Cloud Project của key:</b> <code style="color:#a6e3a1;background:#181825;padding:2px 6px;border-radius:4px;font-weight:600;">${escHtml(response.projectId)}</code>
+              </div>
+            ` : ''}
+
+            <div style="color:#f2cdcd;font-size:12px;margin-bottom:8px;white-space:pre-line;">
+              ${escHtml(response?.message || '')}
+            </div>
+
+            ${actionHtml}
+
+            ${(response?.rawJson || response?.rawMsg) ? `
+              <details style="margin-top:10px;border-top:1px solid #45475a;padding-top:8px;">
+                <summary style="cursor:pointer;color:#89b4fa;font-size:11px;font-weight:600;">📋 Xem chi tiết phản hồi gốc từ Google (Raw JSON)</summary>
+                <pre style="background:#181825;color:#cdd6f4;padding:8px;border-radius:4px;font-size:10.5px;max-height:160px;overflow:auto;margin-top:6px;white-space:pre-wrap;word-break:break-all;">${escHtml(JSON.stringify(response.rawJson || response.rawMsg, null, 2))}</pre>
+              </details>
+            ` : ''}
+
+            <div style="margin-top:12px;background:#31324480;border-left:3px solid #a6e3a1;padding:8px 10px;border-radius:4px;font-size:11.5px;color:#cdd6f4;">
+              💡 <b>Khuyên dùng:</b> Nếu không muốn mất thời gian cấu hình Google Cloud, bạn chỉ cần chuyển sang <b>Groq AI</b> (Lựa chọn thứ 2 phía trên). Groq miễn phí 100%, không cần Google Cloud, lấy key trong 5 giây tại <a href="https://console.groq.com/keys" target="_blank" style="color:#a6e3a1;font-weight:600;text-decoration:underline;">console.groq.com/keys</a> là dùng được ngay lập tức!
+            </div>
+          </div>
+        `;
+      }
     }
   } catch (err) {
     showMsg('msg-ai', `❌ Lỗi: ${err.message}`, 'err');
+    if (diagEl) {
+      diagEl.innerHTML = `<div style="background:#f38ba820;border:1px solid #f38ba8;padding:10px;border-radius:6px;font-size:12px;color:#f38ba8;">❌ Lỗi thực thi kiểm tra: ${escHtml(err.message)}</div>`;
+    }
   } finally {
     btn.textContent = '🧪 Kiểm tra kết nối AI';
     btn.disabled = false;

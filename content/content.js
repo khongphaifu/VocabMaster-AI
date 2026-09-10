@@ -458,24 +458,24 @@ function showErrorTooltip(msg, anchorRect, retryFn = null) {
     document.body.appendChild(tooltip);
   }
 
-  const isGeminiBlocked = msg && (msg.includes('Generative Language API') || msg.includes('Google Cloud Project'));
+  const isGeminiIssue = msg && (msg.includes('Generative Language API') || msg.includes('Google Cloud Project') || msg.includes('API restrictions') || msg.includes('API Key'));
 
   tooltip.innerHTML = `
-    <div class="vm-card" style="padding: 12px 14px; min-width: 260px; max-width: 380px;">
+    <div class="vm-card" style="padding: 12px 14px; min-width: 280px; max-width: 400px;">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px;">
-        <span style="color:#f38ba8; font-weight:700; font-size:12.5px;">⚠️ Thông báo kết nối</span>
+        <span style="color:#f38ba8; font-weight:700; font-size:12.5px;">⚠️ Thông báo kết nối AI</span>
         <button type="button" class="vm-tool-btn vm-close-btn" title="Đóng">${ICONS.close}</button>
       </div>
-      <div class="vm-error" style="margin-bottom: ${(retryFn || isGeminiBlocked) ? '10px' : '0'}; line-height: 1.5; font-size: 12px;">
+      <div class="vm-error" style="margin-bottom: ${(retryFn || isGeminiIssue) ? '10px' : '0'}; line-height: 1.5; font-size: 12px;">
         ${formatErrorContent(msg)}
       </div>
-      ${isGeminiBlocked ? `
-        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;justify-content:center;gap:6px;background:#a6e3a1;color:#11111b;font-weight:700;font-size:12px;padding:7px 12px;border-radius:6px;text-decoration:none;margin-bottom:6px;transition:0.15s;text-align:center;">
-          ✨ Mở Google AI Studio (Tạo Key Mới Tự Bật)
-        </a>
+      ${isGeminiIssue ? `
+        <button type="button" class="vm-open-settings-btn" style="appearance:none; -webkit-appearance:none; border:none; background:#89b4fa; color:#11111b; font-weight:700; font-size:12px; padding:7px 12px; border-radius:6px; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:6px; margin-bottom:6px; transition:0.15s;">
+          ⚙️ Mở Cài đặt để Chẩn đoán & Bật API
+        </button>
       ` : ''}
       ${retryFn ? `
-        <button type="button" class="vm-retry-btn" style="appearance:none; -webkit-appearance:none; border:none; background:#89b4fa; color:#11111b; font-weight:700; font-size:12px; padding:7px 12px; border-radius:6px; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:6px; transition:0.15s;">
+        <button type="button" class="vm-retry-btn" style="appearance:none; -webkit-appearance:none; border:none; background:#a6e3a1; color:#11111b; font-weight:700; font-size:12px; padding:7px 12px; border-radius:6px; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:6px; transition:0.15s;">
           🔄 Thử lại ngay
         </button>
       ` : ''}
@@ -486,6 +486,12 @@ function showErrorTooltip(msg, anchorRect, retryFn = null) {
 
   tooltip.querySelector('.vm-close-btn')?.addEventListener('click', (e) => {
     e.stopPropagation();
+    hideTooltip();
+  });
+
+  tooltip.querySelector('.vm-open-settings-btn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS' });
     hideTooltip();
   });
 
