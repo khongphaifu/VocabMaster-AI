@@ -56,6 +56,24 @@ chrome.runtime.onInstalled.addListener((details) => {
 
   // Configure side panel - must call inside onInstalled (not top-level)
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
+
+  // Seamless re-injection into existing tabs on install/update
+  try {
+    chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] }).then((tabs) => {
+      for (const tab of tabs) {
+        if (tab.id && tab.url && !tab.url.startsWith('chrome') && !tab.url.startsWith('edge')) {
+          chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content/content.js']
+          }).catch(() => {});
+          chrome.scripting.insertCSS({
+            target: { tabId: tab.id },
+            files: ['content/content.css']
+          }).catch(() => {});
+        }
+      }
+    }).catch(() => {});
+  } catch (_) {}
 });
 
 // Handle context menu clicks

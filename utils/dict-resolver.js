@@ -501,6 +501,35 @@ export const CORE_OFFLINE_DICT = {
     ],
     synonyms: ['bike', 'cycle']
   },
+  song: {
+    word_root: 'song',
+    ipa_uk: '/sɒŋ/',
+    ipa_us: '/sɑːŋ/',
+    partOfSpeech: 'noun [C]',
+    level: 'A1',
+    meaning_vi: 'bài hát',
+    definition_vi: 'tác phẩm âm nhạc có lời dành cho giọng hát',
+    definition_en: 'a short piece of music with words that are sung',
+    examples: [
+      'She sang her favorite song at the party.',
+      'Thomas listened to the song on the radio yesterday.'
+    ],
+    word_family: [
+      { pos: 'verb', word: 'sing', meaning_vi: 'hát, ca hát' },
+      { pos: 'noun', word: 'singer', meaning_vi: 'ca sĩ, người hát' },
+      { pos: 'noun', word: 'songwriter', meaning_vi: 'nhạc sĩ, người sáng tác bài hát' },
+      { pos: 'noun', word: 'singing', meaning_vi: 'tiếng hát, sự ca hát' }
+    ],
+    other_meanings: [
+      { pos: 'noun', meaning_vi: 'tiếng hót (của chim)', definition_en: 'the musical sounds made by a bird' }
+    ],
+    collocations: [
+      { phrase: 'favorite song', meaning_vi: 'bài hát yêu thích' },
+      { phrase: 'hit song', meaning_vi: 'bài hát đình đám' },
+      { phrase: 'sing a song', meaning_vi: 'hát một bài hát' }
+    ],
+    synonyms: ['track', 'tune', 'melody']
+  },
   train: {
     word_root: 'train',
     ipa_uk: '/treɪn/',
@@ -854,6 +883,21 @@ const IRREGULAR_VERBS = {
 };
 
 const IRREGULAR_WORD_FAMILIES = {
+  song: [
+    { pos: 'verb', word: 'sing', meaning_vi: 'hát, ca hát' },
+    { pos: 'noun', word: 'singer', meaning_vi: 'ca sĩ, người hát' },
+    { pos: 'noun', word: 'songwriter', meaning_vi: 'nhạc sĩ, người sáng tác bài hát' },
+    { pos: 'noun', word: 'singing', meaning_vi: 'tiếng hát, sự ca hát' }
+  ],
+  sing: [
+    { pos: 'noun', word: 'song', meaning_vi: 'bài hát' },
+    { pos: 'noun', word: 'singer', meaning_vi: 'ca sĩ' },
+    { pos: 'noun', word: 'singing', meaning_vi: 'tiếng hát, sự ca hát' }
+  ],
+  singer: [
+    { pos: 'verb', word: 'sing', meaning_vi: 'hát, ca hát' },
+    { pos: 'noun', word: 'song', meaning_vi: 'bài hát' }
+  ],
   meant: [
     { pos: 'verb', word: 'mean', meaning_vi: 'nguyên mẫu: có nghĩa là, có ý định' },
     { pos: 'noun', word: 'meaning', meaning_vi: 'ý nghĩa, hàm ý' },
@@ -1010,25 +1054,25 @@ export function generateFallbackExamples(word, pos, meaningVi = '') {
 
   if (p.includes('verb')) {
     return [
-      `Researchers must carefully ${w} all variables to guarantee precise outcomes.`,
-      `The engineering team decided to ${w} the entire process for better efficiency.`
+      `They decided to ${w} together to achieve the best possible result.`,
+      `It is important to ${w} carefully in order to avoid mistakes.`
     ];
   }
   if (p.includes('adj')) {
     return [
-      `This model provides a highly ${w} approach for modern scientific research.`,
-      `It is essential to maintain a ${w} condition during the testing phase.`
+      `Her explanation was very ${w} and helped everyone understand.`,
+      `It is essential to stay ${w} during the entire process.`
     ];
   }
   if (p.includes('adv')) {
     return [
-      `The system operates ${w} under standard laboratory conditions.`,
-      `They approached the complex challenge ${w} to avoid unforeseen errors.`
+      `The team worked ${w} to complete the task before the deadline.`,
+      `She answered all the questions ${w} and with confidence.`
     ];
   }
   return [
-    `The concept of ${w} plays a fundamental role in understanding the system.`,
-    `Engineers need to carefully adjust the primary ${w} to optimize performance.`
+    `She loved listening to the beautiful ${w} on her way home.`,
+    `The new ${w} received positive feedback from everyone.`
   ];
 }
 
@@ -1050,50 +1094,86 @@ export function generateFallbackCollocations(word, pos, synonyms = [], meaningVi
     ];
   }
 
-  // If we have native adjective collocations from Datamuse (e.g. ['direct', 'careful', 'close'])
-  if (Array.isArray(adjectiveCollocations) && adjectiveCollocations.length >= 2) {
-    const adjMap = {
-      direct: 'trực tiếp',
-      personal: 'cá nhân',
-      careful: 'kỹ lưỡng / cẩn thận',
-      close: 'chặt chẽ',
-      clinical: 'lâm sàng',
-      empirical: 'thực nghiệm',
-      scientific: 'khoa học',
-      thorough: 'toàn diện / kỹ lưỡng',
-      preliminary: 'sơ bộ',
-      final: 'cuối cùng',
-      accurate: 'chính xác',
-      precise: 'chuẩn xác',
-      important: 'quan trọng',
-      key: 'then chốt',
-      critical: 'trọng yếu',
-      major: 'chủ chốt',
-      simple: 'đơn giản',
-      genetic: 'di truyền',
-      efficient: 'hiệu quả',
-      neural: 'nơ-ron',
-      social: 'xã hội',
-      central: 'trung tâm',
-      raw: 'thô'
-    };
-    const colList = [];
-    for (const adj of adjectiveCollocations.slice(0, 3)) {
+  const adjMap = {
+    old: 'cũ / quen thuộc',
+    new: 'mới',
+    popular: 'nổi tiếng / phổ biến',
+    famous: 'nổi tiếng',
+    favorite: 'yêu thích',
+    good: 'hay / tốt',
+    great: 'tuyệt vời',
+    beautiful: 'tuyệt đẹp',
+    sweet: 'ngọt ngào',
+    sad: 'buồn',
+    happy: 'vui tươi',
+    classic: 'kinh điển',
+    hit: 'đình đám',
+    original: 'nguyên bản / gốc',
+    traditional: 'truyền thống',
+    folk: 'dân gian',
+    romantic: 'lãng mạn',
+    catchy: 'bắt tai',
+    short: 'ngắn',
+    long: 'dài',
+    simple: 'đơn giản',
+    direct: 'trực tiếp',
+    personal: 'cá nhân',
+    careful: 'kỹ lưỡng / cẩn thận',
+    close: 'chặt chẽ',
+    clinical: 'lâm sàng',
+    empirical: 'thực nghiệm',
+    scientific: 'khoa học',
+    thorough: 'toàn diện / kỹ lưỡng',
+    preliminary: 'sơ bộ',
+    final: 'cuối cùng',
+    accurate: 'chính xác',
+    precise: 'chuẩn xác',
+    important: 'quan trọng',
+    key: 'then chốt',
+    critical: 'trọng yếu',
+    major: 'chủ chốt',
+    efficient: 'hiệu quả',
+    neural: 'nơ-ron',
+    social: 'xã hội',
+    central: 'trung tâm',
+    modern: 'hiện đại',
+    perfect: 'hoàn hảo',
+    strong: 'mạnh mẽ',
+    soft: 'nhẹ nhàng',
+    live: 'trực tiếp',
+    main: 'chính',
+    primary: 'chính / chủ yếu',
+    best: 'hay nhất / tốt nhất',
+    latest: 'mới nhất',
+    standard: 'chuẩn mực',
+    raw: 'thô'
+  };
+
+  const colList = [];
+  if (Array.isArray(adjectiveCollocations)) {
+    for (const adj of adjectiveCollocations) {
       if (adj && adj !== w && !colList.some(c => c.phrase.startsWith(adj))) {
-        const viAdj = adjMap[adj.toLowerCase()] || adj;
-        colList.push({
-          phrase: `${adj} ${w}`,
-          meaning_vi: `${cleanM} ${viAdj}`
-        });
+        const viAdj = adjMap[adj.toLowerCase()];
+        if (viAdj) {
+          colList.push({
+            phrase: `${adj} ${w}`,
+            meaning_vi: `${cleanM} ${viAdj}`
+          });
+          if (colList.length >= 3) break;
+        }
       }
     }
-    if (colList.length >= 2) return colList;
   }
 
-  return [
-    { phrase: `direct ${w}`, meaning_vi: `${cleanM} trực tiếp` },
-    { phrase: `key ${w}`, meaning_vi: `${cleanM} then chốt / quan trọng` }
-  ];
+  if (colList.length >= 2) return colList;
+
+  // Fallback natural collocations for nouns
+  colList.push(
+    { phrase: `favorite ${w}`, meaning_vi: `${cleanM} yêu thích` },
+    { phrase: `new ${w}`, meaning_vi: `${cleanM} mới` },
+    { phrase: `popular ${w}`, meaning_vi: `${cleanM} phổ biến / được ưa chuộng` }
+  );
+  return colList.slice(0, 3);
 }
 
 export function generateFallbackFamily(word, pos, meaningVi = '') {
@@ -1175,8 +1255,9 @@ export function generateFallbackFamily(word, pos, meaningVi = '') {
   if (p.includes('noun')) {
     if (cleanWord.endsWith('meter')) {
       list.push({ pos: 'adj', word: `${cleanWord.slice(0, -5)}metric`, meaning_vi: `thuộc về ${cleanM}` });
-    } else {
-      list.push({ pos: 'adj', word: `${cleanWord}al`, meaning_vi: `thuộc về ${cleanM}` });
+    } else if (cleanWord.endsWith('logy')) {
+      list.push({ pos: 'adj', word: `${cleanWord.slice(0, -1)}ical`, meaning_vi: `thuộc về ${cleanM}` });
+      list.push({ pos: 'noun', word: `${cleanWord.slice(0, -1)}ist`, meaning_vi: `chuyên gia ${cleanM}` });
     }
   } else if (p.includes('verb')) {
     const rootWithoutE = cleanWord.endsWith('e') ? cleanWord.slice(0, -1) : cleanWord;
@@ -1336,7 +1417,18 @@ export async function fetchWiktionary(word) {
     const wikitext = data.parse?.wikitext?.['*'];
     if (!wikitext) return null;
 
-    const lines = wikitext.split('\n');
+    // Isolate English section in vi.wiktionary: {{-eng-}} or == Tiếng Anh ==
+    // Prevents English words that collide with Vietnamese words (e.g. song, can, me, tin, may) from returning Vietnamese definitions
+    let targetWikitext = wikitext;
+    const engRegex = /(?:{{-eng-}}|==\s*Tiếng Anh\s*==)([\s\S]*?)(?=(?:{{-[a-z]{3}-}}|==\s*[^=]+\s*==|$))/i;
+    const engMatch = wikitext.match(engRegex);
+    if (engMatch && engMatch[1]) {
+      targetWikitext = engMatch[1];
+    } else if (wikitext.includes('{{-vie-}}') && !wikitext.includes('{{-eng-}}')) {
+      return null;
+    }
+
+    const lines = targetWikitext.split('\n');
     const headwords = [];
     const definitions = [];
     let currentPos = 'noun';
@@ -1375,15 +1467,63 @@ export async function fetchWiktionary(word) {
 }
 
 /**
- * Fetch accurate IPA and phonetic info from Datamuse & Free Dictionary APIs
+ * Fetch accurate IPA and phonetic info from Free Dictionary API & Datamuse
  */
 export async function fetchPhoneticData(word) {
   const cleanWord = (word || '').trim();
   if (!cleanWord) return null;
 
-  const results = { ipa: '', audio: '', definition_en: '', examples: [], synonyms: [], collocations: [] };
+  const results = { ipa: '', audio: '', definition_en: '', examples: [], synonyms: [], collocations: [], adjectiveCollocations: [] };
 
-  // 1. Try Datamuse API for CMU phonetic pronunciation and definitions
+  // 1. Primary Rich Source: Free Dictionary API (authentic native pronunciations, audio, and examples)
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2200);
+    const fUrl = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(cleanWord)}`;
+    const fRes = await fetch(fUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (fRes.ok) {
+      const fJson = await fRes.json();
+      if (Array.isArray(fJson) && fJson[0]) {
+        const entry = fJson[0];
+        if (entry.phonetic && isStandardIpa(entry.phonetic)) {
+          results.ipa = entry.phonetic;
+        }
+        if (Array.isArray(entry.phonetics)) {
+          for (const p of entry.phonetics) {
+            if (!results.ipa && p.text && isStandardIpa(p.text)) {
+              results.ipa = p.text;
+            }
+            if (!results.audio && p.audio && p.audio.startsWith('http')) {
+              results.audio = p.audio;
+            }
+          }
+        }
+        if (Array.isArray(entry.meanings)) {
+          for (const m of entry.meanings) {
+            if (Array.isArray(m.definitions)) {
+              for (const def of m.definitions) {
+                if (!results.definition_en && def.definition) {
+                  results.definition_en = def.definition;
+                }
+                if (def.example && !results.examples.includes(def.example)) {
+                  results.examples.push(def.example);
+                }
+              }
+            }
+            if (Array.isArray(m.synonyms)) {
+              for (const s of m.synonyms) {
+                if (s && !results.synonyms.includes(s)) results.synonyms.push(s);
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (_) {}
+
+  // 2. Try Datamuse API for CMU phonetic pronunciation and definitions fallback
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2000);
@@ -1396,10 +1536,10 @@ export async function fetchPhoneticData(word) {
       const topMatch = dJson?.find(item => item.word?.toLowerCase() === cleanWord.toLowerCase()) || dJson?.[0];
       if (topMatch) {
         const pronTag = topMatch.tags?.find(t => t.startsWith('pron:'));
-        if (pronTag) {
+        if (pronTag && !results.ipa) {
           results.ipa = convertCmuToIpa(pronTag);
         }
-        if (Array.isArray(topMatch.defs) && topMatch.defs.length > 0) {
+        if (Array.isArray(topMatch.defs) && topMatch.defs.length > 0 && !results.definition_en) {
           const rawDef = topMatch.defs[0].replace(/^[a-z]+\t/i, '').trim();
           if (rawDef) results.definition_en = rawDef;
         }
@@ -1407,22 +1547,27 @@ export async function fetchPhoneticData(word) {
     }
   } catch (_) {}
 
-  // 2. Try Datamuse Synonyms (rel_syn)
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
-    const synUrl = `https://api.datamuse.com/words?rel_syn=${encodeURIComponent(cleanWord)}&max=6`;
-    const synRes = await fetch(synUrl, { signal: controller.signal });
-    clearTimeout(timeoutId);
-    if (synRes.ok) {
-      const synJson = await synRes.json();
-      if (Array.isArray(synJson) && synJson.length > 0) {
-        results.synonyms = synJson.map(s => s.word).filter(Boolean).slice(0, 4);
+  // 3. Try Datamuse Synonyms (rel_syn)
+  if (results.synonyms.length < 3) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const synUrl = `https://api.datamuse.com/words?rel_syn=${encodeURIComponent(cleanWord)}&max=6`;
+      const synRes = await fetch(synUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (synRes.ok) {
+        const synJson = await synRes.json();
+        if (Array.isArray(synJson) && synJson.length > 0) {
+          for (const s of synJson) {
+            if (s.word && !results.synonyms.includes(s.word)) results.synonyms.push(s.word);
+            if (results.synonyms.length >= 4) break;
+          }
+        }
       }
-    }
-  } catch (_) {}
+    } catch (_) {}
+  }
 
-  // 3. Fallback to Datamuse 'ml' (means like) if rel_syn returned < 2
+  // 4. Fallback to Datamuse 'ml' (means like) if rel_syn returned < 2
   if (results.synonyms.length < 2) {
     try {
       const controller = new AbortController();
@@ -1445,12 +1590,12 @@ export async function fetchPhoneticData(word) {
     } catch (_) {}
   }
 
-  // 4. Try Datamuse Adjective Collocations (rel_jjb) for nouns
+  // 5. Try Datamuse Adjective Collocations (rel_jjb) for nouns
   results.adjectiveCollocations = [];
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2000);
-    const jjbUrl = `https://api.datamuse.com/words?rel_jjb=${encodeURIComponent(cleanWord)}&max=5`;
+    const jjbUrl = `https://api.datamuse.com/words?rel_jjb=${encodeURIComponent(cleanWord)}&max=6`;
     const jjbRes = await fetch(jjbUrl, { signal: controller.signal });
     clearTimeout(timeoutId);
     if (jjbRes.ok) {

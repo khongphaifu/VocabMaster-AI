@@ -1,6 +1,21 @@
 // d:/extension/content/content.js
 // Intercepts text selection, shows floating action trigger, performs AI translation
 
+// Unbind any previous orphaned content script instance if re-injected
+if (window.__VOCAB_MASTER_CLEANUP__) {
+  try {
+    window.__VOCAB_MASTER_CLEANUP__();
+  } catch (_) {}
+}
+
+function isExtensionValid() {
+  try {
+    return typeof chrome !== 'undefined' && !!chrome.runtime && typeof chrome.runtime.sendMessage === 'function' && !!chrome.runtime.id;
+  } catch (_) {
+    return false;
+  }
+}
+
 const VIETNAMESE_REGEX = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
 
 let tooltip = null;
@@ -10,8 +25,14 @@ let currentSelectionText = '';
 let currentAnchorRect = null;
 let isProcessing = false;
 
-// Listen for mouseup on page to detect text selection
-document.addEventListener('mouseup', (e) => {
+function handleMouseUp(e) {
+  if (!isExtensionValid()) {
+    document.removeEventListener('mouseup', handleMouseUp);
+    hideFloatTrigger();
+    hideTooltip();
+    return;
+  }
+
   // Ignore clicks inside our own tooltip or floating button
   if (tooltip && tooltip.contains(e.target)) return;
   if (floatTrigger && floatTrigger.contains(e.target)) return;
@@ -69,17 +90,27 @@ document.addEventListener('mouseup', (e) => {
 
     showFloatTrigger(triggerX, triggerY, selectedText);
   }, 20);
-});
+}
 
-// Close tooltip & trigger when clicking outside
-document.addEventListener('mousedown', (e) => {
+document.addEventListener('mouseup', handleMouseUp);
+
+function handleMouseDown(e) {
   if (tooltip && !tooltip.contains(e.target)) {
     hideTooltip();
   }
   if (floatTrigger && !floatTrigger.contains(e.target)) {
     hideFloatTrigger();
   }
-});
+}
+
+document.addEventListener('mousedown', handleMouseDown);
+
+window.__VOCAB_MASTER_CLEANUP__ = () => {
+  document.removeEventListener('mouseup', handleMouseUp);
+  document.removeEventListener('mousedown', handleMouseDown);
+  hideFloatTrigger();
+  hideTooltip();
+};
 
 // Close on Escape key
 document.addEventListener('keydown', (e) => {
@@ -168,6 +199,12 @@ async function doTranslate(text, anchorRect) {
   const anchor = anchorRect || currentAnchorRect;
   if (anchor) currentAnchorRect = anchor;
 
+  if (!isExtensionValid()) {
+    showExtensionReloadedTooltip(anchor);
+    isProcessing = false;
+    return;
+  }
+
   // Instant Shell (0ms): render card shell immediately with word header and AI shimmer skeleton
   showStreamingTooltip(cleanText, isWord, anchor);
 
@@ -189,25 +226,36 @@ async function doTranslate(text, anchorRect) {
       showErrorTooltip(response?.error || 'Lỗi không xác định', anchor, () => doTranslate(text, anchor));
     }
   } catch (err) {
-    const msg = err.message.includes('Extension context invalidated')
-      ? 'Extension vừa được reload. Vui lòng F5 (tải lại) trang web này.'
-      : err.message;
-    showErrorTooltip(msg, anchor, () => doTranslate(text, anchor));
+    const isDisconnected = !isExtensionValid() ||
+      (err && (
+        String(err.message || '').includes('Extension context invalidated') ||
+        String(err.message || '').includes('sendMessage') ||
+        String(err.message || '').includes('undefined (reading')
+      ));
+    if (isDisconnected) {
+      showExtensionReloadedTooltip(anchor);
+    } else {
+      showErrorTooltip(err.message, anchor, () => doTranslate(text, anchor));
+    }
   } finally {
     isProcessing = false;
   }
 }
 
 // Listen for messages from background (context menu results or open library)
-chrome.runtime.onMessage.addListener((msg) => {
-  if (msg.type === 'SHOW_RESULT') {
-    showResultTooltip(msg.data, currentAnchorRect);
-  } else if (msg.type === 'SHOW_ERROR') {
-    showErrorTooltip(msg.error, currentAnchorRect);
-  } else if (msg.type === 'OPEN_LIBRARY_MODAL') {
-    openLibraryModal();
-  }
-});
+if (isExtensionValid()) {
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg.type === 'SHOW_RESULT') {
+        showResultTooltip(msg.data, currentAnchorRect);
+      } else if (msg.type === 'SHOW_ERROR') {
+        showErrorTooltip(msg.error, currentAnchorRect);
+      } else if (msg.type === 'OPEN_LIBRARY_MODAL') {
+        openLibraryModal();
+      }
+    });
+  } catch (_) {}
+}
 
 let isExitingTooltip = false;
 let exitTooltipTimer = null;
@@ -452,6 +500,44 @@ function formatErrorContent(msg) {
   return withLinks.replace(/\n/g, '<br>');
 }
 
+function showExtensionReloadedTooltip(anchorRect) {
+  if (!tooltip || isExitingTooltip) {
+    hideTooltip(true);
+    tooltip = createTooltipBase();
+    document.body.appendChild(tooltip);
+  }
+
+  tooltip.innerHTML = `
+    <div class="vm-card" style="padding: 14px 16px; min-width: 290px; max-width: 420px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 10px;">
+        <span style="color:#f9e2af; font-weight:700; font-size:13px; display:flex; align-items:center; gap:6px;">
+          <span>⚠️</span> Tiện ích vừa được tải lại
+        </span>
+        <button type="button" class="vm-tool-btn vm-close-btn" title="Đóng">${ICONS.close}</button>
+      </div>
+      <div style="color:#cdd6f4; font-size:12.5px; line-height:1.5; margin-bottom: 12px;">
+        Tiện ích <strong>VocabMaster AI</strong> vừa được nâng cấp phiên bản mới.<br>
+        Vui lòng bấm nút bên dưới để tải lại (F5) trang web và kích hoạt kết nối.
+      </div>
+      <button type="button" class="vm-reload-page-btn" style="appearance:none; -webkit-appearance:none; border:none; background:linear-gradient(135deg, #a6e3a1 0%, #94e2d5 100%); color:#11111b; font-weight:700; font-size:12.5px; padding:8px 14px; border-radius:6px; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 2px 8px rgba(166, 227, 161, 0.25);">
+        🔄 Tải lại trang web (F5)
+      </button>
+    </div>
+  `;
+
+  smartPositionTooltip(anchorRect);
+
+  tooltip.querySelector('.vm-close-btn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    hideTooltip();
+  });
+
+  tooltip.querySelector('.vm-reload-page-btn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    window.location.reload();
+  });
+}
+
 function showErrorTooltip(msg, anchorRect, retryFn = null) {
   if (!tooltip || isExitingTooltip) {
     hideTooltip(true);
@@ -626,21 +712,27 @@ function showResultTooltip(data, anchorRect) {
 
   // Check if word/phrase is already saved in storage
   const wordToCheck = (data.original || '').trim().toLowerCase();
-  try {
-    chrome.storage.local.get('vocabulary', (res) => {
-      const vocab = res?.vocabulary || [];
-      const isSaved = vocab.some(w => (w.word || '').trim().toLowerCase() === wordToCheck);
-      if (isSaved && addBtn) {
-        addBtn.classList.add('vm-btn-saved');
-        addBtn.innerHTML = `${ICONS.check}<span>Đã lưu vào sổ</span>`;
-        addBtn.title = 'Từ này đã có trong thư viện. Bấm để xem thư viện từ vựng.';
-      }
-    });
-  } catch (_) {}
+  if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+    try {
+      chrome.storage.local.get('vocabulary', (res) => {
+        const vocab = res?.vocabulary || [];
+        const isSaved = vocab.some(w => (w.word || '').trim().toLowerCase() === wordToCheck);
+        if (isSaved && addBtn) {
+          addBtn.classList.add('vm-btn-saved');
+          addBtn.innerHTML = `${ICONS.check}<span>Đã lưu vào sổ</span>`;
+          addBtn.title = 'Từ này đã có trong thư viện. Bấm để xem thư viện từ vựng.';
+        }
+      });
+    } catch (_) {}
+  }
 
   if (addBtn) {
     addBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
+      if (!isExtensionValid()) {
+        showExtensionReloadedTooltip(currentAnchorRect);
+        return;
+      }
       // If already saved, clicking it opens the library modal
       if (addBtn.classList.contains('vm-btn-saved')) {
         openLibraryModal();
@@ -668,9 +760,13 @@ function showResultTooltip(data, anchorRect) {
           addBtn.innerHTML = `<span>❌ Lỗi</span>`;
           addBtn.disabled = false;
         }
-      } catch {
-        addBtn.innerHTML = `<span>❌ Lỗi</span>`;
-        addBtn.disabled = false;
+      } catch (err) {
+        if (!isExtensionValid()) {
+          showExtensionReloadedTooltip(currentAnchorRect);
+        } else {
+          addBtn.innerHTML = `<span>❌ Lỗi</span>`;
+          addBtn.disabled = false;
+        }
       }
     });
   }
@@ -680,9 +776,11 @@ function showResultTooltip(data, anchorRect) {
     panelBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       openLibraryModal();
-      try {
-        chrome.runtime.sendMessage({ type: 'OPEN_PANEL' });
-      } catch (_) {}
+      if (isExtensionValid()) {
+        try {
+          chrome.runtime.sendMessage({ type: 'OPEN_PANEL' });
+        } catch (_) {}
+      }
     });
   }
 }
