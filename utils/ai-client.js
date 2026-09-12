@@ -364,7 +364,21 @@ export function buildFallbackWordResponse(originalText, fbData) {
   };
 }
 
-const WORD_PROMPT_EN_VI = (word, dictContext = null) => {
+export const WORD_PROMPT_EN_VI = (word, dictContext = null, contextSentence = '') => {
+  let contextBlock = '';
+  if (contextSentence && typeof contextSentence === 'string' && contextSentence.trim()) {
+    contextBlock = `
+NGỮ CẢNH CÂU VĂN THỰC TẾ (BẮT BUỘC ĐỊNH NGHĨA PHÙ HỢP NGỮ CẢNH):
+"""
+${contextSentence.trim()}
+"""
+YÊU CẦU ĐỊNH NGHĨA THEO NGỮ CẢNH:
+- Từ "${word}" xuất hiện trong câu văn trên.
+- "meaning_vi" CHÍNH: BẮT BUỘC phải là nghĩa chính xác, phù hợp nhất của từ "${word}" TRONG CHÍNH CÂU VĂN ĐÓ (Ví dụ: "plant" trong "chemical plant" phải là "nhà máy, xí nghiệp"; "bank" trong "river bank" phải là "bờ sông").
+- Các nghĩa thông dụng khác vẫn ghi đầy đủ vào "other_meanings" để người dùng học toàn diện.
+`;
+  }
+
   let groundTruthBlock = '';
   if (dictContext && dictContext.meaning_vi) {
     let otherMeaningsStr = '';
@@ -390,8 +404,9 @@ HƯỚNG DẪN THẨM ĐỊNH THUẦN VIỆT (BẮT BUỘC):
 
   return `Bạn là hệ thống từ điển Anh - Việt cao cấp theo chuẩn Cambridge English-Vietnamese Dictionary (dictionary.cambridge.org).
 Hãy tra cứu từ tiếng Anh "${word}" và trả về mục từ điển CHÍNH XÁC, THUẦN VIỆT, TỰ NHIÊN NHẤT như cách Cambridge Dictionary trình bày.
+${contextBlock}
 ${groundTruthBlock}
-TIÊU CHUẨN DỊCH NGHĨA THUẦN VIỆT (BẮT BUỘC - CHUẨN TỪ ĐIỂN CAMBRIDGE & OXFORD):
+TIÊU CHUẨN DỊCH NGHĨA THUẦN VIỆT & KHỬ VĂN PHONG DỊCH MÁY (BẮT BUỘC):
 1. "meaning_vi" LÀ TỪ TƯƠNG ĐƯƠNG CHÍNH DANH (LEXICAL EQUIVALENT):
    - Phải là từ hoặc ngữ tiếng Việt chuẩn mực, ngắn gọn (1-3 từ), tự nhiên và chính xác nhất mà người Việt dùng làm tên gọi cho sự vật/hành động.
    - TUYỆT ĐỐI KHÔNG DỊCH CỤM ĐỊNH NGHĨA TIẾNG ANH (Definition Glossing) THÀNH "meaning_vi":
@@ -419,8 +434,11 @@ TIÊU CHUẨN DỊCH NGHĨA THUẦN VIỆT (BẮT BUỘC - CHUẨN TỪ ĐIỂN 
      * "compromise" → "thỏa hiệp, dàn xếp; làm tổn hại"!
      * "resilience" → "sự kiên cường, khả năng phục hồi"!
      * "sustainable" → "bền vững"!
-2. NGUYÊN TẮC THUẦN VIỆT:
-   - Dùng từ ngữ tự nhiên, phổ biến trong tiếng Việt hiện đại. Tuyệt đối không dịch máy móc thô ráp (word-by-word), không bịa từ, không dùng từ Hán-Việt tối nghĩa hoặc từ ngữ cổ xưa (lời rao, cáo thị, chánh phạm...) nếu đã có từ thuần Việt hiện đại tương đương.
+2. NGUYÊN TẮC THUẦN VIỆT & KHỬ VĂN PHONG AI:
+   - Dùng từ ngữ tự nhiên, phổ biến trong tiếng Việt hiện đại.
+   - KHỬ DANH HÓA DƯ THỪA: Không tùy tiện thêm "sự/tính/việc" khi từ gốc tiếng Việt đã trọn nghĩa (ví dụ: dùng "nâng cao hiệu quả", không dùng "nâng cao tính hiệu quả").
+   - KHỬ ĐỘNG TỪ NHẸ: Dịch sát động từ tiếng Việt tự nhiên ("quyết định", không dịch "làm một quyết định").
+   - Tuyệt đối không dịch máy móc thô ráp (word-by-word), không bịa từ, không dùng từ Hán-Việt tối nghĩa hoặc từ ngữ cổ xưa (lời rao, cáo thị, chánh phạm...) nếu đã có từ thuần Việt hiện đại tương đương.
 3. "definition_vi": Giải thích câu định nghĩa chi tiết bằng tiếng Việt (1 câu ngắn gọn, chuẩn xác ngữ nghĩa).
 4. "definition_en": Định nghĩa tiếng Anh chuẩn Cambridge Learner's Dictionary.
 
@@ -584,11 +602,11 @@ Trả về DUY NHẤT một JSON hợp lệ theo đúng cấu trúc:
 }`;
 };
 
-export async function callAI(provider, apiKey, text, isWord, direction = 'auto', dictContext = null) {
+export async function callAI(provider, apiKey, text, isWord, direction = 'auto', dictContext = null, contextSentence = '') {
   const isVi = direction === 'vi-en' || (direction === 'auto' && VIETNAMESE_REGEX.test(text));
   let prompt;
   if (isWord) {
-    prompt = isVi ? WORD_PROMPT_VI_EN(text) : WORD_PROMPT_EN_VI(text, dictContext);
+    prompt = isVi ? WORD_PROMPT_VI_EN(text) : WORD_PROMPT_EN_VI(text, dictContext, contextSentence);
   } else {
     prompt = PHRASE_PROMPT(text, direction);
   }

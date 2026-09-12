@@ -773,3 +773,149 @@ export function lookupModernLexicon(word) {
   const clean = word.trim().toLowerCase();
   return MODERN_LEXICON[clean] || null;
 }
+
+export const IDIOM_LEXICON = {
+  'piece of cake': {
+    phrase: 'piece of cake',
+    meaning_vi: 'dễ như ăn cháo, dễ ợt',
+    explanation_vi: 'Dùng để chỉ một việc gì đó vô cùng dễ dàng thực hiện',
+    example: 'The final exam was a piece of cake for her.'
+  },
+  'once in a blue moon': {
+    phrase: 'once in a blue moon',
+    meaning_vi: 'năm thì mười họa, rất hiếm khi',
+    explanation_vi: 'Chỉ sự việc xảy ra với tần suất cực kỳ hiếm hoi',
+    example: 'He only visits his hometown once in a blue moon.'
+  },
+  'under the weather': {
+    phrase: 'under the weather',
+    meaning_vi: 'không khỏe, hơi mệt trong người',
+    explanation_vi: 'Cảm thấy người uể oải, ốm nhẹ hoặc khó chịu',
+    example: 'I am feeling a bit under the weather today, so I will stay home.'
+  },
+  'break a leg': {
+    phrase: 'break a leg',
+    meaning_vi: 'chúc may mắn! (thường trước buổi diễn/thi)',
+    explanation_vi: 'Lời chúc may mắn quen thuộc của người bản xứ trước giờ biểu diễn hoặc thi cử',
+    example: 'Break a leg on your interview tomorrow!'
+  },
+  'spill the beans': {
+    phrase: 'spill the beans',
+    meaning_vi: 'tiết lộ bí mật, buôn chuyện',
+    explanation_vi: 'Vô tình hoặc cố ý để lộ thông tin bí mật cho người khác',
+    example: 'Trust him not to spill the beans about the surprise party.'
+  },
+  'burn the midnight oil': {
+    phrase: 'burn the midnight oil',
+    meaning_vi: 'thức khuya học tập / làm việc',
+    explanation_vi: 'Làm việc hoặc ôn thi miệt mài đến tận đêm khuya',
+    example: 'Students usually burn the midnight oil before final exams.'
+  },
+  'bite the bullet': {
+    phrase: 'bite the bullet',
+    meaning_vi: 'cắn răng chịu đựng, ngậm đắng nuốt cay',
+    explanation_vi: 'Quyết định đối mặt với việc khó khăn hoặc đau đớn mà không thể tránh khỏi',
+    example: 'I decided to bite the bullet and talk to my boss about a raise.'
+  },
+  'cost an arm and a leg': {
+    phrase: 'cost an arm and a leg',
+    meaning_vi: 'đắt cắt cổ, giá trên trời',
+    explanation_vi: 'Chỉ món đồ hoặc dịch vụ có giá cực kỳ đắt đỏ',
+    example: 'Buying a house in this area costs an arm and a leg.'
+  },
+  'call it a day': {
+    phrase: 'call it a day',
+    meaning_vi: 'nghỉ tay, kết thúc công việc hôm nay',
+    explanation_vi: 'Quyết định ngừng làm việc sau một ngày dài',
+    example: 'We have made good progress, let us call it a day.'
+  },
+  'hit the sack': {
+    phrase: 'hit the sack',
+    meaning_vi: 'đi ngủ',
+    explanation_vi: 'Cách nói thân mật chỉ việc đi lên giường ngủ',
+    example: 'I am exhausted after the trip, time to hit the sack.'
+  },
+  'see eye to eye': {
+    phrase: 'see eye to eye',
+    meaning_vi: 'đồng quan điểm, nhất trí với nhau',
+    explanation_vi: 'Có cùng suy nghĩ hoặc tán thành ý kiến của người khác',
+    example: 'My colleague and I see eye to eye on the marketing strategy.'
+  },
+  'take with a grain of salt': {
+    phrase: 'take with a grain of salt',
+    meaning_vi: 'bán tín bán nghi, nghe có chọn lọc',
+    explanation_vi: 'Không tin hoàn toàn 100% vào điều ai đó nói',
+    example: 'You should take rumors on social media with a grain of salt.'
+  },
+  'so far so good': {
+    phrase: 'so far so good',
+    meaning_vi: 'mọi chuyện đến giờ vẫn ổn',
+    explanation_vi: 'Chỉ tình hình đang tiến triển thuận lợi tính đến thời điểm hiện tại',
+    example: 'We started the project last week, so far so good.'
+  },
+  'through thick and thin': {
+    phrase: 'through thick and thin',
+    meaning_vi: 'đồng cam cộng khổ, vượt qua mọi thăng trầm',
+    explanation_vi: 'Luôn bên nhau ủng hộ dù trong hoàn cảnh thuận lợi hay khó khăn',
+    example: 'True friends stick together through thick and thin.'
+  }
+};
+
+export function lookupIdiom(text) {
+  if (!text || typeof text !== 'string') return null;
+  let clean = text.trim().toLowerCase().replace(/[.,!?;:]/g, '');
+  if (clean.startsWith('a ')) clean = clean.slice(2).trim();
+  if (clean.startsWith('an ')) clean = clean.slice(3).trim();
+  if (clean.startsWith('the ')) clean = clean.slice(4).trim();
+  return IDIOM_LEXICON[clean] || IDIOM_LEXICON[text.trim().toLowerCase()] || null;
+}
+
+export const CONTEXT_DISAMBIGUATION_DICT = {
+  plant: {
+    contexts: [
+      { keywords: ['chemical', 'power', 'nuclear', 'manufacturing', 'industrial', 'factory', 'machinery', 'build', 'worker', 'production'], pos: 'noun [C]', meaning_vi: 'nhà máy, xí nghiệp' },
+      { keywords: ['water', 'tree', 'flower', 'leaf', 'soil', 'garden', 'grow', 'biology', 'botany', 'pot'], pos: 'noun [C] / verb', meaning_vi: 'cây cối, thực vật; trồng cây' }
+    ]
+  },
+  bank: {
+    contexts: [
+      { keywords: ['river', 'stream', 'grassy', 'water', 'lake', 'muddy', 'slope', 'canal', 'fishing'], pos: 'noun [C]', meaning_vi: 'bờ sông, bờ suối' },
+      { keywords: ['money', 'account', 'interest', 'deposit', 'loan', 'central', 'finance', 'financial', 'branch', 'teller'], pos: 'noun [C]', meaning_vi: 'ngân hàng' }
+    ]
+  },
+  novel: {
+    contexts: [
+      { keywords: ['idea', 'approach', 'solution', 'concept', 'method', 'technology', 'design', 'feature', 'virus'], pos: 'adjective', meaning_vi: 'mới lạ, độc đáo' },
+      { keywords: ['read', 'author', 'book', 'writer', 'story', 'publish', 'chapter', 'fiction', 'literature'], pos: 'noun [C]', meaning_vi: 'tiểu thuyết' }
+    ]
+  },
+  date: {
+    contexts: [
+      { keywords: ['fruit', 'sweet', 'palm', 'desert', 'eat', 'food', 'dried'], pos: 'noun [C]', meaning_vi: 'quả chà là' },
+      { keywords: ['romantic', 'dinner', 'girlfriend', 'boyfriend', 'movie', 'love', 'meet', 'couple'], pos: 'noun [C]', meaning_vi: 'cuộc hẹn hò' },
+      { keywords: ['calendar', 'year', 'month', 'day', 'birth', 'history', 'time', 'schedule'], pos: 'noun [C]', meaning_vi: 'ngày tháng, niên đại' }
+    ]
+  },
+  spring: {
+    contexts: [
+      { keywords: ['season', 'summer', 'winter', 'autumn', 'march', 'april', 'flower', 'warm', 'festival'], pos: 'noun [C/U]', meaning_vi: 'mùa xuân' },
+      { keywords: ['water', 'hot', 'mineral', 'source', 'mountain', 'drink'], pos: 'noun [C]', meaning_vi: 'suối nước, nguồn nước' },
+      { keywords: ['metal', 'coil', 'mattress', 'bounce', 'jump', 'elastic'], pos: 'noun [C] / verb', meaning_vi: 'lò xo; bật nhảy' }
+    ]
+  }
+};
+
+export function disambiguateByContext(word, contextSentence) {
+  if (!word || !contextSentence || typeof contextSentence !== 'string') return null;
+  const cleanWord = word.trim().toLowerCase();
+  const entry = CONTEXT_DISAMBIGUATION_DICT[cleanWord];
+  if (!entry) return null;
+  const lowerSentence = contextSentence.toLowerCase();
+  for (const sense of entry.contexts) {
+    if (sense.keywords.some(k => lowerSentence.includes(k))) {
+      return sense;
+    }
+  }
+  return null;
+}
+

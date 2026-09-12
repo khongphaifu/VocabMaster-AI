@@ -23,7 +23,39 @@ let floatTrigger = null;
 let activeLibraryModal = null;
 let currentSelectionText = '';
 let currentAnchorRect = null;
+let currentContextSentence = '';
 let isProcessing = false;
+
+function getSurroundingSentence(selection) {
+  if (!selection || selection.rangeCount === 0) return '';
+  try {
+    const range = selection.getRangeAt(0);
+    const container = range.commonAncestorContainer;
+    let block = container.nodeType === Node.TEXT_NODE ? container.parentNode : container;
+    
+    // Look up to nearest block-level element or stop at body
+    const blockTags = ['P', 'DIV', 'LI', 'BLOCKQUOTE', 'ARTICLE', 'SECTION', 'TD', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
+    while (block && block !== document.body && !blockTags.includes(block.nodeName)) {
+      block = block.parentNode;
+    }
+    const text = (block || container).innerText || (block || container).textContent || '';
+    if (!text) return '';
+
+    const selectedStr = selection.toString().trim();
+    if (!selectedStr) return '';
+
+    // Split text into sentences
+    const sentences = text.split(/(?<=[.!?\n])\s+/);
+    for (const s of sentences) {
+      if (s.includes(selectedStr)) {
+        return s.trim().replace(/\s+/g, ' ').slice(0, 300);
+      }
+    }
+    return text.trim().replace(/\s+/g, ' ').slice(0, 300);
+  } catch (_) {
+    return '';
+  }
+}
 
 function handleMouseUp(e) {
   if (!isExtensionValid()) {
@@ -47,6 +79,7 @@ function handleMouseUp(e) {
     }
 
     currentSelectionText = selectedText;
+    currentContextSentence = getSurroundingSentence(selection);
     hideTooltip();
 
     let triggerX = e.pageX + 6;
@@ -152,7 +185,7 @@ function showFloatTrigger(x, y, text) {
     };
 
     hideFloatTrigger(true);
-    await doTranslate(text, anchor);
+    await doTranslate(text, anchor, currentContextSentence);
   });
 
   document.body.appendChild(floatTrigger);
@@ -190,7 +223,7 @@ function hideFloatTrigger(immediate = false) {
 
 let activeTypewriterTimer = null;
 
-async function doTranslate(text, anchorRect) {
+async function doTranslate(text, anchorRect, contextSentence = null) {
   if (isProcessing) return;
   isProcessing = true;
 
@@ -198,6 +231,8 @@ async function doTranslate(text, anchorRect) {
   const isWord = !cleanText.includes(' ') && cleanText.length < 35;
   const anchor = anchorRect || currentAnchorRect;
   if (anchor) currentAnchorRect = anchor;
+
+  const ctxSentence = contextSentence !== null ? contextSentence : currentContextSentence;
 
   if (!isExtensionValid()) {
     showExtensionReloadedTooltip(anchor);
@@ -213,6 +248,7 @@ async function doTranslate(text, anchorRect) {
       type: 'TRANSLATE',
       text: cleanText,
       isWord,
+      contextSentence: ctxSentence,
     });
 
     const timeoutPromise = new Promise((_, reject) =>
@@ -223,7 +259,7 @@ async function doTranslate(text, anchorRect) {
     if (response?.success) {
       showResultTooltip(response.data, anchor);
     } else {
-      showErrorTooltip(response?.error || 'Lỗi không xác định', anchor, () => doTranslate(text, anchor));
+      showErrorTooltip(response?.error || 'Lỗi không xác định', anchor, () => doTranslate(text, anchor, ctxSentence));
     }
   } catch (err) {
     const isDisconnected = !isExtensionValid() ||
@@ -235,7 +271,7 @@ async function doTranslate(text, anchorRect) {
     if (isDisconnected) {
       showExtensionReloadedTooltip(anchor);
     } else {
-      showErrorTooltip(err.message, anchor, () => doTranslate(text, anchor));
+      showErrorTooltip(err.message, anchor, () => doTranslate(text, anchor, ctxSentence));
     }
   } finally {
     isProcessing = false;
@@ -706,6 +742,43 @@ function showResultTooltip(data, anchorRect) {
     });
   });
 
+  // User custom edit button
+  tooltip.querySelectorAll('.vm-edit-meaning-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const targetWord = btn.getAttribute('data-word') || data.original;
+      const curMeaning = btn.getAttribute('data-current-meaning') || '';
+      const newMeaning = window.prompt(`Sửa nghĩa tiếng Việt cho từ "${targetWord}":`, curMeaning);
+      if (newMeaning !== null && newMeaning.trim() !== '') {
+        const trimmed = newMeaning.trim();
+        try {
+          await chrome.runtime.sendMessage({
+            type: 'SAVE_USER_MEANING',
+            word: targetWord,
+            meaning_vi: trimmed
+          });
+          // Update displayed text
+          const meaningTextEl = tooltip.querySelector('.vm-meaning-text');
+          if (meaningTextEl) {
+            meaningTextEl.textContent = trimmed;
+          }
+          btn.setAttribute('data-current-meaning', trimmed);
+          // Show custom badge if not yet present
+          let badge = tooltip.querySelector('.vm-user-custom-tag');
+          if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'vm-user-custom-tag';
+            badge.title = 'Nghĩa do bạn tự lưu';
+            badge.textContent = '✓ Tùy chỉnh';
+            btn.parentNode.insertBefore(badge, btn);
+          }
+        } catch (err) {
+          console.error('Failed to save user meaning:', err);
+        }
+      }
+    });
+  });
+
   // Add word & panel buttons
   const addBtn = tooltip.querySelector('.vm-add-btn');
   const panelBtn = tooltip.querySelector('.vm-panel-btn');
@@ -902,10 +975,12 @@ function buildWordHTML(data) {
         ${cleanLevel ? `<span class="vm-level" style="background:${lvlStyle.bg};color:${lvlStyle.fg};">${escHtml(cleanLevel)}</span>` : ''}
       </div>
 
-      <!-- Core Meaning (Pure Vietnamese) with streaming typewriter reveal -->
+      <!-- Core Meaning (Pure Vietnamese) with streaming typewriter reveal & custom edit -->
       <div class="vm-meaning-vi vm-cascade-item vm-cascade-delay-2">
         <span class="vm-flag-tag vi">VN</span>
         <span class="vm-meaning-text" data-stream-text="${escHtml(cleanMeaning)}">${escHtml(cleanMeaning)}</span>
+        ${w.isUserCustom ? `<span class="vm-user-custom-tag" title="Nghĩa do bạn tự lưu">✓ Tùy chỉnh</span>` : ''}
+        <button type="button" class="vm-edit-meaning-btn" data-word="${escHtml(orig)}" data-current-meaning="${escHtml(cleanMeaning)}" title="Tự sửa/nhập nghĩa chuẩn theo ý bạn">✏️</button>
       </div>
 
       ${cleanDefVi ? `

@@ -365,6 +365,40 @@
   color: #a6e3a1 !important;
 }
 
+.vm-edit-meaning-btn {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  border: none !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  padding: 2px 4px !important;
+  font-size: 12px !important;
+  opacity: 0.55 !important;
+  transition: opacity 0.15s, transform 0.15s !important;
+  color: #cdd6f4 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  margin-left: auto !important;
+}
+
+.vm-edit-meaning-btn:hover {
+  opacity: 1 !important;
+  transform: scale(1.15) !important;
+}
+
+.vm-user-custom-tag {
+  font-size: 10px !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  background: rgba(166, 227, 161, 0.2) !important;
+  color: #a6e3a1 !important;
+  border: 1px solid rgba(166, 227, 161, 0.4) !important;
+  font-weight: 600 !important;
+  margin-left: 4px !important;
+  letter-spacing: 0.3px !important;
+  flex-shrink: 0 !important;
+}
+
 .vm-def-vi {
   font-size: 12.5px !important;
   color: #f9e2af !important;

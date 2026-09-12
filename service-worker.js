@@ -118,8 +118,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     try {
       if (message.type === 'TRANSLATE') {
-        const data = await handleTranslate(message.text, message.isWord, message.direction || 'auto');
+        const data = await handleTranslate(message.text, message.isWord, message.direction || 'auto', message.contextSentence || '');
         sendResponse({ success: true, data });
+
+      } else if (message.type === 'SAVE_USER_MEANING') {
+        const { word, customMeaning } = message;
+        if (word && customMeaning) {
+          const { user_custom_lexicon = {} } = await chrome.storage.local.get('user_custom_lexicon');
+          user_custom_lexicon[word.toLowerCase().trim()] = customMeaning.trim();
+          await chrome.storage.local.set({ user_custom_lexicon });
+          // Invalidate cache for this word
+          for (const k of memoryCache.keys()) {
+            if (k.startsWith(word.toLowerCase().trim())) {
+              memoryCache.delete(k);
+            }
+          }
+          sendResponse({ success: true });
+        } else {
+          sendResponse({ success: false, error: 'Dữ liệu không hợp lệ' });
+        }
 
       } else if (message.type === 'ADD_WORD') {
         const id = await handleAddWord(message.wordData);
@@ -232,22 +249,31 @@ async function setCachedTranslation(key, result) {
   } catch (_) {}
 }
 
-async function handleTranslate(text, isWord, direction = 'auto') {
+async function handleTranslate(text, isWord, direction = 'auto', contextSentence = '') {
   const cleanText = (text || '').trim();
-  const cacheKey = `${cleanText.toLowerCase()}_${isWord}_${direction}`;
+  const contextSnippet = contextSentence ? contextSentence.slice(0, 35).replace(/\s+/g, '_') : '';
+  const cacheKey = `${cleanText.toLowerCase()}_${isWord}_${direction}_${contextSnippet}`;
+
+  // 0. USER CUSTOM LEXICON CHECK (Highest Priority - Cá nhân hóa người dùng)
+  const { user_custom_lexicon = {} } = await chrome.storage.local.get('user_custom_lexicon');
+  const customMeaning = user_custom_lexicon[cleanText.toLowerCase()];
 
   // 1. FAST PERSISTENT CACHE CHECK (0ms)
   const cached = await getCachedTranslation(cacheKey, cleanText);
   if (cached) {
+    if (customMeaning && cached.word) {
+      cached.word.meaning_vi = customMeaning;
+      cached.word.isUserCustom = true;
+    }
     return cached;
   }
 
-  // 2. BULLETPROOF MULTI-TIER DICTIONARY RESOLUTION
+  // 2. BULLETPROOF MULTI-TIER DICTIONARY RESOLUTION (with context & idiom)
   // Pipeline: 1. Offline Core Dict -> 2. Cambridge Online -> 3. Google Dict + Datamuse IPA
   let dictResult = null;
   if (isWord && (direction === 'auto' || direction === 'en-vi')) {
     try {
-      dictResult = await resolveDictionaryWord(cleanText);
+      dictResult = await resolveDictionaryWord(cleanText, contextSentence);
     } catch (e) {
       console.warn('Dictionary resolution failed, falling back:', e);
     }
@@ -260,6 +286,10 @@ async function handleTranslate(text, isWord, direction = 'auto') {
   // If user has no API key configured:
   if (!apiKey) {
     if (dictResult && dictResult.word?.meaning_vi) {
+      if (customMeaning && dictResult.word) {
+        dictResult.word.meaning_vi = customMeaning;
+        dictResult.word.isUserCustom = true;
+      }
       await setCachedTranslation(cacheKey, dictResult);
       return dictResult;
     }
@@ -267,6 +297,10 @@ async function handleTranslate(text, isWord, direction = 'auto') {
       const fb = findFallbackData(cleanText);
       if (fb) {
         const resp = buildFallbackWordResponse(cleanText, fb);
+        if (customMeaning && resp.word) {
+          resp.word.meaning_vi = customMeaning;
+          resp.word.isUserCustom = true;
+        }
         await setCachedTranslation(cacheKey, resp);
         return resp;
       }
@@ -274,17 +308,27 @@ async function handleTranslate(text, isWord, direction = 'auto') {
     throw new Error('Chưa cài API key. Mở Settings (biểu tượng extension → ⚙️) để cài đặt.');
   }
 
-  // If user HAS API key: call AI with ground-truth dictionary data injected (RAG)
+  // If user HAS API key: call AI with ground-truth dictionary data and contextSentence (RAG)
   try {
-    const result = await callAI(aiProvider, apiKey, cleanText, isWord, direction, dictResult?.word || null);
+    const result = await callAI(aiProvider, apiKey, cleanText, isWord, direction, dictResult?.word || null, contextSentence);
     if (result) {
       // SAFETY CHECK: If this is a word lookup, result MUST be type 'word'
       if (isWord && result.type !== 'word') {
         console.warn('AI returned non-word response for word lookup. Reverting to verified dictionary result.');
         if (dictResult && dictResult.word?.meaning_vi) {
+          if (customMeaning && dictResult.word) {
+            dictResult.word.meaning_vi = customMeaning;
+            dictResult.word.isUserCustom = true;
+          }
           await setCachedTranslation(cacheKey, dictResult);
           return dictResult;
         }
+      }
+
+      // Apply user custom meaning override if exists
+      if (customMeaning && result.word) {
+        result.word.meaning_vi = customMeaning;
+        result.word.isUserCustom = true;
       }
 
       // Retain verified dictionary source badge and official audio
@@ -301,10 +345,14 @@ async function handleTranslate(text, isWord, direction = 'auto') {
     console.warn('AI call failed, checking fallbacks:', aiErr);
     if (!dictResult && isWord) {
       try {
-        dictResult = await resolveDictionaryWord(cleanText);
+        dictResult = await resolveDictionaryWord(cleanText, contextSentence);
       } catch (_) {}
     }
     if (dictResult && dictResult.word?.meaning_vi) {
+      if (customMeaning && dictResult.word) {
+        dictResult.word.meaning_vi = customMeaning;
+        dictResult.word.isUserCustom = true;
+      }
       dictResult.aiWarning = aiErr.message || 'AI đang bận, hiển thị từ điển chuẩn';
       await setCachedTranslation(cacheKey, dictResult);
       return dictResult;
@@ -313,6 +361,10 @@ async function handleTranslate(text, isWord, direction = 'auto') {
       const fb = findFallbackData(cleanText);
       if (fb) {
         const resp = buildFallbackWordResponse(cleanText, fb);
+        if (customMeaning && resp.word) {
+          resp.word.meaning_vi = customMeaning;
+          resp.word.isUserCustom = true;
+        }
         resp.aiWarning = aiErr.message || 'AI đang bận, hiển thị từ điển chuẩn';
         await setCachedTranslation(cacheKey, resp);
         return resp;

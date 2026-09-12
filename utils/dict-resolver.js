@@ -8,6 +8,8 @@
 import { fetchFromCambridge } from './cambridge-client.js';
 import {
   lookupModernLexicon,
+  lookupIdiom,
+  disambiguateByContext,
   isArchaicOrAwkward,
   sanitizeVietnamese,
   ARCHAIC_BLACKLIST,
@@ -1627,17 +1629,38 @@ export async function fetchPhoneticData(word) {
  *
  * Guarantees a 100% complete card structure for ANY English word.
  */
-export async function resolveDictionaryWord(word) {
+export async function resolveDictionaryWord(word, contextSentence = '') {
   const cleanWord = (word || '').trim().toLowerCase();
   if (!cleanWord || cleanWord.length > 45) return null;
 
+  // 1. FAST IDIOM CHECK (Thành ngữ tiếng Anh sang tiếng Việt thoát ý)
+  const idiom = lookupIdiom(cleanWord);
+  if (idiom) {
+    return {
+      type: 'phrase',
+      source: 'dictionary',
+      original: word,
+      translation: idiom.meaning_vi,
+      natural_alternative: idiom.meaning_vi,
+      key_vocabulary: [
+        { word: idiom.phrase, ipa: '', pos: 'idiom', meaning_vi: idiom.meaning_vi }
+      ],
+      explanation: idiom.explanation_vi + (idiom.example ? ` Ví dụ ngữ cảnh: "${idiom.example}"` : '')
+    };
+  }
+
   const irreg = IRREGULAR_VERBS[cleanWord];
   const rootLemma = irreg?.root || cleanWord;
+  const contextSense = disambiguateByContext(cleanWord, contextSentence);
 
-  // 1. FAST MODERN VIETNAMESE LEXICON CHECK (Authoritative Thuần Việt, 0ms)
+  // 2. FAST MODERN VIETNAMESE LEXICON CHECK (Authoritative Thuần Việt, 0ms)
   const modern = lookupModernLexicon(cleanWord);
   if (modern) {
     const card = { ...modern };
+    if (contextSense) {
+      card.meaning_vi = contextSense.meaning_vi;
+      card.partOfSpeech = contextSense.pos;
+    }
     return {
       type: 'word',
       source: 'dictionary',
@@ -1717,9 +1740,9 @@ export async function resolveDictionaryWord(word) {
 
     // MULTI-SOURCE SYNTHESIS:
     // 1. Primary Meaning: MUST be concise lexical headword (1-3 words)
-    let primaryMeaning = '';
+    let primaryMeaning = contextSense?.meaning_vi || '';
     let definitionVi = '';
-    let pos = irreg ? `verb (${irreg.form})` : (gDict?.partOfSpeech || wiktionaryDict?.partOfSpeech || 'noun');
+    let pos = irreg ? `verb (${irreg.form})` : (contextSense?.pos || gDict?.partOfSpeech || wiktionaryDict?.partOfSpeech || 'noun');
     const otherMeanings = [];
     const synonyms = [];
 
