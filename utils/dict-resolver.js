@@ -6,6 +6,13 @@
 // 4. Built-in Offline Core Vocabulary (0ms)
 
 import { fetchFromCambridge } from './cambridge-client.js';
+import {
+  lookupModernLexicon,
+  isArchaicOrAwkward,
+  sanitizeVietnamese,
+  ARCHAIC_BLACKLIST,
+  MODERN_LEXICON
+} from './modern-lexicon.js';
 
 // Arpabet (CMU) to International Phonetic Alphabet (IPA) conversion map
 const CMU_TO_IPA = {
@@ -796,12 +803,16 @@ export function isStandardIpa(str) {
 export function ensureNounForm(text, word, pos) {
   if (!pos || !pos.toLowerCase().includes('noun')) return text;
   if (!text || typeof text !== 'string') return text;
-  let clean = text.trim().normalize('NFC');
+  let clean = sanitizeVietnamese(text.trim().normalize('NFC'));
   const lower = clean.toLowerCase();
 
-  // If already starts with a Vietnamese noun classifier or marker, keep it
-  if (/^(sự|cuộc|việc|phép|quá trình|tính|khả năng|bài|lời|mẫu|người|vật|tác phẩm|kết quả|hiện tượng|phương pháp|hệ|bộ)\s+/i.test(lower)) {
+  // If already starts with a modern Vietnamese noun classifier or marker, keep it
+  if (/^(sự|cuộc|việc|phép|quá trình|tính|khả năng|bài|mẫu|người|vật|tác phẩm|kết quả|hiện tượng|phương pháp|hệ|bộ)\s+/i.test(lower)) {
     return clean;
+  }
+
+  if (lower === 'thông báo' || lower === 'bản thông báo') {
+    return 'thông báo';
   }
 
   // Common action verbs in Vietnamese that are mistakenly used as translations of English nominalized verbs
@@ -810,7 +821,7 @@ export function ensureNounForm(text, word, pos) {
     'phân loại', 'dự đoán', 'tối ưu hóa', 'nghiên cứu', 'sáng tạo',
     'thay đổi', 'biến đổi', 'ước tính', 'ước lượng', 'chuyển đổi',
     'kết nối', 'thực thi', 'áp dụng', 'giới thiệu', 'mô tả',
-    'thông báo', 'quản lý', 'vận hành', 'mở rộng', 'phục hồi',
+    'quản lý', 'vận hành', 'mở rộng', 'phục hồi',
     'đóng góp', 'phản ánh', 'tương tác', 'xác thực', 'nhận dạng',
     'khám phá', 'tính toán', 'giải thích', 'hồi phục', 'định nghĩa',
     'phát hiện', 'phát minh', 'tổ chức', 'phát triển'
@@ -1623,7 +1634,22 @@ export async function resolveDictionaryWord(word) {
   const irreg = IRREGULAR_VERBS[cleanWord];
   const rootLemma = irreg?.root || cleanWord;
 
-  // 1. FAST OFFLINE CHECK (emergency fallback)
+  // 1. FAST MODERN VIETNAMESE LEXICON CHECK (Authoritative Thuần Việt, 0ms)
+  const modern = lookupModernLexicon(cleanWord);
+  if (modern) {
+    const card = { ...modern };
+    return {
+      type: 'word',
+      source: 'dictionary',
+      original: word,
+      cambridgeUrl: `https://dictionary.cambridge.org/dictionary/english-vietnamese/${encodeURIComponent(cleanWord)}`,
+      audioUk: `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(cleanWord)}&type=1`,
+      audioUs: `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(cleanWord)}&type=2`,
+      word: card
+    };
+  }
+
+  // 2. FAST OFFLINE CHECK (emergency fallback)
   if (CORE_OFFLINE_DICT[cleanWord]) {
     const offline = { ...CORE_OFFLINE_DICT[cleanWord] };
     if (!offline.examples || offline.examples.length < 2) {
@@ -1699,35 +1725,44 @@ export async function resolveDictionaryWord(word) {
 
     // For nouns: check if Wiktionary has a dedicated nominal headword (starting with Sự, Cuộc, Phép...)
     if (pos.toLowerCase().includes('noun') && Array.isArray(wiktionaryDict?.headwords)) {
-      const nounHw = wiktionaryDict.headwords.find(h => h.pos === 'noun' && /^(Sự|Cuộc|Việc|Phép|Quá trình|Khả năng|Tính|Lời|Bài)/i.test(h.text));
+      const nounHw = wiktionaryDict.headwords.find(h => 
+        h.pos === 'noun' && 
+        /^(Sự|Cuộc|Việc|Phép|Quá trình|Khả năng|Tính|Bài)/i.test(h.text) &&
+        !isArchaicOrAwkward(h.text)
+      );
       if (nounHw) {
-        primaryMeaning = nounHw.text.split(/[,;]/)[0].trim().normalize('NFC');
+        primaryMeaning = sanitizeVietnamese(nounHw.text.split(/[,;]/)[0].trim());
       }
     }
 
     // Prioritize Google Dictionary for concise Vietnamese headword
     if (!primaryMeaning && gDict?.meaning_vi && !isDescriptiveSentence(gDict.meaning_vi)) {
-      primaryMeaning = ensureNounForm(gDict.meaning_vi, cleanWord, pos);
+      if (!isArchaicOrAwkward(gDict.meaning_vi)) {
+        primaryMeaning = ensureNounForm(gDict.meaning_vi, cleanWord, pos);
+      }
     }
 
     // Fallback to Wiktionary headwords if Google Dict didn't yield a concise word
     if (!primaryMeaning && wiktionaryDict?.headwords?.length) {
-      primaryMeaning = ensureNounForm(wiktionaryDict.headwords[0].text.split(/[,;]/)[0].trim(), cleanWord, pos);
+      const validHw = wiktionaryDict.headwords.find(h => !isArchaicOrAwkward(h.text));
+      if (validHw) {
+        primaryMeaning = ensureNounForm(validHw.text.split(/[,;]/)[0].trim(), cleanWord, pos);
+      }
     }
 
     if (primaryMeaning) {
-      primaryMeaning = ensureNounForm(primaryMeaning, cleanWord, pos);
+      primaryMeaning = sanitizeVietnamese(ensureNounForm(primaryMeaning, cleanWord, pos));
     }
 
     // Handle definition_vi: prioritize Wiktionary descriptive definitions or translated Oxford definition
     if (wiktionaryDict?.definitions?.length) {
-      definitionVi = wiktionaryDict.definitions[0].text.normalize('NFC');
+      definitionVi = sanitizeVietnamese(wiktionaryDict.definitions[0].text);
     } else if (gDict?.definition_vi) {
-      definitionVi = gDict.definition_vi.normalize('NFC');
+      definitionVi = sanitizeVietnamese(gDict.definition_vi);
     } else if (gDict?.definition_en) {
-      definitionVi = (await translateDefinition(gDict.definition_en)).normalize('NFC');
+      definitionVi = sanitizeVietnamese(await translateDefinition(gDict.definition_en));
     } else if (phoneticData?.definition_en) {
-      definitionVi = (await translateDefinition(phoneticData.definition_en)).normalize('NFC');
+      definitionVi = sanitizeVietnamese(await translateDefinition(phoneticData.definition_en));
     } else if (primaryMeaning) {
       definitionVi = primaryMeaning;
     }
@@ -1735,20 +1770,20 @@ export async function resolveDictionaryWord(word) {
     // Populate other_meanings
     if (gDict?.other_meanings) {
       for (const m of gDict.other_meanings) {
-        const cleanMeaningVi = String(m.meaning_vi || '')
-          .normalize('NFC')
+        const cleanMeaningVi = sanitizeVietnamese(String(m.meaning_vi || ''))
           .replace(/được\s+quan sát\s+được/gi, 'quan sát được')
           .replace(/được\s+([a-zà-ỹ\s]+)\s+được/gi, '$1 được')
           .trim();
-        if (cleanMeaningVi && !otherMeanings.some(om => om.meaning_vi.toLowerCase() === cleanMeaningVi.toLowerCase())) {
+        if (cleanMeaningVi && !isArchaicOrAwkward(cleanMeaningVi) && !otherMeanings.some(om => om.meaning_vi.toLowerCase() === cleanMeaningVi.toLowerCase())) {
           otherMeanings.push({ pos: m.pos, meaning_vi: cleanMeaningVi });
         }
       }
     }
     if (wiktionaryDict?.headwords) {
       for (const hw of wiktionaryDict.headwords) {
-        const cleanHwText = hw.text.normalize('NFC');
-        if (cleanHwText.toLowerCase() !== primaryMeaning.toLowerCase() &&
+        const cleanHwText = sanitizeVietnamese(hw.text);
+        if (cleanHwText && !isArchaicOrAwkward(cleanHwText) &&
+            cleanHwText.toLowerCase() !== primaryMeaning.toLowerCase() &&
             !otherMeanings.some(om => om.meaning_vi.toLowerCase() === cleanHwText.toLowerCase())) {
           otherMeanings.push({ pos: hw.pos, meaning_vi: cleanHwText });
         }

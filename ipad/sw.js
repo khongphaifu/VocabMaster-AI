@@ -9,7 +9,8 @@ const ASSETS_TO_CACHE = [
   './manifest.webmanifest',
   '../icons/icon-48.png',
   '../icons/icon-128.png',
-  '../utils/dict-resolver.js'
+  '../utils/dict-resolver.js',
+  '../utils/modern-lexicon.js'
 ];
 
 self.addEventListener('install', (event) => {

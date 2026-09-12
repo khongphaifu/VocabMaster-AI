@@ -374,14 +374,17 @@ const WORD_PROMPT_EN_VI = (word, dictContext = null) => {
     }
 
     groundTruthBlock = `
-DỮ LIỆU TỪ ĐIỂN MẪU ĐÃ ĐƯỢC XÁC THỰC (TỪ ĐIỂN CAMBRIDGE & WIKTIONARY - BẮT BUỘC TUÂN THỦ 100%):
-- "meaning_vi" CHÍNH: "${dictContext.meaning_vi}"
+DỮ LIỆU TỪ ĐIỂN MẪU THAM KHẢO (CHUẨN CAMBRIDGE & GOOGLE):
+- Gợi ý "meaning_vi": "${dictContext.meaning_vi}"
 ${dictContext.ipa_uk || dictContext.ipa ? `- Phiên âm IPA UK: "${dictContext.ipa_uk || dictContext.ipa}"` : ''}
 ${dictContext.ipa_us ? `- Phiên âm IPA US: "${dictContext.ipa_us}"` : ''}
 ${dictContext.partOfSpeech ? `- Từ loại: "${dictContext.partOfSpeech}"` : ''}
 ${dictContext.definition_en ? `- Định nghĩa Cambridge: "${dictContext.definition_en}"` : ''}
 ${otherMeaningsStr}
-BẮT BUỘC: Sử dụng "meaning_vi": "${dictContext.meaning_vi}" làm nghĩa chính. Dùng dữ liệu này để hoàn thiện đầy đủ các trường của mục từ điển theo chuẩn Cambridge.
+HƯỚNG DẪN THẨM ĐỊNH THUẦN VIỆT (BẮT BUỘC):
+- Sử dụng dữ liệu trên làm khung chuẩn về IPA, Từ loại và Định nghĩa.
+- Đối với "meaning_vi": Hãy sử dụng từ ngữ tiếng Việt tự nhiên, chuẩn mực và phổ biến nhất trong đời sống hiện đại.
+- TUYỆT ĐỐI KHÔNG dùng từ ngữ cổ xưa, dịch máy thô thiển hoặc dịch nghĩa đen (ví dụ: nếu từ điển thô có 'lời rao' -> BẮT BUỘC dịch là 'thông báo'; 'giám đốc trường' -> BẮT BUỘC dịch là 'hiệu trưởng'; 'người chánh phạm' -> 'chủ mưu'; 'máy xe' -> 'xe hơi, ô tô').
 `;
   }
 
@@ -392,6 +395,8 @@ TIÊU CHUẨN DỊCH NGHĨA THUẦN VIỆT (BẮT BUỘC - CHUẨN TỪ ĐIỂN 
 1. "meaning_vi" LÀ TỪ TƯƠNG ĐƯƠNG CHÍNH DANH (LEXICAL EQUIVALENT):
    - Phải là từ hoặc ngữ tiếng Việt chuẩn mực, ngắn gọn (1-3 từ), tự nhiên và chính xác nhất mà người Việt dùng làm tên gọi cho sự vật/hành động.
    - TUYỆT ĐỐI KHÔNG DỊCH CỤM ĐỊNH NGHĨA TIẾNG ANH (Definition Glossing) THÀNH "meaning_vi":
+     * "announcement" → "meaning_vi" BẮT BUỘC LÀ: "thông báo" (TUYỆT ĐỐI CẤM: "lời rao", "cáo thị", "lời loan báo")!
+     * "principal" → Danh từ BẮT BUỘC LÀ: "hiệu trưởng"; Tính từ BẮT BUỘC LÀ: "chính, chủ yếu" (TUYỆT ĐỐI CẤM: "giám đốc trường", "người chánh phạm")!
      * "feast" (định nghĩa: "a large meal...") → "meaning_vi" BẮT BUỘC LÀ: "bữa tiệc, yến tiệc" (TUYỆT ĐỐI CẤM dịch: "bữa ăn lớn")!
      * "drought" (định nghĩa: "a long period of dry weather...") → "meaning_vi" BẮT BUỘC LÀ: "hạn hán" (TUYỆT ĐỐI CẤM dịch: "thời kỳ khô hạn")!
      * "famine" (định nghĩa: "extreme scarcity of food...") → "meaning_vi" BẮT BUỘC LÀ: "nạn đói" (TUYỆT ĐỐI CẤM dịch: "sự thiếu thức ăn")!
@@ -404,15 +409,18 @@ TIÊU CHUẨN DỊCH NGHĨA THUẦN VIỆT (BẮT BUỘC - CHUẨN TỪ ĐIỂN 
      * "software" → "phần mềm" (TUYỆT ĐỐI CẤM: "tựa ứng")!
      * "hardware" → "phần cứng"!
      * "abandon" → "từ bỏ, bỏ rơi"!
+     * "schedule" → "lịch trình, thời khóa biểu" (CẤM: "bảng giờ giấc")!
+     * "deadline" → "hạn chót, thời hạn"!
+     * "resume" → "hồ sơ xin việc, sơ yếu lý lịch"!
+     * "feedback" → "phản hồi, ý kiến đóng góp"!
      * "table" → "cái bàn"!
      * "become" → "trở thành, trở nên"!
      * "significant" → "đáng kể, quan trọng"!
      * "compromise" → "thỏa hiệp, dàn xếp; làm tổn hại"!
-     * "deadline" → "hạn chót, thời hạn"!
      * "resilience" → "sự kiên cường, khả năng phục hồi"!
      * "sustainable" → "bền vững"!
 2. NGUYÊN TẮC THUẦN VIỆT:
-   - Dùng từ ngữ tự nhiên, phổ biến trong tiếng Việt hiện đại. Tuyệt đối không dịch máy móc thô ráp (word-by-word), không bịa từ, không dùng từ Hán-Việt tối nghĩa nếu đã có từ thuần Việt tương đương.
+   - Dùng từ ngữ tự nhiên, phổ biến trong tiếng Việt hiện đại. Tuyệt đối không dịch máy móc thô ráp (word-by-word), không bịa từ, không dùng từ Hán-Việt tối nghĩa hoặc từ ngữ cổ xưa (lời rao, cáo thị, chánh phạm...) nếu đã có từ thuần Việt hiện đại tương đương.
 3. "definition_vi": Giải thích câu định nghĩa chi tiết bằng tiếng Việt (1 câu ngắn gọn, chuẩn xác ngữ nghĩa).
 4. "definition_en": Định nghĩa tiếng Anh chuẩn Cambridge Learner's Dictionary.
 
@@ -544,8 +552,11 @@ Hãy dịch câu/đoạn văn tiếng Anh sau sang tiếng Việt một cách TH
 ${text}
 """
 
-TIÊU CHÍ BẢN DỊCH:
-1. "translation": Bản dịch tiếng Việt mượt mà, thoát ý, thuần Việt, đúng văn phong người Việt nói và viết. Tuyệt đối KHÔNG dịch máy móc thô cứng từng từ một (word-by-word).
+TIÊU CHÍ BẢN DỊCH (CHUẨN THUẦN VIỆT - TỰ NHIÊN 100%):
+1. "translation": Bản dịch tiếng Việt mượt mà, thoát ý, thuần Việt, chuẩn ngữ cảnh, tự nhiên như người Việt bản xứ nói và viết.
+   - TUYỆT ĐỐI KHÔNG dịch máy móc thô cứng từng từ một (word-by-word literalism).
+   - TUYỆT ĐỐI KHÔNG dùng từ ngữ cổ xưa hoặc dịch ngô nghê (ví dụ "make an announcement" dịch là "đưa ra một thông báo" hoặc "thông báo", CẤM dịch "làm một lời rao"; "school principal" dịch là "hiệu trưởng trường", CẤM dịch "giám đốc trường").
+   - Câu văn gãy gọn, giàu hình ảnh, đúng trật tự từ và ngữ điệu tự nhiên của tiếng Việt hiện đại.
 2. "natural_alternative": Cách diễn đạt tiếng Việt tự nhiên khác (hoặc văn phong mềm mại hơn/chuyên ngành hơn nếu có).
 3. "key_vocabulary": Bóc tách 2-5 từ vựng, phrasal verbs, idioms hoặc collocations trọng tâm trong câu để người học tra cứu, cấu trúc:
    [
@@ -553,12 +564,12 @@ TIÊU CHÍ BẢN DỊCH:
        "word": "từ hoặc cụm từ tiếng Anh nguyên mẫu",
        "ipa": "/phiên âm IPA chuẩn/",
        "pos": "từ loại (noun, verb, phrasal verb, idiom...)",
-       "meaning_vi": "nghĩa tiếng Việt chính xác trong ngữ cảnh câu này"
+       "meaning_vi": "nghĩa tiếng Việt chính xác, thuần Việt trong ngữ cảnh câu này"
      }
    ]
 4. "explanation": Phân tích cấu trúc câu, ngữ pháp nổi bật, sắc thái từ ngữ hoặc lưu ý lỗi chính tả/dễ nhầm lẫn (nếu có).
    QUY TẮC CỐT LÕI: Phần "explanation" BẮT BUỘC PHẢI VIẾT 100% HOÀN TOÀN BẰNG TIẾNG VIỆT. TUYỆT ĐỐI KHÔNG giải thích bằng tiếng Anh!
-5. Giữ nguyên cấu trúc xuống dòng (\\n) nếu văn bản gốc có nhiều dòng.
+5. Giữ nguyên cấu trúc xuống dòng (\n) nếu văn bản gốc có nhiều dòng.
 6. Tuyệt đối KHÔNG điền dấu ba chấm (...).
 
 Trả về DUY NHẤT một JSON hợp lệ theo đúng cấu trúc:
