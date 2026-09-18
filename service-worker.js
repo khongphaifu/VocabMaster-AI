@@ -53,6 +53,16 @@ chrome.runtime.onInstalled.addListener((details) => {
     title: 'VocabMaster: Thêm từ này vào từ điển',
     contexts: ['selection'],
   });
+  chrome.contextMenus.create({
+    id: 'vm-open-pdf',
+    title: 'VocabMaster: Mở Trình đọc & Dịch PDF',
+    contexts: ['action'],
+  });
+  chrome.contextMenus.create({
+    id: 'vm-open-pdf-link',
+    title: 'VocabMaster: Mở link PDF này trong Trình đọc PDF',
+    contexts: ['link'],
+  });
 
   // Configure side panel - must call inside onInstalled (not top-level)
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
@@ -78,19 +88,43 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === 'vm-open-pdf') {
+    chrome.tabs.create({ url: chrome.runtime.getURL('pdf/reader.html') });
+    return;
+  }
+
+  if (info.menuItemId === 'vm-open-pdf-link' && info.linkUrl) {
+    const readerUrl = chrome.runtime.getURL(`pdf/reader.html?file=${encodeURIComponent(info.linkUrl)}`);
+    chrome.tabs.create({ url: readerUrl });
+    return;
+  }
+
   if (!info.selectionText) return;
   const text = info.selectionText.trim();
-  const isWord = !text.includes(' ') && text.length < 30;
+  const isWord = !text.includes(' ') && text.length < 35;
 
   if (info.menuItemId === 'vm-translate') {
     try {
       const result = await handleTranslate(text, isWord);
-      await chrome.tabs.sendMessage(tab.id, {
-        type: 'SHOW_RESULT',
-        data: result,
-      });
+      // Try sending to content script in active tab
+      try {
+        await chrome.tabs.sendMessage(tab.id, {
+          type: 'SHOW_RESULT',
+          data: result,
+        });
+      } catch (tabErr) {
+        // Tab cannot receive content script messages (e.g. Chrome's built-in PDF viewer or chrome:// pages)
+        // Fallback: Open Side Panel and display translation card!
+        if (tab && tab.windowId) {
+          await chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {});
+          await chrome.storage.local.set({ active_quick_translate: result });
+          chrome.runtime.sendMessage({
+            type: 'SHOW_QUICK_TRANSLATE',
+            data: result
+          }).catch(() => {});
+        }
+      }
     } catch (err) {
-      // Tab may not have content script (e.g. chrome:// pages)
       chrome.tabs.sendMessage(tab.id, {
         type: 'SHOW_ERROR',
         error: err.message,

@@ -9,7 +9,12 @@
 <div class="header">
   <div class="header-top">
     <span class="logo">📚 VocabMaster AI</span>
-    <a class="settings-link" id="btn-settings" title="Cài đặt">⚙️</a>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button type="button" id="btn-sidepanel-pdf" title="Mở Trình Đọc &amp; Dịch PDF" style="appearance:none; border:1px solid #45475a; background:rgba(203,166,247,0.12); color:#cba6f7; border-radius:6px; font-size:11px; font-weight:700; padding:3px 7px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+        <span>📄</span> Đọc PDF
+      </button>
+      <a class="settings-link" id="btn-settings" title="Cài đặt">⚙️</a>
+    </div>
   </div>
   <nav class="tabs">
     <button class="tab active" data-tab="library">📖 Thư viện</button>
@@ -23,6 +28,7 @@
 <main>
   <!-- LIBRARY TAB -->
   <div class="pane active" id="pane-library">
+    <div id="quick-translate-card" style="display: none; margin-bottom: 12px;"></div>
     <div class="search-row">
       <input type="text" id="search" placeholder="🔍 Tìm từ...">
       <select id="filter">

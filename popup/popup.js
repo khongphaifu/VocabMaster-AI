@@ -114,6 +114,11 @@ function setupEventListeners() {
     }
     window.close();
   });
+
+  document.getElementById('btn-pdf-reader')?.addEventListener('click', async () => {
+    await chrome.tabs.create({ url: chrome.runtime.getURL('pdf/reader.html') });
+    window.close();
+  });
 }
 
 async function handleTranslate() {

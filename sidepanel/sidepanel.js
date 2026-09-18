@@ -26,6 +26,97 @@ document.getElementById('btn-settings').addEventListener('click', () => {
   chrome.runtime.openOptionsPage();
 });
 
+// PDF Reader button
+document.getElementById('btn-sidepanel-pdf')?.addEventListener('click', async () => {
+  await chrome.tabs.create({ url: chrome.runtime.getURL('pdf/reader.html') });
+});
+
+// Render quick translation card (from PDF or Context Menu)
+function renderQuickTranslate(data) {
+  const container = document.getElementById('quick-translate-card');
+  if (!container || !data) return;
+
+  const isWord = data.type === 'word' && data.word;
+  const orig = data.original || '';
+  const meaning = isWord ? (data.word.meaning_vi || data.word.definition_vi) : (data.translation || '');
+  const ipa = isWord ? (data.word.ipa_uk || data.word.ipa_us || data.word.ipa || '') : '';
+  const pos = isWord ? (data.word.partOfSpeech || '') : 'phrase';
+
+  container.style.display = 'block';
+  container.innerHTML = `
+    <div style="background: rgba(203, 166, 247, 0.08); border: 1px solid rgba(203, 166, 247, 0.3); border-radius: 10px; padding: 12px; position: relative;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+        <span style="font-size: 11px; font-weight: 700; color: #cba6f7; display: flex; align-items: center; gap: 4px;">
+          <span>⚡</span> Tra nhanh từ PDF / Web
+        </span>
+        <button type="button" id="btn-close-quick" style="border: none; background: transparent; color: #a6adc8; cursor: pointer; font-size: 14px;">✕</button>
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px;">
+        <span style="font-size: 16px; font-weight: 700; color: #89b4fa;">${esc(orig)}</span>
+        ${ipa ? `<span style="font-size: 12px; font-style: italic; color: #bac2de;">${esc(ipa)}</span>` : ''}
+        ${pos ? `<span style="font-size: 10px; background: #313244; color: #89dceb; padding: 1px 6px; border-radius: 8px;">${esc(pos)}</span>` : ''}
+      </div>
+      <div style="font-size: 13.5px; font-weight: 700; color: #a6e3a1; margin-bottom: 8px;">
+        ${esc(meaning)}
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button type="button" id="btn-quick-speak" style="border: 1px solid #45475a; background: #313244; color: #cdd6f4; border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 600; cursor: pointer;">
+          🔊 Nghe đọc
+        </button>
+        <button type="button" id="btn-quick-save" style="border: none; background: #89b4fa; color: #11111b; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; cursor: pointer;">
+          + Lưu vào sổ từ
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('btn-close-quick')?.addEventListener('click', () => {
+    container.style.display = 'none';
+  });
+  document.getElementById('btn-quick-speak')?.addEventListener('click', () => {
+    speak(orig);
+  });
+  document.getElementById('btn-quick-save')?.addEventListener('click', async () => {
+    const saveBtn = document.getElementById('btn-quick-save');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Đang lưu...';
+    try {
+      const res = await chrome.runtime.sendMessage({
+        type: 'ADD_WORD',
+        wordData: {
+          word: orig,
+          ...(data.word || {}),
+          definition_vi: meaning,
+          sourceUrl: 'PDF/Web Quick Translate'
+        }
+      });
+      if (res?.success) {
+        saveBtn.textContent = '✓ Đã lưu';
+        renderLibrary();
+      }
+    } catch (_) {
+      saveBtn.textContent = 'Lỗi';
+    }
+  });
+}
+
+// Listen for quick translate message from background
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.type === 'SHOW_QUICK_TRANSLATE' && msg.data) {
+    renderQuickTranslate(msg.data);
+    const libTab = document.querySelector('[data-tab="library"]');
+    if (libTab) libTab.click();
+  }
+});
+
+// Check if there is an active_quick_translate stored
+chrome.storage.local.get('active_quick_translate', (res) => {
+  if (res?.active_quick_translate) {
+    renderQuickTranslate(res.active_quick_translate);
+    chrome.storage.local.remove('active_quick_translate');
+  }
+});
+
 // ═══════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════
