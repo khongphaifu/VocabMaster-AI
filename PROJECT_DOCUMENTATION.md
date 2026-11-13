@@ -495,7 +495,14 @@ node d:/extension/test_universal_verification.mjs
 
 ## 11. Lịch Sử Phiên Bản & Đóng Góp (Changelog)
 
-### Phiên Bản 1.0.28 (Hiện Tại)
+### Phiên Bản 1.0.29 (Hiện Tại)
+- **Khắc Phục Triệt Để Lỗi Không Hiện Nút Dịch ✨ (TDZ ReferenceError Fix):**
+  - **Sửa lỗi Temporal Dead Zone (TDZ):** Chuyển toàn bộ các khai báo biến trạng thái (`tooltip`, `floatTrigger`, `activeLibraryModal`, các biến cờ và bộ đếm thời gian) lên dòng đầu tiên của `content.js`. Trước đó, việc gọi `removeAllVocabMasterUI()` trước dòng khai báo `let tooltip` đã kích hoạt ngoại lệ `ReferenceError: Cannot access 'tooltip' before initialization`, khiến toàn bộ content script bị crash ngay khi khởi tạo và không đăng ký được bất kỳ bộ lắng nghe sự kiện bôi đen nào.
+  - **Chuẩn hóa hàm `isInsideVocabMaster()`:** Tối ưu hóa việc kiểm tra TextNode, SVG, DocumentFragment và Element để loại trừ hoàn toàn các tương tác bên trong popup dịch mà không bao giờ gặp lỗi thiếu phương thức `.closest()`.
+  - **Tách bạch hiển thị nút ✨ và kết nối tiện ích:** Nút nổi `✨` giờ đây luôn luôn xuất hiện khi người dùng bôi đen văn bản hợp lệ. Trong trường hợp tiện ích vừa được nạp lại trong Developer Mode, khi người dùng bấm nút ✨ hệ thống sẽ lịch sự hiển thị hộp thoại thông báo kèm nút bấm F5 một chạm thay vì ẩn nút hoàn toàn.
+  - **Ổn định hóa tiêm script Service Worker:** Tối ưu hóa việc tiêm script nền vào tất cả các tab đang mở với `{ tabId: tab.id }`, vượt qua mọi rào cản hạn chế quyền của cross-origin iframe.
+
+### Phiên Bản 1.0.28
 - **Triệt Tiêu Hoàn Toàn Lỗi Xung Đột & Đè Chồng Giao Diện ("Cấn" UI):**
   - **Triệt tiêu hiện tượng nút nổi ✨ xuất hiện đè lên popup card dịch:** Bổ sung cơ chế loại trừ tương hỗ tuyệt đối (`Mutual Exclusion`). Khi có bất kỳ thẻ dịch popup nào (`.vm-tooltip`) đang hiển thị trên màn hình, nút nổi `✨` sẽ lập tức bị ẩn và tuyệt đối không bao giờ được phép sinh ra.
   - **Chống bôi đen nội bộ (Self-Selection Filtering):** Nâng cấp hàm `getDeepActiveSelection()` kiểm tra phần tử tổ tiên (`closest('.vm-tooltip')`, `closest('.vm-float-trigger')`, `closest('.vm-modal-overlay')`). Khi người dùng bôi đen hoặc sao chép chữ bên trong popup dịch, hệ thống sẽ bỏ qua và không kích hoạt nút dịch mới.

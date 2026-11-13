@@ -69,28 +69,17 @@ chrome.runtime.onInstalled.addListener((details) => {
 
   // Seamless re-injection into existing tabs on install/update
   try {
-    chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] }).then((tabs) => {
+    chrome.tabs.query({}).then((tabs) => {
       for (const tab of tabs) {
-        if (tab.id && tab.url && !tab.url.startsWith('chrome') && !tab.url.startsWith('edge')) {
-          // Attempt allFrames first; if blocked by subframe restrictions, fallback to main frame only
+        if (tab.id && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('edge://') && !tab.url.startsWith('chrome-extension://')) {
           chrome.scripting.executeScript({
-            target: { tabId: tab.id, allFrames: true },
+            target: { tabId: tab.id },
             files: ['content/content.js']
-          }).catch(() => {
-            chrome.scripting.executeScript({
-              target: { tabId: tab.id },
-              files: ['content/content.js']
-            }).catch(() => {});
-          });
+          }).catch(() => {});
           chrome.scripting.insertCSS({
-            target: { tabId: tab.id, allFrames: true },
+            target: { tabId: tab.id },
             files: ['content/content.css']
-          }).catch(() => {
-            chrome.scripting.insertCSS({
-              target: { tabId: tab.id },
-              files: ['content/content.css']
-            }).catch(() => {});
-          });
+          }).catch(() => {});
         }
       }
     }).catch(() => {});

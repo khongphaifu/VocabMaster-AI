@@ -1,12 +1,20 @@
 // d:/extension/content/content.js
 // Intercepts text selection, shows floating action trigger, performs AI translation
 
-// Unbind any previous orphaned content script instance if re-injected
-if (typeof window.__VOCAB_MASTER_CLEANUP__ === 'function') {
-  try {
-    window.__VOCAB_MASTER_CLEANUP__();
-  } catch (_) {}
-}
+// Top-level state variable declarations (must precede removeAllVocabMasterUI to prevent TDZ ReferenceError)
+let tooltip = null;
+let floatTrigger = null;
+let activeLibraryModal = null;
+let currentSelectionText = '';
+let currentAnchorRect = null;
+let currentContextSentence = '';
+let isProcessing = false;
+let isExitingTrigger = false;
+let exitTriggerTimer = null;
+let isExitingTooltip = false;
+let exitTooltipTimer = null;
+let activeTypewriterTimer = null;
+let selectionChangeDebounceTimer = null;
 
 function removeAllVocabMasterUI() {
   document.querySelectorAll('.vm-tooltip, .vm-float-trigger, .vm-modal-overlay').forEach(el => {
@@ -15,6 +23,13 @@ function removeAllVocabMasterUI() {
   tooltip = null;
   floatTrigger = null;
   activeLibraryModal = null;
+}
+
+// Unbind any previous orphaned content script instance if re-injected
+if (typeof window.__VOCAB_MASTER_CLEANUP__ === 'function') {
+  try {
+    window.__VOCAB_MASTER_CLEANUP__();
+  } catch (_) {}
 }
 removeAllVocabMasterUI();
 
@@ -26,15 +41,14 @@ function isExtensionValid() {
   }
 }
 
-const VIETNAMESE_REGEX = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
+function isInsideVocabMaster(node) {
+  if (!node) return false;
+  const el = node.nodeType === 3 ? (node.parentElement || node.parentNode) : node;
+  if (!el || typeof el.closest !== 'function') return false;
+  return !!(el.closest('.vm-tooltip') || el.closest('.vm-float-trigger') || el.closest('.vm-modal-overlay'));
+}
 
-let tooltip = null;
-let floatTrigger = null;
-let activeLibraryModal = null;
-let currentSelectionText = '';
-let currentAnchorRect = null;
-let currentContextSentence = '';
-let isProcessing = false;
+const VIETNAMESE_REGEX = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
 
 // Anti-select and Anti-copy bypass for protected websites (e.g., e-learning platforms, LMS)
 async function enableUniversalSelection() {
@@ -108,14 +122,9 @@ function getDeepActiveSelection() {
     const sel = window.getSelection();
     if (sel && sel.rangeCount > 0 && sel.toString().trim()) {
       const range = sel.getRangeAt(0);
-      const container = range.commonAncestorContainer;
-      const elem = container.nodeType === Node.TEXT_NODE ? container.parentNode : container;
-      const startElem = range.startContainer.nodeType === Node.TEXT_NODE ? range.startContainer.parentNode : range.startContainer;
-      const endElem = range.endContainer.nodeType === Node.TEXT_NODE ? range.endContainer.parentNode : range.endContainer;
-
-      if ((elem && (elem.closest?.('.vm-tooltip') || elem.closest?.('.vm-float-trigger') || elem.closest?.('.vm-modal-overlay'))) ||
-          (startElem && (startElem.closest?.('.vm-tooltip') || startElem.closest?.('.vm-float-trigger') || startElem.closest?.('.vm-modal-overlay'))) ||
-          (endElem && (endElem.closest?.('.vm-tooltip') || endElem.closest?.('.vm-float-trigger') || endElem.closest?.('.vm-modal-overlay')))) {
+      if (isInsideVocabMaster(range.commonAncestorContainer) ||
+          isInsideVocabMaster(range.startContainer) ||
+          isInsideVocabMaster(range.endContainer)) {
         return { selectedText: '', selObj: null, anchorRect: null, contextSentence: '' };
       }
 
@@ -151,14 +160,9 @@ function getDeepActiveSelection() {
           const sSel = active.shadowRoot.getSelection();
           if (sSel && sSel.rangeCount > 0 && sSel.toString().trim()) {
             const sRange = sSel.getRangeAt(0);
-            const sContainer = sRange.commonAncestorContainer;
-            const sElem = sContainer.nodeType === Node.TEXT_NODE ? sContainer.parentNode : sContainer;
-            const sStartElem = sRange.startContainer.nodeType === Node.TEXT_NODE ? sRange.startContainer.parentNode : sRange.startContainer;
-            const sEndElem = sRange.endContainer.nodeType === Node.TEXT_NODE ? sRange.endContainer.parentNode : sRange.endContainer;
-
-            if ((sElem && (sElem.closest?.('.vm-tooltip') || sElem.closest?.('.vm-float-trigger') || sElem.closest?.('.vm-modal-overlay'))) ||
-                (sStartElem && (sStartElem.closest?.('.vm-tooltip') || sStartElem.closest?.('.vm-float-trigger') || sStartElem.closest?.('.vm-modal-overlay'))) ||
-                (sEndElem && (sEndElem.closest?.('.vm-tooltip') || sEndElem.closest?.('.vm-float-trigger') || sEndElem.closest?.('.vm-modal-overlay')))) {
+            if (isInsideVocabMaster(sRange.commonAncestorContainer) ||
+                isInsideVocabMaster(sRange.startContainer) ||
+                isInsideVocabMaster(sRange.endContainer)) {
               return { selectedText: '', selObj: null, anchorRect: null, contextSentence: '' };
             }
 
@@ -195,7 +199,7 @@ function getDeepActiveSelection() {
     try {
       const active = document.activeElement;
       if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
-        if (active.closest?.('.vm-tooltip') || active.closest?.('.vm-float-trigger') || active.closest?.('.vm-modal-overlay')) {
+        if (isInsideVocabMaster(active)) {
           return { selectedText: '', selObj: null, anchorRect: null, contextSentence: '' };
         }
         const start = active.selectionStart;
@@ -231,22 +235,14 @@ function evaluateSelection(source, e) {
   }
 
   // 2. Ignore events originating inside our own UI
-  if (e && e.target) {
-    if (e.target.closest && (e.target.closest('.vm-tooltip') || e.target.closest('.vm-float-trigger') || e.target.closest('.vm-modal-overlay'))) {
-      return;
-    }
+  if (e && e.target && isInsideVocabMaster(e.target)) {
+    return;
   }
 
   const { selectedText, anchorRect, contextSentence } = getDeepActiveSelection();
 
   if (!selectedText || selectedText.length < 1 || selectedText.length > 2500) {
     hideFloatTrigger();
-    return;
-  }
-
-  // If extension is disconnected, silently hide triggers (never pop up annoying alerts on passive selection)
-  if (!isExtensionValid()) {
-    hideFloatTrigger(true);
     return;
   }
 
@@ -322,8 +318,6 @@ function evaluateSelection(source, e) {
   }
 }
 
-let selectionChangeDebounceTimer = null;
-
 function handleMouseUp(e) {
   setTimeout(() => evaluateSelection('mouseup', e), 20);
 }
@@ -337,7 +331,7 @@ function handleKeyUp(e) {
 function handleSelectionChange() {
   clearTimeout(selectionChangeDebounceTimer);
   selectionChangeDebounceTimer = setTimeout(() => {
-    if (document.activeElement && (document.activeElement.closest?.('.vm-tooltip') || document.activeElement.closest?.('.vm-library-overlay'))) {
+    if (document.activeElement && isInsideVocabMaster(document.activeElement)) {
       return;
     }
     evaluateSelection('selectionchange', null);
@@ -346,7 +340,7 @@ function handleSelectionChange() {
 
 function handleMouseDown(e) {
   // Do not dismiss when clicking inside our own UI elements
-  if (e.target && e.target.closest && (e.target.closest('.vm-tooltip') || e.target.closest('.vm-float-trigger') || e.target.closest('.vm-modal-overlay'))) {
+  if (e.target && isInsideVocabMaster(e.target)) {
     return;
   }
   if (tooltip && !tooltip.contains(e.target)) {
@@ -384,9 +378,6 @@ document.addEventListener('keydown', (e) => {
     hideFloatTrigger();
   }
 }, true);
-
-let isExitingTrigger = false;
-let exitTriggerTimer = null;
 
 function showFloatTrigger(x, y, text) {
   // Mutual exclusion: never spawn float trigger if any tooltip or modal is open
@@ -465,8 +456,6 @@ function hideFloatTrigger(immediate = false) {
   }, 150);
 }
 
-let activeTypewriterTimer = null;
-
 async function doTranslate(text, anchorRect, contextSentence = null) {
   if (isProcessing) return;
   isProcessing = true;
@@ -536,9 +525,6 @@ if (isExtensionValid()) {
     });
   } catch (_) {}
 }
-
-let isExitingTooltip = false;
-let exitTooltipTimer = null;
 
 function hideTooltip(immediate = false) {
   if (activeTypewriterTimer) {
