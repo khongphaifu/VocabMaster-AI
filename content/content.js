@@ -245,6 +245,20 @@ function evaluateSelection(source, e) {
   triggerY = Math.max(minY, Math.min(triggerY, maxY));
 
   showFloatTrigger(triggerX, triggerY, selectedText);
+
+  // Speculative Selection Prefetching:
+  // Resolves the word in background memory while the user is moving the cursor to click ✨
+  const cleanPrefetch = selectedText.trim();
+  const isSingleWord = !cleanPrefetch.includes(' ') && cleanPrefetch.length < 35;
+  if (isSingleWord && isExtensionValid()) {
+    try {
+      chrome.runtime.sendMessage({
+        type: 'PREFETCH_WORD',
+        text: cleanPrefetch,
+        contextSentence: currentContextSentence
+      }).catch(() => {});
+    } catch (_) {}
+  }
 }
 
 let selectionChangeDebounceTimer = null;

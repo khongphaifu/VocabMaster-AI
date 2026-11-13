@@ -1699,13 +1699,17 @@ export async function resolveDictionaryWord(word, contextSentence = '') {
     };
   }
 
-  // 2. ULTRA-FAST PARALLEL RESOLVER: Cambridge + Wiktionary + Google Dict + Phonetics in parallel
+  // 2. ULTRA-FAST COOPERATIVE PARALLEL RESOLVER: Cambridge + Google Dict + Datamuse Phonetics
   try {
-    const [cambridgeRes, wiktionaryDict, gDict, phoneticData] = await Promise.all([
-      fetchFromCambridge(cleanWord).catch(() => null),
-      fetchWiktionary(cleanWord).catch(() => null),
-      fetchGoogleDictionary(cleanWord).catch(() => null),
-      fetchPhoneticData(cleanWord).catch(() => null)
+    const cambridgePromise = fetchFromCambridge(cleanWord).catch(() => null);
+    const gDictPromise = fetchGoogleDictionary(cleanWord).catch(() => null);
+    const phoneticPromise = fetchPhoneticData(cleanWord).catch(() => null);
+
+    // Concurrently fetch the fastest primary sources (zero waiting for slow third-party scrapers)
+    const [cambridgeRes, gDict, phoneticData] = await Promise.all([
+      cambridgePromise,
+      gDictPromise,
+      phoneticPromise
     ]);
 
     // If Cambridge succeeded with rich Vietnamese meaning and it is NOT a descriptive sentence
@@ -1717,16 +1721,16 @@ export async function resolveDictionaryWord(word, contextSentence = '') {
           cambridgeRes.word.meaning_vi = irreg.meaning_vi;
         }
       }
-      if (wiktionaryDict && Array.isArray(wiktionaryDict.headwords)) {
+      if (gDict && Array.isArray(gDict.other_meanings)) {
         cambridgeRes.word.other_meanings = cambridgeRes.word.other_meanings || [];
-        for (const hw of wiktionaryDict.headwords) {
-          if (!cambridgeRes.word.other_meanings.some(m => m.meaning_vi?.toLowerCase() === hw.text.toLowerCase())) {
-            cambridgeRes.word.other_meanings.push({ pos: hw.pos, meaning_vi: hw.text });
+        for (const m of gDict.other_meanings) {
+          if (!cambridgeRes.word.other_meanings.some(om => om.meaning_vi?.toLowerCase() === m.meaning_vi?.toLowerCase())) {
+            cambridgeRes.word.other_meanings.push(m);
           }
         }
       }
-      if (!cambridgeRes.word.synonyms?.length && phoneticData?.synonyms?.length) {
-        cambridgeRes.word.synonyms = phoneticData.synonyms;
+      if (!cambridgeRes.word.synonyms?.length && (phoneticData?.synonyms?.length || gDict?.synonyms?.length)) {
+        cambridgeRes.word.synonyms = phoneticData?.synonyms || gDict?.synonyms || [];
       }
       if (!cambridgeRes.word.collocations || cambridgeRes.word.collocations.length < 2) {
         const extraCol = generateFallbackCollocations(rootLemma, cambridgeRes.word.partOfSpeech, cambridgeRes.word.synonyms, cambridgeRes.word.meaning_vi);
@@ -1742,21 +1746,9 @@ export async function resolveDictionaryWord(word, contextSentence = '') {
     // 1. Primary Meaning: MUST be concise lexical headword (1-3 words)
     let primaryMeaning = contextSense?.meaning_vi || '';
     let definitionVi = '';
-    let pos = irreg ? `verb (${irreg.form})` : (contextSense?.pos || gDict?.partOfSpeech || wiktionaryDict?.partOfSpeech || 'noun');
+    let pos = irreg ? `verb (${irreg.form})` : (contextSense?.pos || gDict?.partOfSpeech || 'noun');
     const otherMeanings = [];
     const synonyms = [];
-
-    // For nouns: check if Wiktionary has a dedicated nominal headword (starting with Sự, Cuộc, Phép...)
-    if (pos.toLowerCase().includes('noun') && Array.isArray(wiktionaryDict?.headwords)) {
-      const nounHw = wiktionaryDict.headwords.find(h => 
-        h.pos === 'noun' && 
-        /^(Sự|Cuộc|Việc|Phép|Quá trình|Khả năng|Tính|Bài)/i.test(h.text) &&
-        !isArchaicOrAwkward(h.text)
-      );
-      if (nounHw) {
-        primaryMeaning = sanitizeVietnamese(nounHw.text.split(/[,;]/)[0].trim());
-      }
-    }
 
     // Prioritize Google Dictionary for concise Vietnamese headword
     if (!primaryMeaning && gDict?.meaning_vi && !isDescriptiveSentence(gDict.meaning_vi)) {
@@ -1765,11 +1757,15 @@ export async function resolveDictionaryWord(word, contextSentence = '') {
       }
     }
 
-    // Fallback to Wiktionary headwords if Google Dict didn't yield a concise word
-    if (!primaryMeaning && wiktionaryDict?.headwords?.length) {
-      const validHw = wiktionaryDict.headwords.find(h => !isArchaicOrAwkward(h.text));
-      if (validHw) {
-        primaryMeaning = ensureNounForm(validHw.text.split(/[,;]/)[0].trim(), cleanWord, pos);
+    // Last-resort fallback to Wiktionary ONLY IF Google Dict failed to produce a valid meaning
+    let wiktionaryDict = null;
+    if (!primaryMeaning) {
+      wiktionaryDict = await fetchWiktionary(cleanWord).catch(() => null);
+      if (wiktionaryDict?.headwords?.length) {
+        const validHw = wiktionaryDict.headwords.find(h => !isArchaicOrAwkward(h.text));
+        if (validHw) {
+          primaryMeaning = ensureNounForm(validHw.text.split(/[,;]/)[0].trim(), cleanWord, pos);
+        }
       }
     }
 
@@ -1777,15 +1773,15 @@ export async function resolveDictionaryWord(word, contextSentence = '') {
       primaryMeaning = sanitizeVietnamese(ensureNounForm(primaryMeaning, cleanWord, pos));
     }
 
-    // Handle definition_vi: prioritize Wiktionary descriptive definitions or translated Oxford definition
+    // Handle definition_vi: prioritize definitions without blocking on secondary fetch
     if (wiktionaryDict?.definitions?.length) {
       definitionVi = sanitizeVietnamese(wiktionaryDict.definitions[0].text);
     } else if (gDict?.definition_vi) {
       definitionVi = sanitizeVietnamese(gDict.definition_vi);
     } else if (gDict?.definition_en) {
-      definitionVi = sanitizeVietnamese(await translateDefinition(gDict.definition_en));
+      definitionVi = primaryMeaning || sanitizeVietnamese(gDict.definition_en);
     } else if (phoneticData?.definition_en) {
-      definitionVi = sanitizeVietnamese(await translateDefinition(phoneticData.definition_en));
+      definitionVi = primaryMeaning || sanitizeVietnamese(phoneticData.definition_en);
     } else if (primaryMeaning) {
       definitionVi = primaryMeaning;
     }

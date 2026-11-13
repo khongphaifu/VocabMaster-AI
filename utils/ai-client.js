@@ -1283,7 +1283,8 @@ async function executeGeminiGeneration(apiKey, modelName, prompt, isWord) {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.1,
-          maxOutputTokens: isWord ? 3500 : 4096
+          maxOutputTokens: isWord ? 1000 : 1500,
+          responseMimeType: "application/json"
         }
       })
     });
@@ -1594,7 +1595,8 @@ async function executeGroqGeneration(apiKey, model, prompt, isWord) {
           { role: 'user', content: prompt }
         ],
         temperature: 0.1,
-        max_tokens: isWord ? 2500 : 3500
+        max_tokens: isWord ? 1000 : 1500,
+        response_format: { type: "json_object" }
       })
     });
 
@@ -1646,7 +1648,8 @@ async function callOpenAI(apiKey, prompt, isWord) {
           { role: 'user', content: prompt }
         ],
         temperature: 0.1,
-        max_tokens: isWord ? 1000 : 1800
+        response_format: { type: "json_object" },
+        max_tokens: isWord ? 1000 : 1500
       })
     });
 
@@ -1691,7 +1694,7 @@ async function callClaude(apiKey, prompt, isWord) {
           : 'You are an elite English-Vietnamese translator and linguist. Translate into authentic, natural Vietnamese (thuần Việt). Extract key vocabulary. All explanations and vocabulary meanings MUST be 100% in VIETNAMESE. Output ONLY valid JSON matching the schema.',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.1,
-        max_tokens: isWord ? 1000 : 1800
+        max_tokens: isWord ? 1000 : 1500
       })
     });
 

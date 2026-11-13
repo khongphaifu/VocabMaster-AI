@@ -258,6 +258,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ success: false, error: fetchErr.message });
         }
 
+      } else if (message.type === 'PREFETCH_WORD') {
+        const { text, contextSentence = '' } = message;
+        if (text && typeof text === 'string') {
+          const cleanText = text.trim();
+          if (cleanText && !cleanText.includes(' ') && cleanText.length < 35) {
+            handleTranslate(cleanText, true, 'auto', contextSentence).catch(() => {});
+          }
+        }
+        sendResponse({ success: true });
+
       } else {
         sendResponse({ success: false, error: 'Unknown message type' });
       }
@@ -367,6 +377,18 @@ async function handleTranslate(text, isWord, direction = 'auto', contextSentence
       dictResult = await resolveDictionaryWord(cleanText, contextSentence);
     } catch (e) {
       console.warn('Dictionary resolution failed, falling back:', e);
+    }
+
+    // FAST SMART SHORT-CIRCUITING (Phương án A - Approved):
+    // If dictionary resolution returned a high-quality, verified entry with meaning, pos, and examples:
+    // Return immediately (150ms-250ms)! No need to wait 2 seconds for redundant LLM enrichment!
+    if (dictResult && dictResult.word?.meaning_vi && !isPlaceholderText(dictResult.word.meaning_vi)) {
+      if (customMeaning && dictResult.word) {
+        dictResult.word.meaning_vi = customMeaning;
+        dictResult.word.isUserCustom = true;
+      }
+      await setCachedTranslation(cacheKey, dictResult);
+      return dictResult;
     }
   }
 
