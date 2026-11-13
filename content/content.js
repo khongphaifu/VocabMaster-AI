@@ -2,11 +2,21 @@
 // Intercepts text selection, shows floating action trigger, performs AI translation
 
 // Unbind any previous orphaned content script instance if re-injected
-if (window.__VOCAB_MASTER_CLEANUP__) {
+if (typeof window.__VOCAB_MASTER_CLEANUP__ === 'function') {
   try {
     window.__VOCAB_MASTER_CLEANUP__();
   } catch (_) {}
 }
+
+function removeAllVocabMasterUI() {
+  document.querySelectorAll('.vm-tooltip, .vm-float-trigger, .vm-modal-overlay').forEach(el => {
+    try { el.remove(); } catch (_) {}
+  });
+  tooltip = null;
+  floatTrigger = null;
+  activeLibraryModal = null;
+}
+removeAllVocabMasterUI();
 
 function isExtensionValid() {
   try {
@@ -97,9 +107,20 @@ function getDeepActiveSelection() {
   try {
     const sel = window.getSelection();
     if (sel && sel.rangeCount > 0 && sel.toString().trim()) {
+      const range = sel.getRangeAt(0);
+      const container = range.commonAncestorContainer;
+      const elem = container.nodeType === Node.TEXT_NODE ? container.parentNode : container;
+      const startElem = range.startContainer.nodeType === Node.TEXT_NODE ? range.startContainer.parentNode : range.startContainer;
+      const endElem = range.endContainer.nodeType === Node.TEXT_NODE ? range.endContainer.parentNode : range.endContainer;
+
+      if ((elem && (elem.closest?.('.vm-tooltip') || elem.closest?.('.vm-float-trigger') || elem.closest?.('.vm-modal-overlay'))) ||
+          (startElem && (startElem.closest?.('.vm-tooltip') || startElem.closest?.('.vm-float-trigger') || startElem.closest?.('.vm-modal-overlay'))) ||
+          (endElem && (endElem.closest?.('.vm-tooltip') || endElem.closest?.('.vm-float-trigger') || endElem.closest?.('.vm-modal-overlay')))) {
+        return { selectedText: '', selObj: null, anchorRect: null, contextSentence: '' };
+      }
+
       selectedText = sel.toString().trim();
       selObj = sel;
-      const range = sel.getRangeAt(0);
       let rect = range.getBoundingClientRect();
       if (!rect || (rect.width === 0 && rect.height === 0)) {
         const rects = range.getClientRects();
@@ -129,9 +150,20 @@ function getDeepActiveSelection() {
         if (typeof active.shadowRoot.getSelection === 'function') {
           const sSel = active.shadowRoot.getSelection();
           if (sSel && sSel.rangeCount > 0 && sSel.toString().trim()) {
+            const sRange = sSel.getRangeAt(0);
+            const sContainer = sRange.commonAncestorContainer;
+            const sElem = sContainer.nodeType === Node.TEXT_NODE ? sContainer.parentNode : sContainer;
+            const sStartElem = sRange.startContainer.nodeType === Node.TEXT_NODE ? sRange.startContainer.parentNode : sRange.startContainer;
+            const sEndElem = sRange.endContainer.nodeType === Node.TEXT_NODE ? sRange.endContainer.parentNode : sRange.endContainer;
+
+            if ((sElem && (sElem.closest?.('.vm-tooltip') || sElem.closest?.('.vm-float-trigger') || sElem.closest?.('.vm-modal-overlay'))) ||
+                (sStartElem && (sStartElem.closest?.('.vm-tooltip') || sStartElem.closest?.('.vm-float-trigger') || sStartElem.closest?.('.vm-modal-overlay'))) ||
+                (sEndElem && (sEndElem.closest?.('.vm-tooltip') || sEndElem.closest?.('.vm-float-trigger') || sEndElem.closest?.('.vm-modal-overlay')))) {
+              return { selectedText: '', selObj: null, anchorRect: null, contextSentence: '' };
+            }
+
             selectedText = sSel.toString().trim();
             selObj = sSel;
-            const sRange = sSel.getRangeAt(0);
             let sRect = sRange.getBoundingClientRect();
             if (!sRect || (sRect.width === 0 && sRect.height === 0)) {
               const sRects = sRange.getClientRects();
@@ -163,6 +195,9 @@ function getDeepActiveSelection() {
     try {
       const active = document.activeElement;
       if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+        if (active.closest?.('.vm-tooltip') || active.closest?.('.vm-float-trigger') || active.closest?.('.vm-modal-overlay')) {
+          return { selectedText: '', selObj: null, anchorRect: null, contextSentence: '' };
+        }
         const start = active.selectionStart;
         const end = active.selectionEnd;
         if (typeof start === 'number' && typeof end === 'number' && start < end) {
@@ -188,11 +223,18 @@ function getDeepActiveSelection() {
 }
 
 function evaluateSelection(source, e) {
-  // Ignore events originating inside our own UI
+  // 1. Mutual exclusion: If any tooltip or library modal is currently open, NEVER show floatTrigger
+  const activeTooltip = document.querySelector('.vm-tooltip:not(.vm-tooltip-exit)');
+  if (activeTooltip || (tooltip && !isExitingTooltip && document.body.contains(tooltip)) || activeLibraryModal) {
+    hideFloatTrigger(true);
+    return;
+  }
+
+  // 2. Ignore events originating inside our own UI
   if (e && e.target) {
-    if (tooltip && tooltip.contains(e.target)) return;
-    if (floatTrigger && floatTrigger.contains(e.target)) return;
-    if (activeLibraryModal && activeLibraryModal.contains(e.target)) return;
+    if (e.target.closest && (e.target.closest('.vm-tooltip') || e.target.closest('.vm-float-trigger') || e.target.closest('.vm-modal-overlay'))) {
+      return;
+    }
   }
 
   const { selectedText, anchorRect, contextSentence } = getDeepActiveSelection();
@@ -202,9 +244,9 @@ function evaluateSelection(source, e) {
     return;
   }
 
+  // If extension is disconnected, silently hide triggers (never pop up annoying alerts on passive selection)
   if (!isExtensionValid()) {
-    hideFloatTrigger();
-    showExtensionReloadedTooltip(anchorRect);
+    hideFloatTrigger(true);
     return;
   }
 
@@ -303,11 +345,15 @@ function handleSelectionChange() {
 }
 
 function handleMouseDown(e) {
+  // Do not dismiss when clicking inside our own UI elements
+  if (e.target && e.target.closest && (e.target.closest('.vm-tooltip') || e.target.closest('.vm-float-trigger') || e.target.closest('.vm-modal-overlay'))) {
+    return;
+  }
   if (tooltip && !tooltip.contains(e.target)) {
-    hideTooltip();
+    hideTooltip(true);
   }
   if (floatTrigger && !floatTrigger.contains(e.target)) {
-    hideFloatTrigger();
+    hideFloatTrigger(true);
   }
 }
 
@@ -324,8 +370,7 @@ window.__VOCAB_MASTER_CLEANUP__ = () => {
   document.removeEventListener('touchend', handleMouseUp, true);
   document.removeEventListener('selectionchange', handleSelectionChange, false);
   document.removeEventListener('mousedown', handleMouseDown, true);
-  hideFloatTrigger(true);
-  hideTooltip(true);
+  removeAllVocabMasterUI();
 };
 
 // Close on Escape key
@@ -344,6 +389,13 @@ let isExitingTrigger = false;
 let exitTriggerTimer = null;
 
 function showFloatTrigger(x, y, text) {
+  // Mutual exclusion: never spawn float trigger if any tooltip or modal is open
+  const activeTooltip = document.querySelector('.vm-tooltip:not(.vm-tooltip-exit)');
+  if (activeTooltip || (tooltip && !isExitingTooltip && document.body.contains(tooltip)) || activeLibraryModal) {
+    hideFloatTrigger(true);
+    return;
+  }
+
   hideFloatTrigger(true);
 
   floatTrigger = document.createElement('div');
@@ -523,6 +575,10 @@ function hideTooltip(immediate = false) {
 }
 
 function createTooltipBase() {
+  hideFloatTrigger(true);
+  document.querySelectorAll('.vm-tooltip').forEach(el => {
+    try { el.remove(); } catch (_) {}
+  });
   const el = document.createElement('div');
   el.className = 'vm-tooltip';
   el.style.visibility = 'hidden';
@@ -608,6 +664,7 @@ function smartPositionTooltip(anchorRect) {
  * Instant Shell (0ms): Renders popup card immediately with word header and AI shimmer skeleton
  */
 function showStreamingTooltip(text, isWord, anchorRect) {
+  hideFloatTrigger(true);
   hideTooltip(true);
   tooltip = createTooltipBase();
 
@@ -729,11 +786,10 @@ function formatErrorContent(msg) {
 }
 
 function showExtensionReloadedTooltip(anchorRect) {
-  if (!tooltip || isExitingTooltip) {
-    hideTooltip(true);
-    tooltip = createTooltipBase();
-    (document.body || document.documentElement).appendChild(tooltip);
-  }
+  hideFloatTrigger(true);
+  hideTooltip(true);
+  tooltip = createTooltipBase();
+  (document.body || document.documentElement).appendChild(tooltip);
 
   tooltip.innerHTML = `
     <div class="vm-card" style="padding: 14px 16px; min-width: 290px; max-width: 420px;">
@@ -767,6 +823,7 @@ function showExtensionReloadedTooltip(anchorRect) {
 }
 
 function showErrorTooltip(msg, anchorRect, retryFn = null) {
+  hideFloatTrigger(true);
   if (!tooltip || isExitingTooltip) {
     hideTooltip(true);
     tooltip = createTooltipBase();
@@ -828,6 +885,7 @@ const ICONS = {
 };
 
 function showResultTooltip(data, anchorRect) {
+  hideFloatTrigger(true);
   if (!tooltip || isExitingTooltip) {
     hideTooltip(true);
     tooltip = createTooltipBase();

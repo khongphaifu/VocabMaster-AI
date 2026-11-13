@@ -72,25 +72,25 @@ chrome.runtime.onInstalled.addListener((details) => {
     chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] }).then((tabs) => {
       for (const tab of tabs) {
         if (tab.id && tab.url && !tab.url.startsWith('chrome') && !tab.url.startsWith('edge')) {
-          // 1. Inject into main frame first to guarantee top-level availability
-          chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            files: ['content/content.js']
-          }).catch(() => {});
-          chrome.scripting.insertCSS({
-            target: { tabId: tab.id },
-            files: ['content/content.css']
-          }).catch(() => {});
-
-          // 2. Also attempt allFrames for nested iframes (e.g. e-learning, LMS)
+          // Attempt allFrames first; if blocked by subframe restrictions, fallback to main frame only
           chrome.scripting.executeScript({
             target: { tabId: tab.id, allFrames: true },
             files: ['content/content.js']
-          }).catch(() => {});
+          }).catch(() => {
+            chrome.scripting.executeScript({
+              target: { tabId: tab.id },
+              files: ['content/content.js']
+            }).catch(() => {});
+          });
           chrome.scripting.insertCSS({
             target: { tabId: tab.id, allFrames: true },
             files: ['content/content.css']
-          }).catch(() => {});
+          }).catch(() => {
+            chrome.scripting.insertCSS({
+              target: { tabId: tab.id },
+              files: ['content/content.css']
+            }).catch(() => {});
+          });
         }
       }
     }).catch(() => {});

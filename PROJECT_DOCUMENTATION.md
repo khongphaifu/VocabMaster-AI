@@ -495,7 +495,17 @@ node d:/extension/test_universal_verification.mjs
 
 ## 11. Lịch Sử Phiên Bản & Đóng Góp (Changelog)
 
-### Phiên Bản 1.0.27 (Hiện Tại)
+### Phiên Bản 1.0.28 (Hiện Tại)
+- **Triệt Tiêu Hoàn Toàn Lỗi Xung Đột & Đè Chồng Giao Diện ("Cấn" UI):**
+  - **Triệt tiêu hiện tượng nút nổi ✨ xuất hiện đè lên popup card dịch:** Bổ sung cơ chế loại trừ tương hỗ tuyệt đối (`Mutual Exclusion`). Khi có bất kỳ thẻ dịch popup nào (`.vm-tooltip`) đang hiển thị trên màn hình, nút nổi `✨` sẽ lập tức bị ẩn và tuyệt đối không bao giờ được phép sinh ra.
+  - **Chống bôi đen nội bộ (Self-Selection Filtering):** Nâng cấp hàm `getDeepActiveSelection()` kiểm tra phần tử tổ tiên (`closest('.vm-tooltip')`, `closest('.vm-float-trigger')`, `closest('.vm-modal-overlay')`). Khi người dùng bôi đen hoặc sao chép chữ bên trong popup dịch, hệ thống sẽ bỏ qua và không kích hoạt nút dịch mới.
+  - **Khử bỏ hộp thoại thông báo tải lại phiền toái:** Loại bỏ hàm `showExtensionReloadedTooltip()` khỏi luồng bôi đen chuột thụ động (`evaluateSelection`). Thông báo nâng cấp tiện ích giờ đây chỉ xuất hiện khi người dùng chủ động bấm dịch mà tiện ích đang bị mất kết nối ngữ cảnh, tránh gây phiền hà cho người dùng.
+  - **Khử triệt để Ghost Elements & Duplicate Injection:**
+    - Hàm `createTooltipBase()` chủ động dọn dẹp mọi thẻ `.vm-tooltip` cũ tồn đọng trên DOM trước khi tạo thẻ mới, cam kết tại một thời điểm chỉ tồn tại duy nhất 1 thẻ dịch.
+    - Sửa luồng tiêm script trong `service-worker.js`: Loại bỏ việc gọi `executeScript` 2 lần vào cùng top frame, thay bằng cơ chế tiêm `allFrames` với single fallback.
+    - Bổ sung `removeAllVocabMasterUI()` tự động dọn sạch mọi phần tử UI rác khi script được nạp lại hoặc giải phóng.
+
+### Phiên Bản 1.0.27
 - **Sửa Lỗi Nút Dịch ✨ Không Hiển Thị:**
   - Khắc phục xung đột CSS Cascade: Loại bỏ `all: initial !important` trong `.vm-float-trigger` gây ghi đè `top: auto !important` và `left: auto !important`, khiến nút bị đẩy xuống đáy trang web thay vì xuất hiện cạnh từ bôi đen.
   - Sử dụng `setProperty(..., 'important')` cho các thuộc tính tọa độ (`left`, `top`, `display: flex`, `visibility`, `opacity`, `z-index`), đảm bảo nút luôn hiển thị ổn định trên mọi trang web phức tạp (Google Search, mạng xã hội, LMS).
