@@ -67,17 +67,17 @@ chrome.runtime.onInstalled.addListener((details) => {
   // Configure side panel - must call inside onInstalled (not top-level)
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
 
-  // Seamless re-injection into existing tabs on install/update
+  // Seamless re-injection into existing tabs on install/update (all frames included)
   try {
     chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] }).then((tabs) => {
       for (const tab of tabs) {
         if (tab.id && tab.url && !tab.url.startsWith('chrome') && !tab.url.startsWith('edge')) {
           chrome.scripting.executeScript({
-            target: { tabId: tab.id },
+            target: { tabId: tab.id, allFrames: true },
             files: ['content/content.js']
           }).catch(() => {});
           chrome.scripting.insertCSS({
-            target: { tabId: tab.id },
+            target: { tabId: tab.id, allFrames: true },
             files: ['content/content.css']
           }).catch(() => {});
         }
@@ -85,6 +85,31 @@ chrome.runtime.onInstalled.addListener((details) => {
     }).catch(() => {});
   } catch (_) {}
 });
+
+// Automatic PDF Interception: Redirects native Chrome PDF viewer to VocabMaster PDF Reader
+if (typeof chrome !== 'undefined' && chrome.webNavigation?.onBeforeNavigate) {
+  chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
+    // Only intercept top-level navigations
+    if (details.frameId !== 0) return;
+    const url = details.url;
+    if (!url) return;
+
+    // Do not intercept extension pages or internal URLs
+    if (url.startsWith('chrome-extension://') || url.startsWith('chrome://') || url.startsWith('edge://')) return;
+
+    // Check user preference toggle (default: true)
+    try {
+      const { pdf_auto_intercept = true } = await chrome.storage.local.get('pdf_auto_intercept');
+      if (!pdf_auto_intercept) return;
+    } catch (_) {}
+
+    // Check if URL ends in .pdf or has .pdf? / .pdf#
+    if (/\.pdf($|[?#])/i.test(url)) {
+      const readerUrl = chrome.runtime.getURL(`pdf/reader.html?file=${encodeURIComponent(url)}`);
+      chrome.tabs.update(details.tabId, { url: readerUrl }).catch(() => {});
+    }
+  });
+}
 
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
@@ -200,6 +225,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       } else if (message.type === 'TEST_AI_CONNECTION') {
         const testResult = await testDirectAI(message.provider, message.apiKey);
         sendResponse(testResult);
+
+      } else if (message.type === 'FETCH_PDF_BUFFER') {
+        try {
+          const fetchRes = await fetch(message.url);
+          if (!fetchRes.ok) throw new Error(`HTTP ${fetchRes.status}: ${fetchRes.statusText}`);
+          const arrayBuffer = await fetchRes.arrayBuffer();
+          const bytes = new Uint8Array(arrayBuffer);
+          let binary = '';
+          const chunkSize = 8192;
+          for (let i = 0; i < bytes.length; i += chunkSize) {
+            const chunk = bytes.subarray(i, i + chunkSize);
+            binary += String.fromCharCode.apply(null, chunk);
+          }
+          const base64 = btoa(binary);
+          sendResponse({ success: true, base64 });
+        } catch (fetchErr) {
+          sendResponse({ success: false, error: fetchErr.message });
+        }
 
       } else {
         sendResponse({ success: false, error: 'Unknown message type' });

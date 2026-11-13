@@ -224,6 +224,26 @@ hr { border: none; border-top: 1px solid #313244; margin: 4px 0 12px; }
     <div class="msg" id="msg-sheets"></div>
   </div>
 
+  <!-- Universal Translation & PDF Environment Settings -->
+  <div class="sec">
+    <h2>🌐 Tùy chọn Môi trường Dịch & PDF</h2>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-top:10px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:#cdd6f4">
+        <input type="checkbox" id="toggle-pdf-intercept" checked style="width:18px;height:18px;accent-color:#cba6f7">
+        <span><b>Tự động mở file PDF trong Trình đọc & Dịch VocabMaster</b> (cho phép bôi đen từ/câu trên mọi file PDF online hoặc kéo thả để dịch)</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:#cdd6f4">
+        <input type="checkbox" id="toggle-anti-select" checked style="width:18px;height:18px;accent-color:#cba6f7">
+        <span><b>Mở khóa bôi đen văn bản trên các trang web chống copy / LMS / E-learning</b> (như Youpass, đề thi trực tuyến)</span>
+      </label>
+    </div>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn btn-save" id="btn-save-env" style="margin-top:0">💾 Lưu tùy chọn</button>
+      <a href="../pdf/reader.html" target="_blank" class="btn btn-exp" style="text-decoration:none">📑 Mở Trình đọc PDF ngay</a>
+    </div>
+    <div class="msg" id="msg-env"></div>
+  </div>
+
   <!-- Data Management Section -->
   <div class="sec">
     <h2>📦 Quản lý dữ liệu từ vựng</h2>

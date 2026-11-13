@@ -170,15 +170,47 @@ async function loadPdfFromUrl(url) {
   try {
     const parts = url.split('/');
     currentFileName = decodeURIComponent(parts[parts.length - 1].split('?')[0]) || 'TaiLieu.pdf';
-    const loadingTask = pdfjsLib.getDocument({
-      url,
-      cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
-      cMapPacked: true
-    });
-    pdfDoc = await loadingTask.promise;
-    await onPdfLoaded();
+
+    // First attempt: direct fetch via PDF.js
+    let directSuccess = false;
+    try {
+      const loadingTask = pdfjsLib.getDocument({
+        url,
+        cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
+        cMapPacked: true
+      });
+      pdfDoc = await loadingTask.promise;
+      directSuccess = true;
+      await onPdfLoaded();
+      return;
+    } catch (directErr) {
+      console.warn('Direct PDF load failed (likely CORS). Attempting background proxy fetch...', directErr);
+    }
+
+    // Second attempt: background proxy fetch via service-worker (bypasses CORS restrictions)
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      showLoading('Đang tải tài liệu qua kênh nền bảo mật...');
+      const response = await chrome.runtime.sendMessage({
+        type: 'FETCH_PDF_BUFFER',
+        url
+      });
+      if (response && response.success && response.base64) {
+        const binaryStr = atob(response.base64);
+        const len = binaryStr.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryStr.charCodeAt(i);
+        }
+        await loadPdfData(bytes);
+        return;
+      } else {
+        throw new Error(response?.error || 'Không nhận được dữ liệu PDF từ background worker');
+      }
+    } else {
+      throw new Error('Môi trường không hỗ trợ chrome.runtime');
+    }
   } catch (err) {
-    alert(`Không thể tải PDF từ link (có thể do chặn CORS). Bạn hãy tải file về máy và mở bằng nút "Mở file PDF": ${err.message}`);
+    alert(`Không thể tải PDF từ link: ${err.message}. Bạn có thể tải file PDF về máy và mở bằng nút "Mở file PDF".`);
     hideLoading();
   }
 }

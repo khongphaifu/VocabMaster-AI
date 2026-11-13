@@ -17,6 +17,30 @@ async function init() {
   await loadStats();
   await restoreSheets();
 
+  // Restore environment & PDF settings
+  const { pdf_auto_intercept = true, anti_select_enabled = true } =
+    await chrome.storage.local.get(['pdf_auto_intercept', 'anti_select_enabled']);
+  const pdfToggle = document.getElementById('toggle-pdf-intercept');
+  const antiSelectToggle = document.getElementById('toggle-anti-select');
+  if (pdfToggle) pdfToggle.checked = pdf_auto_intercept !== false;
+  if (antiSelectToggle) antiSelectToggle.checked = anti_select_enabled !== false;
+
+  document.getElementById('btn-save-env')?.addEventListener('click', async () => {
+    const pdfVal = document.getElementById('toggle-pdf-intercept')?.checked ?? true;
+    const antiVal = document.getElementById('toggle-anti-select')?.checked ?? true;
+    await chrome.storage.local.set({
+      pdf_auto_intercept: pdfVal,
+      anti_select_enabled: antiVal
+    });
+    const msg = document.getElementById('msg-env');
+    if (msg) {
+      msg.textContent = '✅ Đã lưu tùy chọn môi trường!';
+      msg.className = 'msg msg-ok';
+      msg.style.display = 'block';
+      setTimeout(() => { msg.style.display = 'none'; }, 3000);
+    }
+  });
+
   // Provider card selection
   document.querySelectorAll('.provider-card').forEach(card => {
     card.addEventListener('click', () => selectProvider(card.dataset.p));

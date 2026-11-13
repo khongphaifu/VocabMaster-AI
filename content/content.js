@@ -26,6 +26,32 @@ let currentAnchorRect = null;
 let currentContextSentence = '';
 let isProcessing = false;
 
+// Anti-select and Anti-copy bypass for protected websites (e.g., e-learning platforms, LMS)
+async function enableUniversalSelection() {
+  try {
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      const { anti_select_enabled = true } = await chrome.storage.local.get('anti_select_enabled').catch(() => ({ anti_select_enabled: true }));
+      if (anti_select_enabled === false) return;
+    }
+    const styleId = 'vm-universal-select-style';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = `
+        /* VocabMaster Universal Selection Unlocker */
+        html, body, p, span, div, td, th, li, a, h1, h2, h3, h4, h5, h6, article, section, main, b, i, strong, em {
+          -webkit-user-select: text !important;
+          -moz-user-select: text !important;
+          -ms-user-select: text !important;
+          user-select: text !important;
+        }
+      `;
+      (document.head || document.documentElement).appendChild(style);
+    }
+  } catch (_) {}
+}
+enableUniversalSelection();
+
 function getSurroundingSentence(selection) {
   if (!selection || selection.rangeCount === 0) return '';
   try {
@@ -57,75 +83,191 @@ function getSurroundingSentence(selection) {
   }
 }
 
-function handleMouseUp(e) {
+/**
+ * Universal Selection Engine:
+ * Traverses standard DOM selection, Shadow DOM (Web Components), and form controls (<input>, <textarea>).
+ */
+function getDeepActiveSelection() {
+  let selectedText = '';
+  let selObj = null;
+  let anchorRect = null;
+  let contextSentence = '';
+
+  // 1. Standard window selection
+  try {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && sel.toString().trim()) {
+      selectedText = sel.toString().trim();
+      selObj = sel;
+      const range = sel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      if (rect && (rect.width > 0 || rect.height > 0)) {
+        anchorRect = {
+          left: rect.left,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height
+        };
+      }
+      contextSentence = getSurroundingSentence(sel);
+    }
+  } catch (_) {}
+
+  // 2. Shadow DOM traversal if not found or activeElement is inside shadow
+  if (!selectedText) {
+    try {
+      let active = document.activeElement;
+      while (active && active.shadowRoot) {
+        if (typeof active.shadowRoot.getSelection === 'function') {
+          const sSel = active.shadowRoot.getSelection();
+          if (sSel && sSel.rangeCount > 0 && sSel.toString().trim()) {
+            selectedText = sSel.toString().trim();
+            selObj = sSel;
+            const sRange = sSel.getRangeAt(0);
+            const sRect = sRange.getBoundingClientRect();
+            if (sRect && (sRect.width > 0 || sRect.height > 0)) {
+              anchorRect = {
+                left: sRect.left,
+                top: sRect.top,
+                right: sRect.right,
+                bottom: sRect.bottom,
+                width: sRect.width,
+                height: sRect.height
+              };
+            }
+            contextSentence = getSurroundingSentence(sSel);
+            break;
+          }
+        }
+        active = active.shadowRoot.activeElement;
+      }
+    } catch (_) {}
+  }
+
+  // 3. Form controls (<input>, <textarea>)
+  if (!selectedText) {
+    try {
+      const active = document.activeElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+        const start = active.selectionStart;
+        const end = active.selectionEnd;
+        if (typeof start === 'number' && typeof end === 'number' && start < end) {
+          selectedText = active.value.substring(start, end).trim();
+          if (selectedText) {
+            const rect = active.getBoundingClientRect();
+            anchorRect = {
+              left: rect.left,
+              top: rect.top,
+              right: rect.right,
+              bottom: rect.bottom,
+              width: rect.width,
+              height: rect.height
+            };
+            contextSentence = active.value.slice(0, 300);
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  return { selectedText, selObj, anchorRect, contextSentence };
+}
+
+function evaluateSelection(source, e) {
   if (!isExtensionValid()) {
-    document.removeEventListener('mouseup', handleMouseUp);
     hideFloatTrigger();
     hideTooltip();
     return;
   }
 
-  // Ignore clicks inside our own tooltip or floating button
-  if (tooltip && tooltip.contains(e.target)) return;
-  if (floatTrigger && floatTrigger.contains(e.target)) return;
+  // Ignore events originating inside our own UI
+  if (e && e.target) {
+    if (tooltip && tooltip.contains(e.target)) return;
+    if (floatTrigger && floatTrigger.contains(e.target)) return;
+    if (activeLibraryModal && activeLibraryModal.contains(e.target)) return;
+  }
 
-  setTimeout(() => {
-    const selection = window.getSelection();
-    const selectedText = selection ? selection.toString().trim() : '';
+  const { selectedText, anchorRect, contextSentence } = getDeepActiveSelection();
 
-    if (!selectedText || selectedText.length < 1 || selectedText.length > 2500) {
-      hideFloatTrigger();
-      return;
+  if (!selectedText || selectedText.length < 1 || selectedText.length > 2500) {
+    hideFloatTrigger();
+    return;
+  }
+
+  currentSelectionText = selectedText;
+  currentContextSentence = contextSentence;
+
+  let triggerX = 0;
+  let triggerY = 0;
+  const scrollX = window.scrollX || window.pageXOffset || 0;
+  const scrollY = window.scrollY || window.pageYOffset || 0;
+
+  if (anchorRect && (anchorRect.width > 0 || anchorRect.height > 0)) {
+    currentAnchorRect = anchorRect;
+    triggerX = scrollX + anchorRect.right + 4;
+    triggerY = scrollY + anchorRect.top - 36;
+    if (triggerY < scrollY + 5) {
+      triggerY = scrollY + anchorRect.bottom + 6;
     }
+  } else if (e && typeof e.pageX === 'number' && typeof e.pageY === 'number') {
+    triggerX = e.pageX + 6;
+    triggerY = e.pageY - 34;
+    currentAnchorRect = {
+      left: e.clientX,
+      top: Math.max(0, e.clientY - 20),
+      right: e.clientX,
+      bottom: e.clientY,
+      width: 0,
+      height: 20
+    };
+  } else {
+    triggerX = scrollX + ((window.innerWidth || 300) / 2);
+    triggerY = scrollY + 40;
+    currentAnchorRect = {
+      left: (window.innerWidth || 300) / 2,
+      top: 40,
+      right: (window.innerWidth || 300) / 2,
+      bottom: 60,
+      width: 0,
+      height: 20
+    };
+  }
 
-    currentSelectionText = selectedText;
-    currentContextSentence = getSurroundingSentence(selection);
-    hideTooltip();
+  // Viewport & iframe boundaries clamping (ensures button never overflows outside frame)
+  const minX = scrollX + 4;
+  const maxX = scrollX + (window.innerWidth || 300) - 44;
+  triggerX = Math.max(minX, Math.min(triggerX, maxX));
 
-    let triggerX = e.pageX + 6;
-    let triggerY = e.pageY - 34;
+  const minY = scrollY + 4;
+  const maxY = scrollY + (window.innerHeight || 400) - 44;
+  triggerY = Math.max(minY, Math.min(triggerY, maxY));
 
-    try {
-      if (selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-        if (rect && (rect.width > 0 || rect.height > 0)) {
-          currentAnchorRect = {
-            left: rect.left,
-            top: rect.top,
-            right: rect.right,
-            bottom: rect.bottom,
-            width: rect.width,
-            height: rect.height,
-          };
-          triggerX = window.scrollX + rect.right + 4;
-          triggerY = window.scrollY + rect.top - 36;
-          if (triggerY < window.scrollY + 5) {
-            triggerY = window.scrollY + rect.bottom + 6;
-          }
-          if (triggerX > window.scrollX + window.innerWidth - 44) {
-            triggerX = window.scrollX + window.innerWidth - 44;
-          }
-        }
-      }
-    } catch (_) {}
-
-    if (!currentAnchorRect) {
-      currentAnchorRect = {
-        left: e.clientX,
-        top: Math.max(0, e.clientY - 20),
-        right: e.clientX,
-        bottom: e.clientY,
-        width: 0,
-        height: 20
-      };
-    }
-
-    showFloatTrigger(triggerX, triggerY, selectedText);
-  }, 20);
+  showFloatTrigger(triggerX, triggerY, selectedText);
 }
 
-document.addEventListener('mouseup', handleMouseUp);
+let selectionChangeDebounceTimer = null;
+
+function handleMouseUp(e) {
+  setTimeout(() => evaluateSelection('mouseup', e), 20);
+}
+
+function handleKeyUp(e) {
+  if (['Shift', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+    setTimeout(() => evaluateSelection('keyup', e), 50);
+  }
+}
+
+function handleSelectionChange() {
+  clearTimeout(selectionChangeDebounceTimer);
+  selectionChangeDebounceTimer = setTimeout(() => {
+    if (document.activeElement && (document.activeElement.closest?.('.vm-tooltip') || document.activeElement.closest?.('.vm-library-overlay'))) {
+      return;
+    }
+    evaluateSelection('selectionchange', null);
+  }, 350);
+}
 
 function handleMouseDown(e) {
   if (tooltip && !tooltip.contains(e.target)) {
@@ -136,13 +278,21 @@ function handleMouseDown(e) {
   }
 }
 
-document.addEventListener('mousedown', handleMouseDown);
+// Attach event listeners using CAPTURE phase (useCapture: true) to bypass e.stopPropagation()
+document.addEventListener('mouseup', handleMouseUp, true);
+document.addEventListener('keyup', handleKeyUp, true);
+document.addEventListener('touchend', handleMouseUp, true);
+document.addEventListener('selectionchange', handleSelectionChange, false);
+document.addEventListener('mousedown', handleMouseDown, true);
 
 window.__VOCAB_MASTER_CLEANUP__ = () => {
-  document.removeEventListener('mouseup', handleMouseUp);
-  document.removeEventListener('mousedown', handleMouseDown);
-  hideFloatTrigger();
-  hideTooltip();
+  document.removeEventListener('mouseup', handleMouseUp, true);
+  document.removeEventListener('keyup', handleKeyUp, true);
+  document.removeEventListener('touchend', handleMouseUp, true);
+  document.removeEventListener('selectionchange', handleSelectionChange, false);
+  document.removeEventListener('mousedown', handleMouseDown, true);
+  hideFloatTrigger(true);
+  hideTooltip(true);
 };
 
 // Close on Escape key
@@ -155,7 +305,7 @@ document.addEventListener('keydown', (e) => {
     hideTooltip();
     hideFloatTrigger();
   }
-});
+}, true);
 
 let isExitingTrigger = false;
 let exitTriggerTimer = null;
@@ -188,7 +338,7 @@ function showFloatTrigger(x, y, text) {
     await doTranslate(text, anchor, currentContextSentence);
   });
 
-  document.body.appendChild(floatTrigger);
+  (document.body || document.documentElement).appendChild(floatTrigger);
 }
 
 function hideFloatTrigger(immediate = false) {
@@ -463,7 +613,7 @@ function showStreamingTooltip(text, isWord, anchorRect) {
     </div>
   `;
 
-  document.body.appendChild(tooltip);
+  (document.body || document.documentElement).appendChild(tooltip);
   smartPositionTooltip(anchorRect);
 
   // Hook close button
@@ -540,7 +690,7 @@ function showExtensionReloadedTooltip(anchorRect) {
   if (!tooltip || isExitingTooltip) {
     hideTooltip(true);
     tooltip = createTooltipBase();
-    document.body.appendChild(tooltip);
+    (document.body || document.documentElement).appendChild(tooltip);
   }
 
   tooltip.innerHTML = `
@@ -578,7 +728,7 @@ function showErrorTooltip(msg, anchorRect, retryFn = null) {
   if (!tooltip || isExitingTooltip) {
     hideTooltip(true);
     tooltip = createTooltipBase();
-    document.body.appendChild(tooltip);
+    (document.body || document.documentElement).appendChild(tooltip);
   }
 
   const isGeminiIssue = msg && (msg.includes('Generative Language API') || msg.includes('Google Cloud Project') || msg.includes('API restrictions') || msg.includes('API Key'));
@@ -639,7 +789,7 @@ function showResultTooltip(data, anchorRect) {
   if (!tooltip || isExitingTooltip) {
     hideTooltip(true);
     tooltip = createTooltipBase();
-    document.body.appendChild(tooltip);
+    (document.body || document.documentElement).appendChild(tooltip);
   }
 
   let isWord = data.type === 'word' || (data.word && typeof data.word === 'object');
@@ -1258,7 +1408,7 @@ async function openLibraryModal() {
     </div>
   `;
 
-  document.body.appendChild(overlay);
+  (document.body || document.documentElement).appendChild(overlay);
 
   // Close handlers
   overlay.querySelector('#vm-modal-close')?.addEventListener('click', closeLibraryModal);
