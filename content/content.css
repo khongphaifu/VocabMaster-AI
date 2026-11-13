@@ -936,7 +936,10 @@
 
 /* Floating Trigger Button */
 .vm-float-trigger {
-  all: initial !important;
+  all: initial;
+  margin: 0 !important;
+  padding: 0 !important;
+  outline: none !important;
   position: absolute !important;
   z-index: 2147483647 !important;
   width: 32px !important;

@@ -100,7 +100,13 @@ function getDeepActiveSelection() {
       selectedText = sel.toString().trim();
       selObj = sel;
       const range = sel.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
+      let rect = range.getBoundingClientRect();
+      if (!rect || (rect.width === 0 && rect.height === 0)) {
+        const rects = range.getClientRects();
+        if (rects && rects.length > 0) {
+          rect = rects[0];
+        }
+      }
       if (rect && (rect.width > 0 || rect.height > 0)) {
         anchorRect = {
           left: rect.left,
@@ -126,7 +132,13 @@ function getDeepActiveSelection() {
             selectedText = sSel.toString().trim();
             selObj = sSel;
             const sRange = sSel.getRangeAt(0);
-            const sRect = sRange.getBoundingClientRect();
+            let sRect = sRange.getBoundingClientRect();
+            if (!sRect || (sRect.width === 0 && sRect.height === 0)) {
+              const sRects = sRange.getClientRects();
+              if (sRects && sRects.length > 0) {
+                sRect = sRects[0];
+              }
+            }
             if (sRect && (sRect.width > 0 || sRect.height > 0)) {
               anchorRect = {
                 left: sRect.left,
@@ -176,12 +188,6 @@ function getDeepActiveSelection() {
 }
 
 function evaluateSelection(source, e) {
-  if (!isExtensionValid()) {
-    hideFloatTrigger();
-    hideTooltip();
-    return;
-  }
-
   // Ignore events originating inside our own UI
   if (e && e.target) {
     if (tooltip && tooltip.contains(e.target)) return;
@@ -193,6 +199,17 @@ function evaluateSelection(source, e) {
 
   if (!selectedText || selectedText.length < 1 || selectedText.length > 2500) {
     hideFloatTrigger();
+    return;
+  }
+
+  if (!isExtensionValid()) {
+    hideFloatTrigger();
+    showExtensionReloadedTooltip(anchorRect);
+    return;
+  }
+
+  // Prevent flicker if button is already shown for the exact same text
+  if (floatTrigger && currentSelectionText === selectedText && source === 'selectionchange') {
     return;
   }
 
@@ -236,12 +253,14 @@ function evaluateSelection(source, e) {
   }
 
   // Viewport & iframe boundaries clamping (ensures button never overflows outside frame)
+  const viewW = window.innerWidth || 300;
+  const viewH = window.innerHeight || 400;
   const minX = scrollX + 4;
-  const maxX = scrollX + (window.innerWidth || 300) - 44;
+  const maxX = scrollX + Math.max(minX + 10, viewW - 40);
   triggerX = Math.max(minX, Math.min(triggerX, maxX));
 
   const minY = scrollY + 4;
-  const maxY = scrollY + (window.innerHeight || 400) - 44;
+  const maxY = scrollY + Math.max(minY + 10, viewH - 40);
   triggerY = Math.max(minY, Math.min(triggerY, maxY));
 
   showFloatTrigger(triggerX, triggerY, selectedText);
@@ -329,10 +348,19 @@ function showFloatTrigger(x, y, text) {
 
   floatTrigger = document.createElement('div');
   floatTrigger.className = 'vm-float-trigger';
-  floatTrigger.style.left = `${x}px`;
-  floatTrigger.style.top = `${y}px`;
+  floatTrigger.style.setProperty('left', `${Math.round(x)}px`, 'important');
+  floatTrigger.style.setProperty('top', `${Math.round(y)}px`, 'important');
+  floatTrigger.style.setProperty('display', 'flex', 'important');
+  floatTrigger.style.setProperty('visibility', 'visible', 'important');
+  floatTrigger.style.setProperty('opacity', '1', 'important');
+  floatTrigger.style.setProperty('pointer-events', 'auto', 'important');
+  floatTrigger.style.setProperty('z-index', '2147483647', 'important');
   floatTrigger.innerHTML = '✨';
   floatTrigger.title = 'Dịch bằng AI (VocabMaster)';
+
+  floatTrigger.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+  }, true);
 
   floatTrigger.addEventListener('click', async (e) => {
     e.stopPropagation();

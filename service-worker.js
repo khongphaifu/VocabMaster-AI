@@ -67,11 +67,22 @@ chrome.runtime.onInstalled.addListener((details) => {
   // Configure side panel - must call inside onInstalled (not top-level)
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
 
-  // Seamless re-injection into existing tabs on install/update (all frames included)
+  // Seamless re-injection into existing tabs on install/update
   try {
     chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] }).then((tabs) => {
       for (const tab of tabs) {
         if (tab.id && tab.url && !tab.url.startsWith('chrome') && !tab.url.startsWith('edge')) {
+          // 1. Inject into main frame first to guarantee top-level availability
+          chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content/content.js']
+          }).catch(() => {});
+          chrome.scripting.insertCSS({
+            target: { tabId: tab.id },
+            files: ['content/content.css']
+          }).catch(() => {});
+
+          // 2. Also attempt allFrames for nested iframes (e.g. e-learning, LMS)
           chrome.scripting.executeScript({
             target: { tabId: tab.id, allFrames: true },
             files: ['content/content.js']

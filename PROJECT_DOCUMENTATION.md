@@ -1,6 +1,6 @@
 # 📖 VocabMaster AI — Tài Liệu Kỹ Thuật & Toàn Bộ Kiến Trúc Dự Án (Project Documentation A–Z)
 
-> **Phiên bản:** 1.0.26  
+> **Phiên bản:** 1.0.27  
 > **Cập nhật gần nhất:** Tháng 11/2026  
 > **Nền tảng hỗ trợ:** Google Chrome Extension (Manifest V3), Windows Desktop (Electron), iPad (Progressive Web App - PWA)  
 > **Tác giả:** Đội ngũ Kỹ sư Dự án VocabMaster AI
@@ -495,7 +495,16 @@ node d:/extension/test_universal_verification.mjs
 
 ## 11. Lịch Sử Phiên Bản & Đóng Góp (Changelog)
 
-### Phiên Bản 1.0.26 (Hiện Tại)
+### Phiên Bản 1.0.27 (Hiện Tại)
+- **Sửa Lỗi Nút Dịch ✨ Không Hiển Thị:**
+  - Khắc phục xung đột CSS Cascade: Loại bỏ `all: initial !important` trong `.vm-float-trigger` gây ghi đè `top: auto !important` và `left: auto !important`, khiến nút bị đẩy xuống đáy trang web thay vì xuất hiện cạnh từ bôi đen.
+  - Sử dụng `setProperty(..., 'important')` cho các thuộc tính tọa độ (`left`, `top`, `display: flex`, `visibility`, `opacity`, `z-index`), đảm bảo nút luôn hiển thị ổn định trên mọi trang web phức tạp (Google Search, mạng xã hội, LMS).
+  - Bổ sung cơ chế Fallback `range.getClientRects()` khi `range.getBoundingClientRect()` trả về hình chữ nhật kích thước 0 trên các liên kết `<a>` hoặc phần tử lồng nhau.
+  - Tối ưu hóa chu kỳ sự kiện: Ngăn chặn xóa và tái tạo lại nút khi `selectionchange` kích hoạt nếu từ bôi đen không thay đổi.
+  - Nâng cấp tái nạp Service Worker: Tự động tiêm script vào khung chính (`mainFrame`) trước khi tiêm `allFrames`, đảm bảo các tab đang mở ngay lập tức nhận diện tiện ích khi cập nhật.
+  - Thêm thông báo trực quan khi ngữ cảnh tiện ích bị ngắt kết nối (Extension context invalidated) thay vì im lặng không hiển thị.
+
+### Phiên Bản 1.0.26
 - **Tăng Tốc Đột Phá 10x - 25x:** Giảm thời gian phản hồi trung bình từ ~2,500ms xuống chỉ còn **~101ms** (từ đơn có sẵn: 0ms, tra cứu mới: 130ms - 250ms).
 - **Kiến Trúc 5 Trụ Cột Tối Ưu Tốc Độ:**
   1. *Cooperative Parallel Resolver:* Gọi đồng thời Cambridge + Google Dict + Datamuse; chuyển Wiktionary thành last-resort fallback.
