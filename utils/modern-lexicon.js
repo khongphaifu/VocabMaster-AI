@@ -765,6 +765,404 @@ export const MODERN_LEXICON = {
     ],
     synonyms: ['talk', 'speech', 'lecture', 'demonstration'],
     antonyms: []
+  },
+  accommodation: {
+    word_root: 'accommodation',
+    ipa_uk: '/əˌkɒm.əˈdeɪ.ʃən/',
+    ipa_us: '/əˌkɑː.məˈdeɪ.ʃən/',
+    partOfSpeech: 'noun [U]',
+    level: 'B1',
+    meaning_vi: 'chỗ ở, nơi lưu trú',
+    definition_vi: 'nơi để ở hoặc nghỉ ngơi tạm thời như khách sạn, phòng trọ, nhà ở',
+    definition_en: 'a place to live, work, or stay in',
+    examples: [
+      'The university provides student accommodation on campus.',
+      'Hotel accommodation is included in the tour package.'
+    ],
+    word_family: [
+      { pos: 'verb', word: 'accommodate', meaning_vi: 'cung cấp chỗ ở, đáp ứng' }
+    ],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'temporary accommodation', meaning_vi: 'chỗ ở tạm thời' },
+      { phrase: 'book accommodation', meaning_vi: 'đặt phòng, đặt chỗ ở' }
+    ],
+    synonyms: ['housing', 'lodging', 'living quarters'],
+    antonyms: []
+  },
+  admission: {
+    word_root: 'admission',
+    ipa_uk: '/ədˈmɪʃ.ən/',
+    ipa_us: '/ædˈmɪʃ.ən/',
+    partOfSpeech: 'noun [C/U]',
+    level: 'B1',
+    meaning_vi: 'sự nhận vào (học/viện); vé vào cửa; sự thừa nhận',
+    definition_vi: 'sự cho phép một người vào trường học, bệnh viện hoặc sự kiện',
+    definition_en: 'permission to enter a place, or the fee paid to enter; or accepting that something is true',
+    examples: [
+      'Admission to the museum is free on Sundays.',
+      'She applied for university admission last month.'
+    ],
+    word_family: [
+      { pos: 'verb', word: 'admit', meaning_vi: 'thừa nhận; cho phép vào' }
+    ],
+    other_meanings: [
+      { pos: 'noun', meaning_vi: 'lời thú nhận, sự thừa nhận', definition_en: 'an admission of guilt' }
+    ],
+    collocations: [
+      { phrase: 'admission fee', meaning_vi: 'giá vé vào cửa' },
+      { phrase: 'gain admission', meaning_vi: 'được trúng tuyển, được nhận vào' }
+    ],
+    synonyms: ['entry', 'admittance', 'access'],
+    antonyms: []
+  },
+  appliance: {
+    word_root: 'appliance',
+    ipa_uk: '/əˈplaɪ.əns/',
+    ipa_us: '/əˈplaɪ.əns/',
+    partOfSpeech: 'noun [C]',
+    level: 'B2',
+    meaning_vi: 'thiết bị, đồ gia dụng',
+    definition_vi: 'thiết bị điện máy được dùng trong gia đình (như tủ lạnh, máy giặt, lò vi sóng)',
+    definition_en: 'a device, machine, or piece of equipment, especially an electrical one used in the home',
+    examples: [
+      'Modern household appliances make daily chores much easier.',
+      'Always unplug the appliance before cleaning it.'
+    ],
+    word_family: [
+      { pos: 'verb', word: 'apply', meaning_vi: 'áp dụng; nộp đơn' }
+    ],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'household appliance', meaning_vi: 'đồ gia dụng trong nhà' },
+      { phrase: 'kitchen appliance', meaning_vi: 'thiết bị nhà bếp' }
+    ],
+    synonyms: ['device', 'machine', 'gadget', 'equipment'],
+    antonyms: []
+  },
+  commute: {
+    word_root: 'commute',
+    ipa_uk: '/kəˈmjuːt/',
+    ipa_us: '/kəˈmjuːt/',
+    partOfSpeech: 'verb / noun [C]',
+    level: 'B1',
+    meaning_vi: 'đi lại làm việc; quãng đường đi làm',
+    definition_vi: 'quá trình di chuyển thường xuyên giữa nhà và nơi làm việc',
+    definition_en: 'to make the same trip regularly between work and home',
+    examples: [
+      'She commutes from the suburbs to the city center by train every day.',
+      'My daily commute takes about forty-five minutes.'
+    ],
+    word_family: [
+      { pos: 'noun', word: 'commuter', meaning_vi: 'người đi làm bằng phương tiện công cộng' }
+    ],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'daily commute', meaning_vi: 'quãng đường đi làm hằng ngày' },
+      { phrase: 'morning commute', meaning_vi: 'chuyến đi làm buổi sáng' }
+    ],
+    synonyms: ['travel', 'journey', 'trip'],
+    antonyms: []
+  },
+  complimentary: {
+    word_root: 'complimentary',
+    ipa_uk: '/ˌkɒm.plɪˈmen.tər.i/',
+    ipa_us: '/ˌkɑːm.pləˈmen.t̬ɚ.i/',
+    partOfSpeech: 'adjective',
+    level: 'B2',
+    meaning_vi: 'miễn phí, tặng kèm; khen ngợi',
+    definition_vi: 'được cung cấp miễn phí nhằm mục đích tri ân khách hàng hoặc mang tính khen ngợi',
+    definition_en: 'given free of charge, or expressing praise',
+    examples: [
+      'Guests enjoy complimentary breakfast and high-speed Wi-Fi.',
+      'The hotel offered a complimentary bottle of wine upon arrival.'
+    ],
+    word_family: [
+      { pos: 'noun', word: 'compliment', meaning_vi: 'lời khen ngợi' }
+    ],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'complimentary breakfast', meaning_vi: 'bữa sáng miễn phí' },
+      { phrase: 'complimentary ticket', meaning_vi: 'vé mời, vé miễn phí' }
+    ],
+    synonyms: ['free', 'courtesy', 'gratis'],
+    antonyms: ['paid', 'chargeable']
+  },
+  itinerary: {
+    word_root: 'itinerary',
+    ipa_uk: '/aɪˈtɪn.ər.ər.i/',
+    ipa_us: '/aɪˈtɪn.ə.rer.i/',
+    partOfSpeech: 'noun [C]',
+    level: 'B2',
+    meaning_vi: 'lịch trình chuyến đi, hành trình',
+    definition_vi: 'bản kế hoạch chi tiết về tuyến đường và các điểm dừng trong chuyến đi',
+    definition_en: 'a detailed plan or route of a journey',
+    examples: [
+      'We must finalize our travel itinerary before booking the flights.',
+      'The tour itinerary includes visits to ancient temples and museums.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'travel itinerary', meaning_vi: 'lịch trình du lịch' },
+      { phrase: 'flight itinerary', meaning_vi: 'hành trình chuyến bay' }
+    ],
+    synonyms: ['schedule', 'route', 'tour plan'],
+    antonyms: []
+  },
+  inventory: {
+    word_root: 'inventory',
+    ipa_uk: '/ˈɪn.vən.tər.i/',
+    ipa_us: '/ˈɪn.vən.tɔːr.i/',
+    partOfSpeech: 'noun [C/U]',
+    level: 'B2',
+    meaning_vi: 'hàng tồn kho; danh mục kiểm kê',
+    definition_vi: 'toàn bộ số hàng hóa hiện có trong kho hoặc bảng kiểm kê chi tiết',
+    definition_en: 'a detailed list of all the things in a place, or the amount of goods in stock',
+    examples: [
+      'The warehouse conducts an inventory check at the end of each month.',
+      'We need to reduce our inventory to cut storage costs.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'inventory control', meaning_vi: 'kiểm soát hàng tồn kho' },
+      { phrase: 'take inventory', meaning_vi: 'kiểm kê hàng hóa' }
+    ],
+    synonyms: ['stock', 'goods', 'supplies', 'catalogue'],
+    antonyms: []
+  },
+  perspective: {
+    word_root: 'perspective',
+    ipa_uk: '/pəˈspek.tɪv/',
+    ipa_us: '/pɚˈspek.tɪv/',
+    partOfSpeech: 'noun [C/U]',
+    level: 'B2',
+    meaning_vi: 'góc nhìn, quan điểm; tầm nhìn',
+    definition_vi: 'cách suy nghĩ hoặc nhận định về một sự việc dựa trên trải nghiệm cá nhân',
+    definition_en: 'a particular way of considering something; an attitude or point of view',
+    examples: [
+      'Traveling abroad gives you a completely fresh perspective on life.',
+      'From a financial perspective, the merger makes complete sense.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'from my perspective', meaning_vi: 'theo góc nhìn của tôi' },
+      { phrase: 'gain perspective', meaning_vi: 'có cái nhìn khách quan, thấu đáo hơn' }
+    ],
+    synonyms: ['viewpoint', 'outlook', 'point of view', 'standpoint'],
+    antonyms: []
+  },
+  phenomenon: {
+    word_root: 'phenomenon',
+    ipa_uk: '/fəˈnɒm.ɪ.nən/',
+    ipa_us: '/fəˈnɑː.mə.nɑːn/',
+    partOfSpeech: 'noun [C]',
+    level: 'B2',
+    meaning_vi: 'hiện tượng',
+    definition_vi: 'sự việc hoặc hiện tượng tự nhiên/xã hội xảy ra và quan sát được',
+    definition_en: 'something that exists and can be seen, felt, or experienced, especially something unusual',
+    examples: [
+      'Global warming is a complex phenomenon with worldwide consequences.',
+      'Social media influencers have become a global phenomenon.'
+    ],
+    word_family: [
+      { pos: 'adj', word: 'phenomenal', meaning_vi: 'phi thường, kỳ diệu' }
+    ],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'natural phenomenon', meaning_vi: 'hiện tượng tự nhiên' },
+      { phrase: 'cultural phenomenon', meaning_vi: 'hiện tượng văn hóa' }
+    ],
+    synonyms: ['occurrence', 'event', 'marvel', 'wonder'],
+    antonyms: []
+  },
+  preliminary: {
+    word_root: 'preliminary',
+    ipa_uk: '/prɪˈlɪm.ɪ.nər.i/',
+    ipa_us: '/prɪˈlɪm.ə.ner.i/',
+    partOfSpeech: 'adjective',
+    level: 'B2',
+    meaning_vi: 'sơ bộ, ban đầu',
+    definition_vi: 'được tiến hành trước để chuẩn bị cho giai đoạn chính thức',
+    definition_en: 'coming before a more important action or event, especially introducing or preparing for it',
+    examples: [
+      'Preliminary results show significant improvement in air quality.',
+      'The company held preliminary discussions regarding the acquisition.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'preliminary findings', meaning_vi: 'những phát hiện sơ bộ' },
+      { phrase: 'preliminary round', meaning_vi: 'vòng sơ loại' }
+    ],
+    synonyms: ['initial', 'preparatory', 'introductory'],
+    antonyms: ['final', 'conclusive']
+  },
+  remedy: {
+    word_root: 'remedy',
+    ipa_uk: '/ˈrem.ə.di/',
+    ipa_us: '/ˈrem.ə.di/',
+    partOfSpeech: 'noun [C] / verb',
+    level: 'B2',
+    meaning_vi: 'biện pháp khắc phục; phương thuốc',
+    definition_vi: 'cách giải quyết một vấn đề khó khăn hoặc phương pháp chữa bệnh',
+    definition_en: 'a successful way of curing an illness or dealing with a problem or difficulty',
+    examples: [
+      'A warm cup of herbal tea is an effective home remedy for colds.',
+      'Management is taking swift steps to remedy the situation.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'home remedy', meaning_vi: 'bài thuốc dân gian' },
+      { phrase: 'legal remedy', meaning_vi: 'biện pháp khắc phục theo luật' }
+    ],
+    synonyms: ['solution', 'cure', 'treatment', 'fix'],
+    antonyms: []
+  },
+  tenant: {
+    word_root: 'tenant',
+    ipa_uk: '/ˈten.ənt/',
+    ipa_us: '/ˈten.ənt/',
+    partOfSpeech: 'noun [C]',
+    level: 'B2',
+    meaning_vi: 'người thuê nhà, người thuê mặt bằng',
+    definition_vi: 'người trả tiền định kỳ để thuê căn hộ, phòng trọ hoặc mặt bằng kinh doanh',
+    definition_en: 'a person who pays rent for the use of land, a building, or an apartment',
+    examples: [
+      'The landlord signed a one-year lease contract with the new tenant.',
+      'Commercial tenants were granted a rent discount during renovations.'
+    ],
+    word_family: [
+      { pos: 'noun', word: 'tenancy', meaning_vi: 'thời hạn thuê, sự thuê nhà' }
+    ],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'prospective tenant', meaning_vi: 'khách thuê tiềm năng' },
+      { phrase: 'evict a tenant', meaning_vi: 'buộc người thuê nhà dọn đi' }
+    ],
+    synonyms: ['renter', 'occupant', 'leaseholder'],
+    antonyms: ['landlord', 'owner']
+  },
+  tariff: {
+    word_root: 'tariff',
+    ipa_uk: '/ˈtær.ɪf/',
+    ipa_us: '/ˈter.ɪf/',
+    partOfSpeech: 'noun [C]',
+    level: 'B2',
+    meaning_vi: 'thuế quan, biểu thuế; giá cước',
+    definition_vi: 'khoản thuế mà chính phủ đánh vào hàng hóa xuất nhập khẩu hoặc bảng giá cước',
+    definition_en: 'a tax on goods entering or leaving a country, or a charge for service',
+    examples: [
+      'The government imposed higher tariffs on imported electronics.',
+      'Check the mobile phone tariff plans before signing a contract.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'impose tariffs', meaning_vi: 'áp thuế quan' },
+      { phrase: 'protective tariff', meaning_vi: 'thuế quan bảo hộ' }
+    ],
+    synonyms: ['customs duty', 'tax', 'levy', 'rate'],
+    antonyms: []
+  },
+  venue: {
+    word_root: 'venue',
+    ipa_uk: '/ˈven.juː/',
+    ipa_us: '/ˈven.juː/',
+    partOfSpeech: 'noun [C]',
+    level: 'B1',
+    meaning_vi: 'địa điểm tổ chức',
+    definition_vi: 'nơi diễn ra một sự kiện cụ thể như hòa nhạc, hội thảo, đám cưới hoặc trận đấu',
+    definition_en: 'the place where a public event or meeting happens',
+    examples: [
+      'The convention center is an ideal venue for international tech summits.',
+      'They are still searching for a suitable wedding venue.'
+    ],
+    word_family: [],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'event venue', meaning_vi: 'địa điểm tổ chức sự kiện' },
+      { phrase: 'concert venue', meaning_vi: 'địa điểm hòa nhạc' }
+    ],
+    synonyms: ['location', 'place', 'site', 'setting'],
+    antonyms: []
+  },
+  warranty: {
+    word_root: 'warranty',
+    ipa_uk: '/ˈwɒr.ən.ti/',
+    ipa_us: '/ˈwɔːr.ən.t̬i/',
+    partOfSpeech: 'noun [C/U]',
+    level: 'B1',
+    meaning_vi: 'bảo hành, phiếu bảo hành',
+    definition_vi: 'văn bản cam kết sửa chữa hoặc đổi mới sản phẩm nếu bị lỗi trong khoảng thời gian nhất định',
+    definition_en: 'a written promise by a company to repair or replace a product if it breaks within a certain time',
+    examples: [
+      'The laptop comes with a two-year manufacturer warranty.',
+      'Repairs are fully covered under the terms of the warranty.'
+    ],
+    word_family: [
+      { pos: 'verb', word: 'warrant', meaning_vi: 'đảm bảo, chứng nhận' }
+    ],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'under warranty', meaning_vi: 'còn trong thời hạn bảo hành' },
+      { phrase: 'extended warranty', meaning_vi: 'gói bảo hành mở rộng' }
+    ],
+    synonyms: ['guarantee', 'assurance', 'pledge'],
+    antonyms: []
+  },
+  infrastructure: {
+    word_root: 'infrastructure',
+    ipa_uk: '/ˈɪn.frəˌstrʌk.tʃər/',
+    ipa_us: '/ˈɪn.frəˌstrʌk.tʃɚ/',
+    partOfSpeech: 'noun [C/U]',
+    level: 'B2',
+    meaning_vi: 'cơ sở hạ tầng',
+    definition_vi: 'hệ thống giao thông, điện nước, liên lạc thiết yếu phục vụ cho một quốc gia hoặc tổ chức',
+    definition_en: 'the basic systems and services, such as transport and power supplies, that a country or organization uses in order to work effectively',
+    examples: [
+      'The city urgently requires investments to modernize its transport infrastructure.',
+      'Telecommunication infrastructure is vital for digital economic growth.'
+    ],
+    word_family: [
+      { pos: 'noun', word: 'structure', meaning_vi: 'cấu trúc' }
+    ],
+    other_meanings: [],
+    collocations: [
+      { phrase: 'transport infrastructure', meaning_vi: 'hạ tầng giao thông' },
+      { phrase: 'digital infrastructure', meaning_vi: 'hạ tầng kỹ thuật số' }
+    ],
+    synonyms: ['framework', 'foundation', 'substructure'],
+    antonyms: []
+  },
+  liability: {
+    word_root: 'liability',
+    ipa_uk: '/ˌlaɪ.əˈbɪl.ə.ti/',
+    ipa_us: '/ˌlaɪ.əˈbɪl.ə.t̬i/',
+    partOfSpeech: 'noun [C/U]',
+    level: 'B2',
+    meaning_vi: 'trách nhiệm pháp lý; nghĩa vụ nợ, gánh nặng',
+    definition_vi: 'trách nhiệm chịu phạt hoặc bồi thường theo pháp luật; hoặc khoản tiền nợ của doanh nghiệp',
+    definition_en: 'the state of being legally responsible, or an amount of money that a person or company owes',
+    examples: [
+      'The airline accepted full liability for the damaged passenger baggage.',
+      'The company balance sheet lists both assets and liabilities.'
+    ],
+    word_family: [
+      { pos: 'adj', word: 'liable', meaning_vi: 'chịu trách nhiệm pháp lý' }
+    ],
+    other_meanings: [
+      { pos: 'noun', meaning_vi: 'gánh nặng, mối bất lợi', definition_en: 'a person or thing whose presence causes embarrassment or disadvantage' }
+    ],
+    collocations: [
+      { phrase: 'legal liability', meaning_vi: 'trách nhiệm pháp lý' },
+      { phrase: 'limited liability', meaning_vi: 'trách nhiệm hữu hạn' }
+    ],
+    synonyms: ['accountability', 'responsibility', 'obligation', 'debt'],
+    antonyms: ['asset', 'immunity']
   }
 };
 
@@ -901,6 +1299,75 @@ export const CONTEXT_DISAMBIGUATION_DICT = {
       { keywords: ['season', 'summer', 'winter', 'autumn', 'march', 'april', 'flower', 'warm', 'festival'], pos: 'noun [C/U]', meaning_vi: 'mùa xuân' },
       { keywords: ['water', 'hot', 'mineral', 'source', 'mountain', 'drink'], pos: 'noun [C]', meaning_vi: 'suối nước, nguồn nước' },
       { keywords: ['metal', 'coil', 'mattress', 'bounce', 'jump', 'elastic'], pos: 'noun [C] / verb', meaning_vi: 'lò xo; bật nhảy' }
+    ]
+  },
+  current: {
+    contexts: [
+      { keywords: ['water', 'ocean', 'sea', 'river', 'swim', 'flow', 'wave', 'stream', 'tide', 'air', 'wind'], pos: 'noun [C]', meaning_vi: 'dòng nước, hải lưu, luồng gió' },
+      { keywords: ['electric', 'electricity', 'wire', 'circuit', 'voltage', 'ampere', 'battery', 'charge'], pos: 'noun [C/U]', meaning_vi: 'dòng điện' },
+      { keywords: ['time', 'now', 'present', 'situation', 'affair', 'trend', 'event', 'status', 'issue', 'market'], pos: 'adjective', meaning_vi: 'hiện tại, hiện hành, đương thời' }
+    ]
+  },
+  charge: {
+    contexts: [
+      { keywords: ['battery', 'phone', 'laptop', 'cable', 'plug', 'charger', 'electric', 'percent', 'recharge'], pos: 'verb / noun', meaning_vi: 'sạc pin, nạp điện' },
+      { keywords: ['money', 'fee', 'price', 'bill', 'pay', 'cost', 'service', 'card', 'account', 'dollar'], pos: 'noun [C] / verb', meaning_vi: 'tiền phí, giá tiền; tính phí' },
+      { keywords: ['police', 'court', 'arrest', 'crime', 'murder', 'judge', 'law', 'guilty', 'illegal', 'theft'], pos: 'noun [C] / verb', meaning_vi: 'cáo buộc, lời buộc tội' },
+      { keywords: ['responsible', 'duty', 'lead', 'manager', 'department', 'team', 'control'], pos: 'noun (in charge of)', meaning_vi: 'phụ trách, chịu trách nhiệm' }
+    ]
+  },
+  match: {
+    contexts: [
+      { keywords: ['football', 'game', 'play', 'player', 'team', 'tournament', 'cup', 'score', 'win', 'lose', 'stadium'], pos: 'noun [C]', meaning_vi: 'trận đấu, cuộc thi đấu' },
+      { keywords: ['fire', 'flame', 'light', 'candle', 'box', 'burn', 'smoke', 'strike'], pos: 'noun [C]', meaning_vi: 'que diêm' },
+      { keywords: ['suit', 'pair', 'color', 'shirt', 'fit', 'compatible', 'equal', 'look'], pos: 'verb / noun [C]', meaning_vi: 'hợp, vừa vặn, tương xứng' }
+    ]
+  },
+  party: {
+    contexts: [
+      { keywords: ['birthday', 'celebrate', 'music', 'dance', 'drink', 'beer', 'invitation', 'guest', 'weekend', 'fun'], pos: 'noun [C]', meaning_vi: 'bữa tiệc, buổi liên hoan' },
+      { keywords: ['politics', 'election', 'vote', 'democrat', 'republican', 'communist', 'government', 'member', 'leader'], pos: 'noun [C]', meaning_vi: 'đảng phái chính trị' },
+      { keywords: ['contract', 'agreement', 'legal', 'lawyer', 'third', 'sign', 'both', 'dispute', 'clause'], pos: 'noun [C]', meaning_vi: 'bên tham gia (hợp đồng, pháp lý)' }
+    ]
+  },
+  scale: {
+    contexts: [
+      { keywords: ['weight', 'weigh', 'kg', 'gram', 'pound', 'heavy', 'balance', 'fat', 'diet'], pos: 'noun [C]', meaning_vi: 'cái cân' },
+      { keywords: ['fish', 'reptile', 'snake', 'skin', 'tail'], pos: 'noun [C]', meaning_vi: 'vảy (cá, bò sát)' },
+      { keywords: ['large', 'global', 'economy', 'project', 'map', 'measure', 'grade', 'level', 'rate'], pos: 'noun [C/U]', meaning_vi: 'quy mô, tỷ lệ, thang đo' }
+    ]
+  },
+  bark: {
+    contexts: [
+      { keywords: ['dog', 'puppy', 'hound', 'loud', 'bite', 'growl', 'tail'], pos: 'verb / noun [C]', meaning_vi: 'sủa; tiếng sủa' },
+      { keywords: ['tree', 'wood', 'trunk', 'branch', 'forest', 'oak', 'pine'], pos: 'noun [U]', meaning_vi: 'vỏ cây' }
+    ]
+  },
+  crane: {
+    contexts: [
+      { keywords: ['construction', 'building', 'lift', 'heavy', 'site', 'machine', 'engine', 'port'], pos: 'noun [C]', meaning_vi: 'cần cẩu, máy trục' },
+      { keywords: ['bird', 'feather', 'wetland', 'fly', 'lake', 'wildlife', 'species'], pos: 'noun [C]', meaning_vi: 'chim sếu' },
+      { keywords: ['neck', 'look', 'see', 'stretch', 'head', 'crowd'], pos: 'verb', meaning_vi: 'ngước cổ, nghển cổ nhìn' }
+    ]
+  },
+  fair: {
+    contexts: [
+      { keywords: ['judge', 'referee', 'law', 'equal', 'rule', 'honest', 'unfair', 'right', 'decision', 'treatment'], pos: 'adjective', meaning_vi: 'công bằng, hợp lý' },
+      { keywords: ['book', 'trade', 'job', 'festival', 'fun', 'exhibition', 'market', 'annual', 'show'], pos: 'noun [C]', meaning_vi: 'hội chợ' },
+      { keywords: ['weather', 'sky', 'sunny', 'day', 'wind', 'forecast'], pos: 'adjective', meaning_vi: 'quang đãng, đẹp trời' }
+    ]
+  },
+  train: {
+    contexts: [
+      { keywords: ['railway', 'rail', 'station', 'track', 'ticket', 'passenger', 'arrive', 'depart', 'platform', 'subway'], pos: 'noun [C]', meaning_vi: 'tàu hỏa, xe lửa' },
+      { keywords: ['gym', 'coach', 'athlete', 'skill', 'practice', 'course', 'program', 'learn', 'teach', 'dog'], pos: 'verb', meaning_vi: 'đào tạo, huấn luyện, rèn luyện' }
+    ]
+  },
+  address: {
+    contexts: [
+      { keywords: ['home', 'street', 'house', 'city', 'post', 'mail', 'email', 'live', 'deliver', 'number'], pos: 'noun [C]', meaning_vi: 'địa chỉ' },
+      { keywords: ['speech', 'audience', 'president', 'public', 'conference', 'meeting', 'speak'], pos: 'noun [C] / verb', meaning_vi: 'bài diễn văn; phát biểu trước' },
+      { keywords: ['problem', 'issue', 'concern', 'challenge', 'solve', 'handle', 'deal', 'tackle'], pos: 'verb', meaning_vi: 'giải quyết, xử lý (vấn đề)' }
     ]
   }
 };

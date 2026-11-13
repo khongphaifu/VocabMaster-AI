@@ -87,6 +87,24 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 
 // Automatic PDF Interception: Redirects native Chrome PDF viewer to VocabMaster PDF Reader
+function isLikelyPdfUrl(urlStr) {
+  try {
+    if (!urlStr || typeof urlStr !== 'string') return false;
+    if (urlStr.startsWith('chrome-extension://') || urlStr.startsWith('chrome://') || urlStr.startsWith('edge://')) return false;
+
+    const parsed = new URL(urlStr);
+    const hostname = (parsed.hostname || '').toLowerCase();
+    if (hostname.includes('google.') || hostname.includes('bing.') || hostname.includes('duckduckgo.') || hostname.includes('yahoo.')) {
+      return false;
+    }
+
+    const pathname = (parsed.pathname || '').toLowerCase();
+    return pathname.endsWith('.pdf');
+  } catch (_) {
+    return false;
+  }
+}
+
 if (typeof chrome !== 'undefined' && chrome.webNavigation?.onBeforeNavigate) {
   chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
     // Only intercept top-level navigations
@@ -94,8 +112,7 @@ if (typeof chrome !== 'undefined' && chrome.webNavigation?.onBeforeNavigate) {
     const url = details.url;
     if (!url) return;
 
-    // Do not intercept extension pages or internal URLs
-    if (url.startsWith('chrome-extension://') || url.startsWith('chrome://') || url.startsWith('edge://')) return;
+    if (!isLikelyPdfUrl(url)) return;
 
     // Check user preference toggle (default: true)
     try {
@@ -103,11 +120,8 @@ if (typeof chrome !== 'undefined' && chrome.webNavigation?.onBeforeNavigate) {
       if (!pdf_auto_intercept) return;
     } catch (_) {}
 
-    // Check if URL ends in .pdf or has .pdf? / .pdf#
-    if (/\.pdf($|[?#])/i.test(url)) {
-      const readerUrl = chrome.runtime.getURL(`pdf/reader.html?file=${encodeURIComponent(url)}`);
-      chrome.tabs.update(details.tabId, { url: readerUrl }).catch(() => {});
-    }
+    const readerUrl = chrome.runtime.getURL(`pdf/reader.html?file=${encodeURIComponent(url)}`);
+    chrome.tabs.update(details.tabId, { url: readerUrl }).catch(() => {});
   });
 }
 
@@ -513,7 +527,9 @@ async function handleAddWord(wordData) {
   const entry = {
     id,
     word: wordData.word || '',
-    ipa: wordData.ipa || '',
+    ipa: wordData.ipa || wordData.ipa_uk || wordData.ipa_us || '',
+    ipa_uk: wordData.ipa_uk || wordData.ipa || '',
+    ipa_us: wordData.ipa_us || wordData.ipa || '',
     partOfSpeech: wordData.partOfSpeech || '',
     meaning_vi: wordData.meaning_vi || wordData.definition_vi || '',
     definition_vi: wordData.definition_vi || '',
@@ -521,6 +537,8 @@ async function handleAddWord(wordData) {
     examples: wordData.examples || [],
     synonyms: wordData.synonyms || [],
     antonyms: wordData.antonyms || [],
+    collocations: wordData.collocations || [],
+    word_family: wordData.word_family || [],
     level: wordData.level || '',
     etymology: wordData.etymology || '',
     sourceUrl: wordData.sourceUrl || '',

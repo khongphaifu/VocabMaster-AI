@@ -7,8 +7,24 @@ import { MODERN_LEXICON, disambiguateByContext, isArchaicOrAwkward, sanitizeViet
 console.log('--- 🧪 STARTING UNIVERSAL TRANSLATION ENGINE VERIFICATION ---');
 
 // 1. PDF URL Interceptor Regex Test
-console.log('\n[TEST 1] PDF URL Interceptor Regex');
-const pdfRegex = /\.pdf($|[?#])/i;
+console.log('\n[TEST 1] PDF URL Interceptor');
+function isLikelyPdfUrl(urlStr) {
+  try {
+    if (!urlStr || typeof urlStr !== 'string') return false;
+    if (urlStr.startsWith('chrome-extension://') || urlStr.startsWith('chrome://') || urlStr.startsWith('edge://')) return false;
+
+    const parsed = new URL(urlStr);
+    const hostname = (parsed.hostname || '').toLowerCase();
+    if (hostname.includes('google.') || hostname.includes('bing.') || hostname.includes('duckduckgo.') || hostname.includes('yahoo.')) {
+      return false;
+    }
+
+    const pathname = (parsed.pathname || '').toLowerCase();
+    return pathname.endsWith('.pdf');
+  } catch (_) {
+    return false;
+  }
+}
 
 const testUrls = [
   { url: 'https://arxiv.org/pdf/2301.00001.pdf', expected: true },
@@ -21,11 +37,12 @@ const testUrls = [
   { url: 'https://example.com/not-a-pdf.doc', expected: false },
   { url: 'https://example.com/something.pdf.html', expected: false },
   { url: 'chrome-extension://xyz/pdf/reader.html?file=...', expected: false },
+  { url: 'https://www.google.com/search?q=ielts_reading.pdf', expected: false },
+  { url: 'https://duckduckgo.com/?q=sample.pdf', expected: false },
 ];
 
 testUrls.forEach(({ url, expected }) => {
-  const isExtensionUrl = url.startsWith('chrome-extension://');
-  const matched = !isExtensionUrl && pdfRegex.test(url);
+  const matched = isLikelyPdfUrl(url);
   assert.strictEqual(matched, expected, `URL failed: ${url}`);
   console.log(`  ✓ ${url} => ${matched ? 'INTERCEPTED' : 'PASSED THROUGH'}`);
 });
@@ -189,6 +206,34 @@ const bankMoney = disambiguateByContext('bank', 'I deposited money in the centra
 assert.ok(bankMoney, 'bank in money context must disambiguate');
 assert.strictEqual(bankMoney.meaning_vi, 'ngân hàng');
 console.log(`  ✓ 'bank' in money context => '${bankMoney.meaning_vi}'`);
+
+const currentWater = disambiguateByContext('current', 'The ocean current was strong.');
+assert.ok(currentWater);
+assert.ok(currentWater.meaning_vi.includes('dòng nước'));
+console.log(`  ✓ 'current' in ocean context => '${currentWater.meaning_vi}'`);
+
+const currentElectric = disambiguateByContext('current', 'The electric current passes through the circuit wire.');
+assert.ok(currentElectric);
+assert.strictEqual(currentElectric.meaning_vi, 'dòng điện');
+console.log(`  ✓ 'current' in circuit context => '${currentElectric.meaning_vi}'`);
+
+const chargeBattery = disambiguateByContext('charge', 'My phone battery needs to charge.');
+assert.ok(chargeBattery);
+assert.ok(chargeBattery.meaning_vi.includes('sạc pin'));
+console.log(`  ✓ 'charge' in phone battery context => '${chargeBattery.meaning_vi}'`);
+
+const partyPolitics = disambiguateByContext('party', 'The opposition party won the general election vote.');
+assert.ok(partyPolitics);
+assert.ok(partyPolitics.meaning_vi.includes('đảng phái'));
+console.log(`  ✓ 'party' in election context => '${partyPolitics.meaning_vi}'`);
+
+// New Modern Lexicon entries test
+assert.ok(MODERN_LEXICON['accommodation']);
+assert.ok(MODERN_LEXICON['complimentary']);
+assert.ok(MODERN_LEXICON['infrastructure']);
+console.log(`  ✓ 'accommodation' => '${MODERN_LEXICON['accommodation'].meaning_vi}'`);
+console.log(`  ✓ 'complimentary' => '${MODERN_LEXICON['complimentary'].meaning_vi}'`);
+console.log(`  ✓ 'infrastructure' => '${MODERN_LEXICON['infrastructure'].meaning_vi}'`);
 
 // Archaic detection and sanitize
 assert.strictEqual(isArchaicOrAwkward('ông ta là giám đốc trường'), true);
