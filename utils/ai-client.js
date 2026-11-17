@@ -1834,3 +1834,90 @@ export async function testDirectAI(provider, apiKey) {
   };
 }
 
+/**
+ * Extracts clean selectable text from a scanned PDF page or document image using Vision AI.
+ */
+export async function extractTextFromImageAI({ provider = 'gemini', apiKey = '', dataUrl = '' }) {
+  const cleanKey = (apiKey || '').trim();
+  if (!cleanKey) {
+    throw new Error('Cần có Gemini hoặc OpenAI API Key trong Cài đặt để quét chữ (OCR) từ ảnh/PDF scan.');
+  }
+
+  const m = String(dataUrl || '').match(/^data:([^;]+);base64,(.+)$/);
+  if (!m) throw new Error('Dữ liệu hình ảnh không hợp lệ.');
+  const mimeType = m[1];
+  const base64Data = m[2];
+  const ocrPrompt = 'Extract ALL readable text from this document page image verbatim. Preserve natural paragraphs and headings. Do NOT translate or add commentary—return ONLY the extracted text.';
+
+  if (provider === 'openai') {
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 20000);
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cleanKey}` },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        temperature: 0,
+        max_tokens: 2048,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: ocrPrompt },
+            { type: 'image_url', image_url: { url: dataUrl } }
+          ]
+        }]
+      })
+    });
+    clearTimeout(tid);
+    if (!res.ok) throw new Error(`OpenAI OCR lỗi ${res.status}`);
+    const j = await res.json();
+    return (j?.choices?.[0]?.message?.content || '').trim();
+  }
+
+  // Default: Gemini Vision (gemini-2.5-flash -> gemini-2.0-flash)
+  const models = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+  let lastErr = null;
+  for (const model of models) {
+    try {
+      const isBearer = cleanKey.startsWith('AQ.');
+      const headers = { 'Content-Type': 'application/json' };
+      let url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+      if (isBearer) headers['Authorization'] = `Bearer ${cleanKey}`;
+      else {
+        url += `?key=${encodeURIComponent(cleanKey)}`;
+        headers['x-goog-api-key'] = cleanKey;
+      }
+
+      const controller = new AbortController();
+      const tid = setTimeout(() => controller.abort(), 20000);
+      const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: ocrPrompt },
+              { inlineData: { mimeType, data: base64Data } }
+            ]
+          }],
+          generationConfig: { temperature: 0, maxOutputTokens: 2500 }
+        })
+      });
+      clearTimeout(tid);
+      if (!res.ok) {
+        const errJ = await res.json().catch(() => ({}));
+        lastErr = new Error(`Gemini OCR lỗi ${res.status}: ${errJ.error?.message || ''}`);
+        continue;
+      }
+      const data = await res.json();
+      const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('').trim();
+      if (text) return text;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error('Không thể nhận dạng chữ từ ảnh này.');
+}
+

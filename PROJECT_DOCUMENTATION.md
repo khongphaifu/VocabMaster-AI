@@ -1,6 +1,6 @@
 # 📖 VocabMaster AI — Tài Liệu Kỹ Thuật & Toàn Bộ Kiến Trúc Dự Án (Project Documentation A–Z)
 
-> **Phiên bản:** 1.0.27  
+> **Phiên bản:** 1.1.1  
 > **Cập nhật gần nhất:** Tháng 11/2026  
 > **Nền tảng hỗ trợ:** Google Chrome Extension (Manifest V3), Windows Desktop (Electron), iPad (Progressive Web App - PWA)  
 > **Tác giả:** Đội ngũ Kỹ sư Dự án VocabMaster AI
@@ -495,7 +495,15 @@ node d:/extension/test_universal_verification.mjs
 
 ## 11. Lịch Sử Phiên Bản & Đóng Góp (Changelog)
 
-### Phiên Bản 1.1.0 (Hiện Tại)
+### Phiên Bản 1.1.1 (Hiện Tại)
+- **Trình Đọc & Bôi Đen File Đa Định Dạng Chuyên Sâu Trên iPad (`📄 Đọc File`):**
+  - **Hỗ trợ trọn bộ định dạng tài liệu iPad:** Mở và bôi đen trực tiếp **PDF** (thường + **PDF Scan ảnh qua Vision AI OCR**), **Word `.docx`** (giải nén ZIP + XML thuần trình duyệt `utils/docx-reader.js` không cần thư viện ngoài), **`.txt`, `.md`, `.srt` (phụ đề), `.csv`**, và **Ảnh chụp trang sách (`.png`, `.jpg`, `.jpeg`, `.webp` qua Gemini/OpenAI Vision OCR)**.
+  - **Chế độ Chạm 1 Từ Là Dịch (`👆 Chạm 1 từ là dịch`):** Bổ sung tính năng chạm 1 ngón tay hoặc Apple Pencil trực tiếp vào bất kỳ từ tiếng Anh nào trong file để giải nghĩa ngay (sử dụng `caretRangeFromPoint` + `extractWordAtCaret`), song song với chế độ bôi đen cả câu hiện nút `✨ Dịch AI`.
+  - **Điều hướng nhanh & Tự nhớ file đang đọc:** Thêm ô nhảy thẳng đến số trang PDF (`#pdf-page-input`), tự động lưu tệp gần nhất + số trang vào **IndexedDB** (`vm_ipad_files_db`) để bấm **"Tiếp tục đọc file vừa mở"** trong 1 chạm.
+  - **Kéo & Thả Toàn Màn Hình Split View:** Kéo file trực tiếp từ ứng dụng **Tệp (Files)** hoặc văn bản từ Apple Books / Ghi chú thả thẳng vào cửa sổ VocabMaster AI iPad.
+  - **Vá lỗi kiểm tra kết nối AI trên iPad (`ipad/app.js`):** Khớp đúng thuộc tính `{ success, message }` trả về từ `testDirectAI()`.
+
+### Phiên Bản 1.1.0
 - **Hệ Sinh Thái iPad Hoàn Chỉnh & Đồng Bộ Sổ Từ 2 Chiều PC ↔ iPad:**
   - **Sửa triệt để lỗi iPad PWA (`ipad/app.js`):** Khắc phục hoàn toàn lỗi lệch schema (`word_root`, `partOfSpeech`, `level`, `collocations[].phrase`), mở khóa tính năng lưu từ & phát âm chuẩn bản xứ trên iPad, loại bỏ `alert()`/`confirm()` thô bằng Toast & Confirm Modal chuẩn iPadOS.
   - **Vá lỗi CORS cho Safari (`utils/dict-resolver.js`, `utils/cambridge-client.js`):** Loại bỏ header cấm `User-Agent` trong Google Dict fetch, thêm `&origin=*` cho Wiktionary API, tự động điều phối an toàn trên trình duyệt Web/Safari.

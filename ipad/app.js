@@ -17,7 +17,7 @@ import {
   decodePairingPayload
 } from '../utils/cloud-sync.js';
 import { StorageAdapter } from './storage-adapter.js';
-import { createIpadPdfController } from './pdf-ipad.js';
+import { createIpadPdfController, extractWordAtCaret } from './pdf-ipad.js';
 
 const VIETNAMESE_REGEX = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
 
@@ -269,6 +269,17 @@ function getActiveAiCredentials() {
     if (k) return { provider: p, apiKey: k };
   }
   return { provider, apiKey: '' };
+}
+
+function getVisionCredentials() {
+  const geminiKey = (state.settings.apiKeys?.gemini || '').trim();
+  const openaiKey = (state.settings.apiKeys?.openai || '').trim();
+  if (state.settings.aiProvider === 'openai' && openaiKey) {
+    return { provider: 'openai', apiKey: openaiKey };
+  }
+  if (geminiKey) return { provider: 'gemini', apiKey: geminiKey };
+  if (openaiKey) return { provider: 'openai', apiKey: openaiKey };
+  return { provider: 'gemini', apiKey: '' };
 }
 
 export async function performLookupOrTranslate(rawText, contextSentence = '') {
@@ -876,32 +887,53 @@ function renderBottomSheetResult(res) {
 }
 
 function initReaderAndSelection() {
-  createIpadPdfController({ showToast });
-
   const modePdfBtn = document.getElementById('mode-btn-pdf');
   const modeArtBtn = document.getElementById('mode-btn-article');
   const pdfView = document.getElementById('reader-pdf-view');
   const artView = document.getElementById('reader-article-view');
 
-  modePdfBtn?.addEventListener('click', () => {
-    modePdfBtn.classList.add('active');
-    modeArtBtn?.classList.remove('active');
-    pdfView?.classList.remove('hidden');
-    artView?.classList.add('hidden');
-  });
-
-  modeArtBtn?.addEventListener('click', () => {
-    modeArtBtn.classList.add('active');
-    modePdfBtn?.classList.remove('active');
-    artView?.classList.remove('hidden');
-    pdfView?.classList.add('hidden');
-  });
-
-  // Article Paste & Render Mode
   const artTextarea = document.getElementById('article-textarea');
   const artEditorBox = document.getElementById('article-editor-box');
   const artDisplayBox = document.getElementById('article-display-box');
   const artBody = document.getElementById('article-reader-body');
+  const artTitleEl = document.getElementById('article-doc-title');
+  const artImgWrap = document.getElementById('article-image-preview-wrap');
+  const artImgEl = document.getElementById('article-image-preview');
+
+  function activateSubMode(mode) {
+    const isPdf = mode === 'pdf';
+    modePdfBtn?.classList.toggle('active', isPdf);
+    modeArtBtn?.classList.toggle('active', !isPdf);
+    pdfView?.classList.toggle('hidden', !isPdf);
+    artView?.classList.toggle('hidden', isPdf);
+  }
+
+  modePdfBtn?.addEventListener('click', () => activateSubMode('pdf'));
+  modeArtBtn?.addEventListener('click', () => activateSubMode('article'));
+
+  const pdfCtrl = createIpadPdfController({
+    showToast,
+    getVisionCredentials,
+    onOpenTextArticle: ({ title, text, imageDataUrl }) => {
+      activateSubMode('article');
+      if (artTitleEl) artTitleEl.textContent = title || 'Nội dung tài liệu (chạm từ hoặc bôi đen)';
+      if (artBody) artBody.textContent = text || '';
+      if (artTextarea && text) artTextarea.value = text;
+      if (imageDataUrl && artImgWrap && artImgEl) {
+        artImgEl.src = imageDataUrl;
+        artImgWrap.classList.remove('hidden');
+      } else if (artImgWrap && artImgEl) {
+        artImgEl.removeAttribute('src');
+        artImgWrap.classList.add('hidden');
+      }
+      artEditorBox?.classList.add('hidden');
+      artDisplayBox?.classList.remove('hidden');
+    }
+  });
+
+  document.getElementById('btn-quick-open-reader')?.addEventListener('click', () => {
+    switchTab('reader');
+  });
 
   document.getElementById('btn-article-paste')?.addEventListener('click', async () => {
     try {
@@ -919,6 +951,11 @@ function initReaderAndSelection() {
       showToast('Hãy dán văn bản tiếng Anh vào trước nhé!', 'error');
       return;
     }
+    if (artTitleEl) artTitleEl.textContent = 'Nội dung bài đọc (chạm từ hoặc bôi đen)';
+    if (artImgWrap && artImgEl) {
+      artImgEl.removeAttribute('src');
+      artImgWrap.classList.add('hidden');
+    }
     if (artBody) artBody.textContent = txt;
     artEditorBox?.classList.add('hidden');
     artDisplayBox?.classList.remove('hidden');
@@ -929,16 +966,39 @@ function initReaderAndSelection() {
     artEditorBox?.classList.remove('hidden');
   });
 
-  // Floating ✨ Selection Trigger specifically inside Reader (PDF + Article)
+  // Floating ✨ Selection Trigger + 1-Tap Word Translator inside Reader (PDF / DOCX / OCR / Article)
   const triggerBtn = document.getElementById('reader-float-trigger');
   const sheetOverlay = document.getElementById('reader-sheet-overlay');
   const sheetBody = document.getElementById('sheet-body');
   const sheetTitle = document.getElementById('sheet-title');
+  const tapToggle = document.getElementById('toggle-tap-word');
   let pendingSelectedText = '';
+  let pendingContextText = '';
   let selDebounce = null;
 
   function hideTrigger() {
     triggerBtn?.classList.add('hidden');
+  }
+
+  async function openReaderSheetForText(text, contextSentence = '') {
+    const clean = (text || '').trim();
+    if (!clean) return;
+    hideTrigger();
+
+    if (sheetTitle) sheetTitle.textContent = '⏳ Đang phân tích AI...';
+    if (sheetBody) sheetBody.innerHTML = '<div class="ios-spinner"></div><p style="text-align:center;color:var(--text-sub)">Đang giải nghĩa chuẩn Cambridge & AI Thuần Việt...</p>';
+    sheetOverlay?.classList.remove('hidden');
+
+    try {
+      const res = await performLookupOrTranslate(clean, contextSentence);
+      if (res) {
+        renderBottomSheetResult(res);
+      } else if (sheetBody) {
+        sheetBody.innerHTML = '<p style="color:var(--danger);text-align:center;padding:20px;">❌ Không tìm thấy dữ liệu cho đoạn vừa chọn.</p>';
+      }
+    } catch (err) {
+      if (sheetBody) sheetBody.innerHTML = `<p style="color:var(--danger);text-align:center;padding:20px;">❌ ${escHtml(err.message)}</p>`;
+    }
   }
 
   function evaluateReaderSelection() {
@@ -966,12 +1026,13 @@ function initReaderAndSelection() {
     const range = sel.getRangeAt(0);
     const container = range.commonAncestorContainer;
     const el = container.nodeType === 3 ? container.parentElement : container;
-    if (!el || (!el.closest('#ipad-pdf-pages') && !el.closest('#article-reader-body'))) {
+    if (!el || (!el.closest('#ipad-pdf-pages') && !el.closest('#article-reader-body') && !el.closest('.scanned-text-box'))) {
       hideTrigger();
       return;
     }
 
     pendingSelectedText = text;
+    pendingContextText = container.nodeType === 3 ? (container.textContent || '').trim().slice(0, 260) : '';
     let rect = range.getBoundingClientRect();
     if (!rect || (rect.width === 0 && rect.height === 0)) {
       const rects = range.getClientRects();
@@ -994,6 +1055,71 @@ function initReaderAndSelection() {
     }
   }
 
+  function handleTapWordInReader(e) {
+    if (!tapToggle?.checked) return;
+    if (e.detail > 1) return;
+    if (!sheetOverlay?.classList.contains('hidden')) return;
+    if (!document.getElementById('pane-reader')?.classList.contains('active')) return;
+    if (e.target.closest('button, a, input, select, textarea, label, .scanned-ocr-bar, .reader-float-trigger')) return;
+
+    const readerTarget = e.target.closest('#ipad-pdf-pages, #article-reader-body, .scanned-text-box');
+    if (!readerTarget) return;
+
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) return;
+
+    let textNode = null;
+    let offset = 0;
+    if (typeof document.caretRangeFromPoint === 'function') {
+      const r = document.caretRangeFromPoint(e.clientX, e.clientY);
+      if (r) {
+        textNode = r.startContainer;
+        offset = r.startOffset;
+      }
+    } else if (typeof document.caretPositionFromPoint === 'function') {
+      const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+      if (pos) {
+        textNode = pos.offsetNode;
+        offset = pos.offset;
+      }
+    }
+
+    if (!textNode || textNode.nodeType !== 3) return;
+    const parentEl = textNode.parentElement;
+    if (!parentEl || (!parentEl.closest('#ipad-pdf-pages') && !parentEl.closest('#article-reader-body') && !parentEl.closest('.scanned-text-box'))) {
+      return;
+    }
+
+    const fullText = textNode.textContent || '';
+    const word = extractWordAtCaret(fullText, offset);
+    if (!word || word.length < 2) return;
+
+    // Ensure tap landed reasonably near the word bounding box (avoid empty white margin misfires)
+    const startIdx = Math.max(0, fullText.lastIndexOf(word, offset));
+    if (startIdx <= offset && startIdx + word.length >= offset) {
+      const checkRange = document.createRange();
+      checkRange.setStart(textNode, startIdx);
+      checkRange.setEnd(textNode, startIdx + word.length);
+      const rect = checkRange.getBoundingClientRect();
+      if (
+        !rect ||
+        rect.width === 0 ||
+        e.clientX < rect.left - 18 ||
+        e.clientX > rect.right + 18 ||
+        e.clientY < rect.top - 14 ||
+        e.clientY > rect.bottom + 14
+      ) {
+        return;
+      }
+    }
+
+    const contextSlice = fullText.slice(Math.max(0, offset - 80), Math.min(fullText.length, offset + 120)).trim();
+    openReaderSheetForText(word, contextSlice);
+  }
+
+  document.getElementById('ipad-pdf-pages')?.addEventListener('click', handleTapWordInReader);
+  artBody?.addEventListener('click', handleTapWordInReader);
+
   document.addEventListener('selectionchange', () => {
     clearTimeout(selDebounce);
     selDebounce = setTimeout(evaluateReaderSelection, 220);
@@ -1005,21 +1131,8 @@ function initReaderAndSelection() {
     setTimeout(evaluateReaderSelection, 30);
   });
 
-  triggerBtn?.addEventListener('click', async () => {
-    const text = pendingSelectedText;
-    hideTrigger();
-    if (!text) return;
-
-    if (sheetTitle) sheetTitle.textContent = '⏳ Đang phân tích AI...';
-    if (sheetBody) sheetBody.innerHTML = '<div class="ios-spinner"></div><p style="text-align:center;color:var(--text-sub)">Đang giải nghĩa chuẩn Cambridge & AI Thuần Việt...</p>';
-    sheetOverlay?.classList.remove('hidden');
-
-    try {
-      const res = await performLookupOrTranslate(text);
-      if (res) renderBottomSheetResult(res);
-    } catch (err) {
-      if (sheetBody) sheetBody.innerHTML = `<p style="color:var(--danger);text-align:center;padding:20px;">❌ ${escHtml(err.message)}</p>`;
-    }
+  triggerBtn?.addEventListener('click', () => {
+    openReaderSheetForText(pendingSelectedText, pendingContextText);
   });
 
   document.getElementById('sheet-close')?.addEventListener('click', () => {
@@ -1027,6 +1140,63 @@ function initReaderAndSelection() {
   });
   sheetOverlay?.addEventListener('click', (e) => {
     if (e.target === sheetOverlay) sheetOverlay.classList.add('hidden');
+  });
+
+  // Global Drag & Drop (iPad Split View from Files, Books, Safari, Notes)
+  const dropOverlay = document.getElementById('global-drop-overlay');
+  let dragDepth = 0;
+  let isInternalDrag = false;
+
+  document.addEventListener('dragstart', () => {
+    isInternalDrag = true;
+  });
+  document.addEventListener('dragend', () => {
+    isInternalDrag = false;
+    dragDepth = 0;
+    dropOverlay?.classList.add('hidden');
+  });
+
+  document.addEventListener('dragenter', (e) => {
+    if (isInternalDrag || !e.dataTransfer) return;
+    dragDepth++;
+    dropOverlay?.classList.remove('hidden');
+  });
+
+  document.addEventListener('dragover', (e) => {
+    if (isInternalDrag) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+  });
+
+  document.addEventListener('dragleave', () => {
+    if (isInternalDrag) return;
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) dropOverlay?.classList.add('hidden');
+  });
+
+  document.addEventListener('drop', async (e) => {
+    if (isInternalDrag) {
+      isInternalDrag = false;
+      return;
+    }
+    e.preventDefault();
+    dragDepth = 0;
+    dropOverlay?.classList.add('hidden');
+
+    const file = e.dataTransfer?.files?.[0];
+    if (file) {
+      switchTab('reader');
+      await pdfCtrl.openDocumentFile(file);
+      return;
+    }
+
+    const droppedText = (e.dataTransfer?.getData('text/plain') || '').trim();
+    if (droppedText) {
+      switchTab('lookup');
+      const input = document.getElementById('lookup-input');
+      if (input) input.value = droppedText;
+      await triggerLookup(droppedText);
+    }
   });
 }
 
@@ -1553,8 +1723,8 @@ function initSettings() {
     }
     const res = await testDirectAI(prov, key);
     if (msgEl) {
-      msgEl.style.color = res?.ok ? 'var(--success)' : 'var(--danger)';
-      msgEl.textContent = res?.ok ? `✅ ${res.msg}` : `❌ ${res?.msg || 'Lỗi kết nối AI'}`;
+      msgEl.style.color = res?.success ? 'var(--success)' : 'var(--danger)';
+      msgEl.textContent = res?.success ? `✅ ${res.message}` : `❌ ${res?.message || 'Lỗi kết nối AI'}`;
     }
   });
 }

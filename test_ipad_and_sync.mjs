@@ -4,6 +4,7 @@
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -15,6 +16,9 @@ import {
 import { generateQrSvg } from './utils/qr-svg.js';
 import { resolveDictionaryWord } from './utils/dict-resolver.js';
 import { fetchFromCambridge } from './utils/cambridge-client.js';
+import { extractDocxText } from './utils/docx-reader.js';
+import { extractWordAtCaret } from './ipad/pdf-ipad.js';
+import { testDirectAI, extractTextFromImageAI } from './utils/ai-client.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
@@ -240,6 +244,117 @@ console.log('--- 🧪 STARTING IPAD ECOSYSTEM & 2-WAY CLOUD SYNC VERIFICATION --
   await new Promise(r => setTimeout(r, 160));
   assert(appended.some(el => el.className === 'vm-float-trigger'), 'Safari Userscript spawned floating ✨ button after iPad touch selection!');
   console.log('[TEST 5] Icons, Manifest & Safari Userscript runtime touch selection ✓');
+}
+
+// =========================================================================
+// TEST 6: Client-side DOCX ZIP + XML Extractor (Stored & DEFLATE)
+// =========================================================================
+function buildZipArchive(entries) {
+  const localParts = [];
+  const cdParts = [];
+  let offset = 0;
+
+  for (const { name, data, method } of entries) {
+    const nameBytes = Buffer.from(name, 'utf8');
+    const rawBytes = Buffer.from(data, 'utf8');
+    const payload = method === 8 ? zlib.deflateRawSync(rawBytes) : rawBytes;
+
+    const lh = Buffer.alloc(30 + nameBytes.length);
+    lh.writeUInt32LE(0x04034b50, 0);
+    lh.writeUInt16LE(20, 4);
+    lh.writeUInt16LE(0, 6);
+    lh.writeUInt16LE(method, 8);
+    lh.writeUInt32LE(payload.length, 18);
+    lh.writeUInt32LE(rawBytes.length, 22);
+    lh.writeUInt16LE(nameBytes.length, 26);
+    lh.writeUInt16LE(0, 28);
+    nameBytes.copy(lh, 30);
+
+    localParts.push(lh, payload);
+
+    const cd = Buffer.alloc(46 + nameBytes.length);
+    cd.writeUInt32LE(0x02014b50, 0);
+    cd.writeUInt16LE(20, 4);
+    cd.writeUInt16LE(20, 6);
+    cd.writeUInt16LE(method, 10);
+    cd.writeUInt32LE(payload.length, 20);
+    cd.writeUInt32LE(rawBytes.length, 24);
+    cd.writeUInt16LE(nameBytes.length, 28);
+    cd.writeUInt32LE(offset, 42);
+    nameBytes.copy(cd, 46);
+
+    cdParts.push(cd);
+    offset += lh.length + payload.length;
+  }
+
+  const cdBuf = Buffer.concat(cdParts);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(entries.length, 8);
+  eocd.writeUInt16LE(entries.length, 10);
+  eocd.writeUInt32LE(cdBuf.length, 12);
+  eocd.writeUInt32LE(offset, 16);
+
+  return Buffer.concat([...localParts, cdBuf, eocd]);
+}
+
+{
+  const docXml = `<?xml version="1.0" encoding="UTF-8"?>
+    <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      <w:body>
+        <w:p><w:r><w:t>Research &amp; Development&#8217;s goal</w:t><w:tab/><w:t>2026</w:t></w:r></w:p>
+        <w:p><w:r><w:t>Students&apos; resilience matters.</w:t></w:r></w:p>
+      </w:body>
+    </w:document>`;
+
+  const storedDocx = buildZipArchive([
+    { name: '[Content_Types].xml', data: '<Types/>', method: 0 },
+    { name: 'word/document.xml', data: docXml, method: 0 }
+  ]);
+  const storedOut = await extractDocxText(storedDocx);
+  assert(storedOut.includes('Research & Development’s goal 2026'), 'DOCX XML entities & tabs decoded');
+  assert(storedOut.includes("Students' resilience matters."), 'DOCX apostrophes decoded across paragraphs');
+
+  const deflatedDocx = buildZipArchive([
+    { name: 'word/document.xml', data: docXml, method: 8 }
+  ]);
+  const deflatedOut = await extractDocxText(deflatedDocx);
+  assert.strictEqual(deflatedOut, storedOut, 'DEFLATE-compressed DOCX matches stored output');
+
+  await assert.rejects(() => extractDocxText(Buffer.from('not-a-zip')), /ZIP\/DOCX/);
+  console.log('[TEST 6] Zero-dependency DOCX ZIP (Stored & DEFLATE) + XML extraction ✓');
+}
+
+// =========================================================================
+// TEST 7: 1-Tap Caret Word Extractor (extractWordAtCaret)
+// =========================================================================
+{
+  const sample = 'A well-known student\'s "resilience," shines cleanly.';
+  assert.strictEqual(extractWordAtCaret(sample, sample.indexOf('well-known') + 5), 'well-known');
+  assert.strictEqual(extractWordAtCaret(sample, sample.indexOf("student's") + 2), "student's");
+  assert.strictEqual(extractWordAtCaret(sample, sample.indexOf('resilience')), 'resilience');
+  assert.strictEqual(extractWordAtCaret(sample, sample.indexOf('cleanly') + 7), 'cleanly');
+  const punctIdx = sample.indexOf('," ');
+  assert(punctIdx > 0);
+  assert.strictEqual(extractWordAtCaret(sample, punctIdx + 2), ''); // non-word space after punctuation
+  assert.strictEqual(extractWordAtCaret('hello   world', 6), ''); // pure whitespace
+  assert.strictEqual(extractWordAtCaret('12345', 2), ''); // numbers without letters ignored
+  console.log('[TEST 7] 1-Tap Caret word boundary extraction ✓');
+}
+
+// =========================================================================
+// TEST 8: AI Connection Test & Vision OCR Contract
+// =========================================================================
+{
+  const aiRes = await testDirectAI('gemini', '');
+  assert.strictEqual(aiRes.success, false, 'Empty key must return success: false');
+  assert(typeof aiRes.message === 'string' && aiRes.message.length > 0, 'Response must use .message field');
+
+  await assert.rejects(
+    () => extractTextFromImageAI({ provider: 'gemini', apiKey: '', dataUrl: 'data:image/png;base64,AA==' }),
+    /API Key/
+  );
+  console.log('[TEST 8] testDirectAI schema (.success/.message) & Vision OCR validation ✓');
 }
 
 console.log('\n======================================================');

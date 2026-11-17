@@ -25,7 +25,7 @@
         <span class="logo-icon">✨</span>
         <div class="brand-text">
           <span class="brand-name">VocabMaster</span>
-          <span class="brand-tag">iPad v1.1.0</span>
+          <span class="brand-tag">iPad v1.1.1</span>
         </div>
       </div>
 
@@ -37,7 +37,7 @@
         </button>
         <button class="nav-tab" data-tab="reader">
           <span class="tab-icon">📄</span>
-          <span class="tab-label">Đọc & PDF</span>
+          <span class="tab-label">Đọc File</span>
         </button>
         <button class="nav-tab" data-tab="library">
           <span class="tab-icon">📖</span>
@@ -198,32 +198,54 @@
         <div id="lookup-empty" class="state-box">
           <div class="state-ico">📱✨</div>
           <h3>Trợ lý Từ vựng & Dịch AI trên iPad</h3>
-          <p>Nhập từ đơn hoặc câu dài bất kỳ, bấm <strong>📋 Dán</strong> từ app khác trong Split View, hoặc chuyển sang tab <strong>📄 Đọc & PDF</strong> để bôi đen trực tiếp trên tài liệu!</p>
+          <p>Nhập từ/câu cần dịch, bấm <strong>📋 Dán</strong> từ app khác trong Split View, hoặc mở trực tiếp file <strong>PDF, Word (.docx), TXT, Ảnh Scan</strong> để bôi đen dịch ngay!</p>
+          <div style="margin-top:16px;display:flex;justify-content:center;gap:10px;flex-wrap:wrap;">
+            <button id="btn-quick-open-reader" class="btn-touch-primary">📂 Mở File Để Bôi Đen Dịch (PDF / Word / Ảnh)</button>
+          </div>
         </div>
       </section>
 
-      <!-- TAB 2: ĐỌC PDF & BÀI VIẾT CẢM ỨNG (BÔI ĐEN HIỆN ICON ✨) -->
+      <!-- TAB 2: ĐỌC FILE & BÔI ĐEN DỊCH NỔI (PDF / DOCX / TXT / OCR) -->
       <section class="tab-pane" id="pane-reader">
         <div class="ipad-pane-header">
-          <h2>Đọc & Bôi Đen Dịch Nổi (PDF / Văn Bản)</h2>
+          <h2>Đọc File & Bôi Đen Dịch Nổi</h2>
           <div class="reader-mode-switch">
-            <button id="mode-btn-pdf" class="mode-pill active">📄 Đọc PDF</button>
-            <button id="mode-btn-article" class="mode-pill">📝 Dán Bài Đọc</button>
+            <button id="mode-btn-pdf" class="mode-pill active">📄 File (PDF / Word / Ảnh)</button>
+            <button id="mode-btn-article" class="mode-pill">📝 Văn Bản / Đã Trích Xuất</button>
           </div>
+        </div>
+
+        <!-- READER QUICK TOOLBAR -->
+        <div class="pdf-toolbar">
+          <div class="pdf-toolbar-group">
+            <button id="pdf-btn-file" class="btn-touch-primary btn-compact">📂 Mở File iPad (PDF / DOCX / TXT / Ảnh)</button>
+            <button id="pdf-btn-url" class="btn-touch-secondary btn-compact">🔗 Link PDF</button>
+            <button id="pdf-btn-sample" class="btn-touch-secondary btn-compact">📚 Mẫu IELTS</button>
+            <input type="file" id="ipad-pdf-input" accept=".pdf,.docx,.txt,.md,.srt,.csv,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,image/*" style="display:none">
+          </div>
+          <div class="pdf-toolbar-group">
+            <label class="tap-mode-pill" title="Bật để chạm 1 cái vào từ bất kỳ trong file là dịch ngay không cần kéo bôi đen">
+              <input type="checkbox" id="toggle-tap-word" checked>
+              <span>👆 Chạm 1 từ là dịch</span>
+            </label>
+          </div>
+        </div>
+
+        <div id="pdf-url-row" class="pdf-url-row hidden">
+          <input type="url" id="pdf-url-input" class="touch-input" placeholder="Dán link file .pdf (https://...)">
+          <button id="pdf-url-go" class="btn-touch-primary btn-compact">Tải PDF</button>
         </div>
 
         <!-- SUBMODE A: PDF VIEWER -->
         <div id="reader-pdf-view">
-          <div class="pdf-toolbar">
+          <div class="pdf-nav-bar hidden" id="pdf-nav-group">
+            <span id="pdf-doc-title" class="pdf-doc-name"></span>
             <div class="pdf-toolbar-group">
-              <button id="pdf-btn-file" class="btn-touch-primary btn-compact">📂 Mở PDF từ iPad Files</button>
-              <button id="pdf-btn-url" class="btn-touch-secondary btn-compact">🔗 Link PDF</button>
-              <button id="pdf-btn-sample" class="btn-touch-secondary btn-compact">📚 Mẫu IELTS</button>
-              <input type="file" id="ipad-pdf-input" accept="application/pdf,.pdf" style="display:none">
-            </div>
-            <div class="pdf-toolbar-group hidden" id="pdf-nav-group">
               <button id="pdf-prev" class="btn-touch-secondary btn-compact">◀</button>
-              <span id="pdf-page-label" class="progress-pill">1 / 1</span>
+              <div class="pdf-page-jump">
+                <input type="number" id="pdf-page-input" min="1" value="1" class="pdf-page-input" title="Nhập số trang để nhảy nhanh">
+                <span id="pdf-page-total">/ 1</span>
+              </div>
               <button id="pdf-next" class="btn-touch-secondary btn-compact">▶</button>
               <button id="pdf-zoom-out" class="btn-touch-secondary btn-compact">🔍−</button>
               <button id="pdf-zoom-in" class="btn-touch-secondary btn-compact">🔍+</button>
@@ -231,20 +253,21 @@
             </div>
           </div>
 
-          <div id="pdf-url-row" class="pdf-url-row hidden">
-            <input type="url" id="pdf-url-input" class="touch-input" placeholder="Dán link file .pdf (https://...)">
-            <button id="pdf-url-go" class="btn-touch-primary btn-compact">Tải PDF</button>
-          </div>
-
           <div id="pdf-loading" class="state-box hidden">
             <div class="ios-spinner"></div>
-            <p id="pdf-loading-msg">Đang dựng trang PDF sắc nét cho iPad...</p>
+            <p id="pdf-loading-msg">Đang dựng tài liệu sắc nét cho iPad...</p>
           </div>
 
           <div id="pdf-drop-empty" class="state-box">
             <div class="state-ico">📄✨</div>
-            <h3>Bôi đen dịch trực tiếp trên PDF bằng ngón tay hoặc Apple Pencil</h3>
-            <p>Bấm <strong>"📂 Mở PDF từ iPad Files"</strong> để chọn sách/đề thi từ iCloud Drive hoặc máy iPad, rồi bôi đen từ/câu bất kỳ — nút <strong>✨ Dịch AI</strong> sẽ lập tức nổi lên!</p>
+            <h3>Mở File & Bôi Đen Dịch Ngay Trên iPad</h3>
+            <p>Hỗ trợ đầy đủ: <strong>PDF (kể cả PDF Scan bằng OCR AI), Word (.docx), TXT/Markdown, Phụ đề (.srt) và Ảnh chụp sách</strong>.<br>Có thể bấm nút <strong>📂 Mở File iPad</strong> hoặc <strong>kéo thả trực tiếp</strong> từ ứng dụng Tệp (Files) khi dùng Split View!</p>
+            <div id="pdf-resume-wrap" class="hidden" style="margin-top:16px;">
+              <button id="btn-resume-file" class="resume-file-card">
+                <span>🕘 Tiếp tục đọc file gần đây:</span>
+                <strong id="resume-file-name">document.pdf</strong>
+              </button>
+            </div>
           </div>
 
           <div id="ipad-pdf-viewport" class="ipad-pdf-viewport theme-dark hidden">
@@ -252,11 +275,11 @@
           </div>
         </div>
 
-        <!-- SUBMODE B: ARTICLE / PASSAGE READER -->
+        <!-- SUBMODE B: ARTICLE / DOCX / TXT / OCR TEXT READER -->
         <div id="reader-article-view" class="hidden">
           <div id="article-editor-box" class="settings-card">
-            <div class="block-label">Dán bài báo, đề thi IELTS, email hoặc đoạn sách tiếng Anh vào đây:</div>
-            <textarea id="article-textarea" class="article-textarea" rows="7" placeholder="Paste any English passage here, then tap 'Bắt đầu đọc & Bôi đen' to highlight any word or sentence for instant AI translation..."></textarea>
+            <div class="block-label">Dán văn bản hoặc mở file Word (.docx) / TXT / Ảnh bằng nút "📂 Mở File iPad" phía trên:</div>
+            <textarea id="article-textarea" class="article-textarea" rows="7" placeholder="Paste any English passage here, then tap 'Bắt đầu đọc & Bôi đen' to highlight or tap any word..."></textarea>
             <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
               <button id="btn-article-paste" class="btn-touch-secondary">📋 Dán từ Clipboard</button>
               <button id="btn-article-render" class="btn-touch-primary">✨ Bắt đầu đọc & Bôi đen</button>
@@ -265,8 +288,11 @@
 
           <div id="article-display-box" class="hidden">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap;">
-              <span style="font-size:12.5px;color:var(--apple-blue);font-weight:600;">💡 Bôi đen bất kỳ từ hoặc câu nào bên dưới để hiện nút ✨ Dịch AI</span>
+              <span id="article-doc-title" style="font-size:13px;color:var(--apple-blue);font-weight:700;">💡 Chạm vào 1 từ bất kỳ hoặc bôi đen cả câu để dịch AI</span>
               <button id="btn-article-edit" class="btn-touch-secondary btn-compact">✏️ Sửa / Dán bài khác</button>
+            </div>
+            <div id="article-image-preview-wrap" class="hidden" style="margin-bottom:14px;text-align:center;">
+              <img id="article-image-preview" alt="Preview tài liệu ảnh" style="max-width:100%;max-height:280px;border-radius:12px;border:1px solid var(--border-glass);">
             </div>
             <div id="article-reader-body" class="article-reader-body"></div>
           </div>
@@ -512,6 +538,15 @@
         <button id="vm-confirm-cancel" class="btn-touch-secondary">Hủy</button>
         <button id="vm-confirm-ok" class="btn-touch-danger">Đồng ý</button>
       </div>
+    </div>
+  </div>
+
+  <!-- GLOBAL DRAG & DROP OVERLAY (SPLIT VIEW FILE / TEXT DROP) -->
+  <div id="global-drop-overlay" class="global-drop-overlay hidden">
+    <div class="drop-target-card">
+      <div style="font-size:44px;margin-bottom:10px;">📂✨</div>
+      <h3>Thả File hoặc Đoạn Chữ vào đây</h3>
+      <p>Tự động mở file (PDF, Word .docx, TXT, Ảnh) hoặc dịch ngay chữ vừa kéo từ app khác!</p>
     </div>
   </div>
 

@@ -1,11 +1,105 @@
 // d:/extension/ipad/pdf-ipad.js
-// Touch-optimized PDF Reader & Select-to-Translate controller for iPad PWA
+// Multi-format Touch Document Reader for iPadOS (.pdf, scanned PDF OCR, .docx, .txt, .md, .srt, Images)
 
-export function createIpadPdfController({ showToast }) {
+import { extractDocxText } from '../utils/docx-reader.js';
+import { extractTextFromImageAI } from '../utils/ai-client.js';
+
+const IDB_NAME = 'vm_ipad_files_db';
+const IDB_STORE = 'recent_files';
+const MAX_PERSIST_BYTES = 25 * 1024 * 1024; // 25MB limit for smooth iPad storage
+
+/**
+ * Extract clean English word around a DOM text-node caret offset (used by 1-tap word mode).
+ */
+export function extractWordAtCaret(text, offset) {
+  if (!text || typeof offset !== 'number' || offset < 0 || offset > text.length) return '';
+  const isWordChar = (ch) => /[A-Za-z0-9'’-]/.test(ch);
+  let start = offset;
+  let end = offset;
+  if (start === text.length && start > 0) start--;
+  if (start > 0 && !isWordChar(text[start]) && isWordChar(text[start - 1])) {
+    start--;
+    end = start;
+  }
+  if (!isWordChar(text[start])) return '';
+  while (start > 0 && isWordChar(text[start - 1])) start--;
+  while (end < text.length && isWordChar(text[end])) end++;
+  const word = text.slice(start, end).replace(/^['’-]+|['’-]+$/g, '');
+  return /[A-Za-z]/.test(word) ? word : '';
+}
+
+function openFileDb() {
+  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) {
+          db.createObjectStore(IDB_STORE);
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    } catch (_) {
+      resolve(null);
+    }
+  });
+}
+
+async function saveRecentDoc({ name, ext, bytes, pageNum = 1 }) {
+  if (!bytes || bytes.byteLength > MAX_PERSIST_BYTES) return;
+  const db = await openFileDb();
+  if (!db) return;
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put({ name, ext, bytes, pageNum, savedAt: Date.now() }, 'last_doc');
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    } catch (_) {
+      resolve(false);
+    }
+  });
+}
+
+async function loadRecentDoc() {
+  const db = await openFileDb();
+  if (!db) return null;
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).get('last_doc');
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    } catch (_) {
+      resolve(null);
+    }
+  });
+}
+
+async function updateRecentPageNum(pageNum) {
+  const rec = await loadRecentDoc();
+  if (!rec) return;
+  rec.pageNum = pageNum;
+  await saveRecentDoc(rec);
+}
+
+function uint8ToDataUrl(bytes, mimeType) {
+  let binary = '';
+  const chunk = 8192;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return `data:${mimeType};base64,${btoa(binary)}`;
+}
+
+export function createIpadPdfController({ showToast, getVisionCredentials, onOpenTextArticle }) {
   let pdfDoc = null;
   let currentScale = 1.0;
   let pageCount = 0;
   let currentPageNum = 1;
+  let currentDocName = '';
   let renderedPages = new Set();
   let observer = null;
   const themes = ['theme-dark', 'theme-sepia', 'theme-light'];
@@ -16,10 +110,15 @@ export function createIpadPdfController({ showToast }) {
   const pagesEl = document.getElementById('ipad-pdf-pages');
   const dropEmpty = document.getElementById('pdf-drop-empty');
   const navGroup = document.getElementById('pdf-nav-group');
-  const pageLabel = document.getElementById('pdf-page-label');
+  const docTitleEl = document.getElementById('pdf-doc-title');
+  const pageInput = document.getElementById('pdf-page-input');
+  const pageTotal = document.getElementById('pdf-page-total');
   const loadingEl = document.getElementById('pdf-loading');
   const urlRow = document.getElementById('pdf-url-row');
   const urlInput = document.getElementById('pdf-url-input');
+  const resumeWrap = document.getElementById('pdf-resume-wrap');
+  const resumeBtn = document.getElementById('btn-resume-file');
+  const resumeNameEl = document.getElementById('resume-file-name');
 
   function ensureWorker() {
     if (typeof pdfjsLib !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -27,10 +126,16 @@ export function createIpadPdfController({ showToast }) {
     }
   }
 
-  function showLoading(show, msg = 'Đang dựng trang PDF sắc nét cho iPad...') {
+  function showLoading(show, msg = 'Đang dựng tài liệu sắc nét cho iPad...') {
     const msgEl = document.getElementById('pdf-loading-msg');
     if (msgEl) msgEl.textContent = msg;
     loadingEl?.classList.toggle('hidden', !show);
+  }
+
+  function updatePageUi(p) {
+    currentPageNum = p;
+    if (pageInput) pageInput.value = String(p);
+    if (pageTotal) pageTotal.textContent = `/ ${pageCount}`;
   }
 
   async function computeFitScale() {
@@ -46,26 +151,35 @@ export function createIpadPdfController({ showToast }) {
     }
   }
 
-  async function loadPdfData(source) {
+  async function loadPdfData(source, fileName = 'Document.pdf', startPage = 1) {
     ensureWorker();
     if (typeof pdfjsLib === 'undefined') {
       showToast('❌ Chưa tải được thư viện PDF.js.', 'error');
       return;
     }
 
+    document.getElementById('mode-btn-pdf')?.click();
     showLoading(true);
     dropEmpty?.classList.add('hidden');
+    currentDocName = fileName;
+    if (docTitleEl) docTitleEl.textContent = fileName;
 
     try {
       const task = pdfjsLib.getDocument(source);
       pdfDoc = await task.promise;
       pageCount = pdfDoc.numPages;
-      currentPageNum = 1;
+      const clampedStart = Math.max(1, Math.min(pageCount, startPage));
+      updatePageUi(clampedStart);
+      if (pageInput) pageInput.max = String(pageCount);
+
       currentScale = await computeFitScale();
-      await rebuildPages();
+      await rebuildPages(clampedStart);
       navGroup?.classList.remove('hidden');
       viewportEl?.classList.remove('hidden');
-      if (pageLabel) pageLabel.textContent = `1 / ${pageCount}`;
+
+      if (clampedStart > 1) {
+        setTimeout(() => scrollToPage(clampedStart), 120);
+      }
     } catch (err) {
       console.error('iPad PDF load error:', err);
       showToast(`❌ Không mở được PDF: ${err.message}`, 'error');
@@ -76,7 +190,7 @@ export function createIpadPdfController({ showToast }) {
     }
   }
 
-  async function rebuildPages() {
+  async function rebuildPages(priorityPage = 1) {
     if (!pdfDoc || !pagesEl) return;
     if (observer) observer.disconnect();
     renderedPages.clear();
@@ -88,20 +202,20 @@ export function createIpadPdfController({ showToast }) {
       shell.id = `ipad-pdf-page-${i}`;
       shell.dataset.pageNum = String(i);
       shell.style.width = `${Math.round(595 * currentScale)}px`;
-      shell.style.height = `${Math.round(842 * currentScale)}px`;
+      shell.style.minHeight = `${Math.round(842 * currentScale)}px`;
       pagesEl.appendChild(shell);
     }
 
-    await renderPage(1);
-    if (pageCount >= 2) await renderPage(2);
+    await renderPage(priorityPage);
+    if (priorityPage + 1 <= pageCount) await renderPage(priorityPage + 1);
 
     observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         if (entry.isIntersecting) {
           const p = parseInt(entry.target.dataset.pageNum, 10);
           if (p) {
-            currentPageNum = p;
-            if (pageLabel) pageLabel.textContent = `${p} / ${pageCount}`;
+            updatePageUi(p);
+            updateRecentPageNum(p).catch(() => {});
             if (!renderedPages.has(p)) renderPage(p);
           }
         }
@@ -125,8 +239,13 @@ export function createIpadPdfController({ showToast }) {
       const h = Math.floor(vp.height);
 
       shell.style.width = `${w}px`;
-      shell.style.height = `${h}px`;
+      shell.style.minHeight = `${h}px`;
       shell.innerHTML = '';
+
+      const canvasWrap = document.createElement('div');
+      canvasWrap.style.position = 'relative';
+      canvasWrap.style.width = `${w}px`;
+      canvasWrap.style.height = `${h}px`;
 
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
@@ -141,7 +260,7 @@ export function createIpadPdfController({ showToast }) {
         viewport: vp,
         transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null
       }).promise;
-      shell.appendChild(canvas);
+      canvasWrap.appendChild(canvas);
 
       const textContent = await page.getTextContent();
       const textLayer = document.createElement('div');
@@ -155,7 +274,50 @@ export function createIpadPdfController({ showToast }) {
         container: textLayer,
         viewport: vp
       }).promise;
-      shell.appendChild(textLayer);
+      canvasWrap.appendChild(textLayer);
+      shell.appendChild(canvasWrap);
+
+      // Detect Scanned Image-only PDF page and offer 1-Tap AI Vision OCR
+      const hasSelectableText = Array.isArray(textContent?.items) &&
+        textContent.items.some(it => String(it.str || '').trim().length > 0);
+
+      if (!hasSelectableText) {
+        const ocrBar = document.createElement('div');
+        ocrBar.className = 'scanned-ocr-bar';
+        ocrBar.innerHTML = `
+          <span>📷 Trang ${pageNum} là <b>PDF Scan (dạng ảnh)</b> chưa có chữ để bôi đen.</span>
+          <button type="button" class="btn-touch-primary btn-compact">🔍 Quét chữ AI (OCR) trang này</button>
+        `;
+        const ocrBtn = ocrBar.querySelector('button');
+        ocrBtn?.addEventListener('click', async () => {
+          const creds = typeof getVisionCredentials === 'function' ? getVisionCredentials() : null;
+          if (!creds?.apiKey) {
+            showToast('⚠️ Hãy thêm Gemini hoặc OpenAI API Key trong ⚙️ Cài đặt để quét PDF Scan!', 'error');
+            return;
+          }
+          ocrBtn.disabled = true;
+          ocrBtn.textContent = '⏳ Đang quét chữ...';
+          try {
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.86);
+            const text = await extractTextFromImageAI({
+              provider: creds.provider,
+              apiKey: creds.apiKey,
+              dataUrl
+            });
+            ocrBar.remove();
+            const textBox = document.createElement('div');
+            textBox.className = 'scanned-text-box';
+            textBox.textContent = text;
+            shell.appendChild(textBox);
+            showToast('✅ Đã tách chữ xong! Hãy chạm hoặc bôi đen văn bản bên dưới trang.', 'success');
+          } catch (err) {
+            ocrBtn.disabled = false;
+            ocrBtn.textContent = '🔍 Thử quét lại OCR';
+            showToast(`❌ ${err.message}`, 'error');
+          }
+        });
+        shell.appendChild(ocrBar);
+      }
     } catch (err) {
       console.error(`Render page ${pageNum} failed:`, err);
       renderedPages.delete(pageNum);
@@ -163,12 +325,13 @@ export function createIpadPdfController({ showToast }) {
   }
 
   function scrollToPage(p) {
+    if (!pageCount) return;
     const target = Math.max(1, Math.min(pageCount, p));
     const el = document.getElementById(`ipad-pdf-page-${target}`);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      currentPageNum = target;
-      if (pageLabel) pageLabel.textContent = `${target} / ${pageCount}`;
+      updatePageUi(target);
+      updateRecentPageNum(target).catch(() => {});
       if (!renderedPages.has(target)) renderPage(target);
     }
   }
@@ -176,9 +339,99 @@ export function createIpadPdfController({ showToast }) {
   async function changeZoom(delta) {
     if (!pdfDoc) return;
     currentScale = Number(Math.max(0.5, Math.min(2.6, currentScale + delta)).toFixed(2));
-    await rebuildPages();
+    await rebuildPages(currentPageNum);
     scrollToPage(currentPageNum);
   }
+
+  async function openDocumentFromBytes(name, uint8Bytes, startPage = 1, skipPersist = false) {
+    const ext = (name.split('.').pop() || '').toLowerCase();
+
+    if (!skipPersist) {
+      await saveRecentDoc({ name, ext, bytes: uint8Bytes, pageNum: startPage });
+      refreshRecentPrompt().catch(() => {});
+    }
+
+    if (ext === 'pdf') {
+      await loadPdfData({ data: uint8Bytes }, name, startPage);
+      return;
+    }
+
+    if (ext === 'docx') {
+      showLoading(true, `Đang giải nén văn bản từ "${name}"...`);
+      try {
+        const text = await extractDocxText(uint8Bytes);
+        if (!text.trim()) throw new Error('Tài liệu Word này trống hoặc không có văn bản đọc được.');
+        onOpenTextArticle?.({ title: `📘 ${name}`, text });
+        showToast(`✅ Đã mở "${name}"! Chạm từ hoặc bôi đen để dịch.`, 'success');
+      } catch (err) {
+        showToast(`❌ Lỗi đọc DOCX: ${err.message}`, 'error');
+      } finally {
+        showLoading(false);
+      }
+      return;
+    }
+
+    if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
+      const mime = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
+      const dataUrl = uint8ToDataUrl(uint8Bytes, mime);
+      onOpenTextArticle?.({ title: `🖼️ ${name} (Đang nhận diện chữ OCR...)`, text: '⏳ Đang dùng AI quét chữ từ hình ảnh...', imageDataUrl: dataUrl });
+      const creds = typeof getVisionCredentials === 'function' ? getVisionCredentials() : null;
+      if (!creds?.apiKey) {
+        onOpenTextArticle?.({
+          title: `🖼️ ${name}`,
+          text: '⚠️ Cần nhập Gemini hoặc OpenAI API Key trong ⚙️ Cài đặt để AI trích xuất chữ từ hình ảnh!',
+          imageDataUrl: dataUrl
+        });
+        return;
+      }
+      try {
+        const extracted = await extractTextFromImageAI({ provider: creds.provider, apiKey: creds.apiKey, dataUrl });
+        onOpenTextArticle?.({ title: `🖼️ ${name}`, text: extracted || '(Không tìm thấy chữ trong ảnh)', imageDataUrl: dataUrl });
+        showToast('✅ Đã trích xuất văn bản từ ảnh! Hãy bôi đen hoặc chạm từ để dịch.', 'success');
+      } catch (err) {
+        onOpenTextArticle?.({ title: `🖼️ ${name}`, text: `❌ Lỗi OCR: ${err.message}`, imageDataUrl: dataUrl });
+      }
+      return;
+    }
+
+    // Plain text formats: .txt, .md, .srt, .csv, etc.
+    try {
+      let decoded = new TextDecoder('utf-8').decode(uint8Bytes);
+      if (ext === 'srt') {
+        decoded = decoded
+          .replace(/\r/g, '')
+          .replace(/^\d+\n\d{2}:\d{2}:\d{2},\d{3} --> .*$/gm, '')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+      }
+      onOpenTextArticle?.({ title: `📝 ${name}`, text: decoded });
+      showToast(`✅ Đã mở "${name}"!`, 'success');
+    } catch (err) {
+      showToast(`❌ Không đọc được file: ${err.message}`, 'error');
+    }
+  }
+
+  async function openDocumentFile(file) {
+    if (!file) return;
+    const buf = new Uint8Array(await file.arrayBuffer());
+    await openDocumentFromBytes(file.name, buf, 1, false);
+  }
+
+  async function refreshRecentPrompt() {
+    const rec = await loadRecentDoc();
+    if (rec && rec.bytes && resumeWrap && resumeNameEl) {
+      const pageTxt = rec.ext === 'pdf' && rec.pageNum ? ` (Trang ${rec.pageNum})` : '';
+      resumeNameEl.textContent = `${rec.name}${pageTxt}`;
+      resumeWrap.classList.remove('hidden');
+    }
+  }
+
+  resumeBtn?.addEventListener('click', async () => {
+    const rec = await loadRecentDoc();
+    if (!rec?.bytes) return;
+    const bytes = rec.bytes instanceof Uint8Array ? rec.bytes : new Uint8Array(rec.bytes);
+    await openDocumentFromBytes(rec.name, bytes, rec.pageNum || 1, true);
+  });
 
   function buildSamplePdfBytes() {
     const pdf = `%PDF-1.4
@@ -226,14 +479,12 @@ startxref
   document.getElementById('pdf-btn-file')?.addEventListener('click', () => pdfInput?.click());
   pdfInput?.addEventListener('change', async (e) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    const buf = new Uint8Array(await file.arrayBuffer());
-    await loadPdfData({ data: buf });
+    if (file) await openDocumentFile(file);
     e.target.value = '';
   });
 
   document.getElementById('pdf-btn-sample')?.addEventListener('click', async () => {
-    await loadPdfData({ data: buildSamplePdfBytes() });
+    await loadPdfData({ data: buildSamplePdfBytes() }, 'Sample_IELTS_Reading.pdf', 1);
   });
 
   document.getElementById('pdf-btn-url')?.addEventListener('click', () => {
@@ -250,15 +501,20 @@ startxref
       const resp = await fetch(u);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const buf = new Uint8Array(await resp.arrayBuffer());
-      await loadPdfData({ data: buf });
+      const urlName = u.split('?')[0].split('/').pop() || 'Remote_Document.pdf';
+      await openDocumentFromBytes(urlName, buf, 1, false);
     } catch (err) {
       showLoading(false);
-      showToast(`⚠️ Link PDF này chặn tải trực tiếp (${err.message}). Hãy tải file về Tệp (Files) rồi mở bằng "📂 Mở PDF từ iPad Files"!`, 'error');
+      showToast(`⚠️ Link PDF này chặn tải trực tiếp (${err.message}). Hãy lưu file vào Tệp (Files) rồi mở bằng "📂 Mở File iPad"!`, 'error');
     }
   });
 
   document.getElementById('pdf-prev')?.addEventListener('click', () => scrollToPage(currentPageNum - 1));
   document.getElementById('pdf-next')?.addEventListener('click', () => scrollToPage(currentPageNum + 1));
+  pageInput?.addEventListener('change', () => {
+    const val = parseInt(pageInput.value, 10);
+    if (!Number.isNaN(val)) scrollToPage(val);
+  });
   document.getElementById('pdf-zoom-out')?.addEventListener('click', () => changeZoom(-0.15));
   document.getElementById('pdf-zoom-in')?.addEventListener('click', () => changeZoom(0.15));
   document.getElementById('pdf-theme-cycle')?.addEventListener('click', () => {
@@ -268,5 +524,7 @@ startxref
     viewportEl.classList.add(themes[themeIdx]);
   });
 
-  return { loadPdfData };
+  refreshRecentPrompt().catch(() => {});
+
+  return { loadPdfData, openDocumentFile };
 }

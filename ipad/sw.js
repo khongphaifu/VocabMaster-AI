@@ -1,5 +1,5 @@
 // sw.js - Service Worker hỗ trợ Offline & Tự Động Cập Nhật trên iPad
-const CACHE_NAME = 'vocabmaster-ipad-v1.1.0';
+const CACHE_NAME = 'vocabmaster-ipad-v1.1.1';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -18,6 +18,7 @@ const ASSETS_TO_CACHE = [
   '../utils/dict-resolver.js',
   '../utils/modern-lexicon.js',
   '../utils/cloud-sync.js',
+  '../utils/docx-reader.js',
   '../lib/pdf.min.js',
   '../lib/pdf.worker.min.js',
   '../lib/pdf_viewer.min.css'
