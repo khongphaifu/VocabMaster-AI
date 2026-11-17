@@ -402,32 +402,49 @@ export async function fetchFromCambridge(word) {
     return null; // Only query single words / compounds
   }
 
+  // Skip direct Cambridge fetch in non-extension web browsers (e.g. Safari iPad PWA) to avoid CORS blocks,
+  // unless a custom CORS proxy / GM fetch bridge is explicitly configured.
+  const isBrowserPage = typeof window !== 'undefined' && typeof document !== 'undefined';
+  const hasExtPerm = typeof chrome !== 'undefined' && !!(chrome?.runtime?.id);
+  const customProxy = typeof globalThis !== 'undefined' ? (globalThis.__VM_CORS_PROXY__ || '') : '';
+  const customFetch = typeof globalThis !== 'undefined' ? globalThis.__VM_RAW_FETCH__ : null;
+  if (isBrowserPage && !hasExtPerm && !customProxy && !customFetch) {
+    return null;
+  }
+
   const lemmas = getCandidateLemmas(cleanWord);
   const targetLemmas = lemmas.slice(0, 2); // Only test top 2 lemmas to keep it fast
 
   for (const lemma of targetLemmas) {
-    const url = `${CAMBRIDGE_BASE}/dictionary/english-vietnamese/${encodeURIComponent(lemma)}`;
+    const targetUrl = `${CAMBRIDGE_BASE}/dictionary/english-vietnamese/${encodeURIComponent(lemma)}`;
+    const url = customProxy ? `${customProxy}${encodeURIComponent(targetUrl)}` : targetUrl;
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 1200); // 1.2s max
 
-      const resp = await fetch(url, {
-        signal: controller.signal,
-        credentials: 'include',
-        headers: {
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-          'Cache-Control': 'no-cache'
+      let html = '';
+      if (typeof customFetch === 'function') {
+        html = await customFetch(targetUrl);
+      } else {
+        const resp = await fetch(url, {
+          signal: controller.signal,
+          credentials: customProxy ? 'omit' : 'include',
+          headers: customProxy ? {} : {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8',
+            'Cache-Control': 'no-cache'
+          }
+        });
+        clearTimeout(timeoutId);
+
+        if (resp.status === 403 || !resp.ok) {
+          return null;
         }
-      });
-      clearTimeout(timeoutId);
-
-      if (resp.status === 403 || !resp.ok) {
-        return null;
+        html = await resp.text();
       }
+      clearTimeout(timeoutId);
+      if (!html) continue;
 
-      const html = await resp.text();
       const parsed = parseCambridgeHTML(html, cleanWord);
       if (parsed && (parsed.word?.meaning_vi || parsed.word?.definition_en)) {
         if (lemma !== cleanWord) {

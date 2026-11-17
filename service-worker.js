@@ -5,6 +5,68 @@
 import { callAI, testDirectAI, isPlaceholderText, findFallbackData, buildFallbackWordResponse } from './utils/ai-client.js';
 import { fetchFromCambridge } from './utils/cambridge-client.js';
 import { resolveDictionaryWord } from './utils/dict-resolver.js';
+import { syncWithGitHubGist, normalizeVocabEntry } from './utils/cloud-sync.js';
+
+let isApplyingCloudSync = false;
+let cloudSyncTimer = null;
+
+function scheduleCloudSync(delayMs = 1500) {
+  if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
+  cloudSyncTimer = setTimeout(() => {
+    cloudSyncTimer = null;
+    syncCloudNow().catch(() => {});
+  }, delayMs);
+}
+
+async function syncCloudNow() {
+  const { cloudSyncToken = '', cloudSyncGistId = '', cloudSyncEnabled = false } =
+    await chrome.storage.sync.get(['cloudSyncToken', 'cloudSyncGistId', 'cloudSyncEnabled']);
+  if (!cloudSyncEnabled || !cloudSyncToken) {
+    return { skipped: true, reason: 'Chưa bật đồng bộ Cloud' };
+  }
+
+  const {
+    vocabulary = [],
+    vocab_tombstones = {},
+    user_custom_lexicon = {}
+  } = await chrome.storage.local.get(['vocabulary', 'vocab_tombstones', 'user_custom_lexicon']);
+
+  const res = await syncWithGitHubGist({
+    token: cloudSyncToken,
+    gistId: cloudSyncGistId,
+    localVocab: vocabulary,
+    localTombstones: vocab_tombstones,
+    localLexicon: user_custom_lexicon
+  });
+
+  isApplyingCloudSync = true;
+  try {
+    await chrome.storage.local.set({
+      vocabulary: res.vocabulary,
+      vocab_tombstones: res.tombstones,
+      user_custom_lexicon: res.customLexicon,
+      lastCloudSyncAt: res.syncedAt
+    });
+    if (res.gistId && res.gistId !== cloudSyncGistId) {
+      await chrome.storage.sync.set({ cloudSyncGistId: res.gistId });
+    }
+  } finally {
+    setTimeout(() => { isApplyingCloudSync = false; }, 300);
+  }
+  return res;
+}
+
+chrome.runtime.onStartup?.addListener(() => {
+  scheduleCloudSync(1200);
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && !isApplyingCloudSync) {
+    if (changes.vocabulary || changes.vocab_tombstones || changes.user_custom_lexicon) {
+      scheduleCloudSync(1800);
+    }
+  }
+});
 
 chrome.runtime.onInstalled.addListener((details) => {
   // On UPDATE: clear dictionary cache so words are re-fetched with improved parser
@@ -42,30 +104,40 @@ chrome.runtime.onInstalled.addListener((details) => {
     } catch (_) {}
   })();
 
-  // Setup context menus
-  chrome.contextMenus.create({
-    id: 'vm-translate',
-    title: 'VocabMaster: Dịch & phân tích',
-    contexts: ['selection'],
-  });
-  chrome.contextMenus.create({
-    id: 'vm-add',
-    title: 'VocabMaster: Thêm từ này vào từ điển',
-    contexts: ['selection'],
-  });
-  chrome.contextMenus.create({
-    id: 'vm-open-pdf',
-    title: 'VocabMaster: Mở Trình đọc & Dịch PDF',
-    contexts: ['action'],
-  });
-  chrome.contextMenus.create({
-    id: 'vm-open-pdf-link',
-    title: 'VocabMaster: Mở link PDF này trong Trình đọc PDF',
-    contexts: ['link'],
-  });
+  // Setup context menus safely (some mobile browsers like Orion iOS don't support all menu contexts)
+  try {
+    if (chrome.contextMenus?.create) {
+      chrome.contextMenus.removeAll?.(() => {
+        chrome.contextMenus.create({
+          id: 'vm-translate',
+          title: 'VocabMaster: Dịch & phân tích',
+          contexts: ['selection'],
+        });
+        chrome.contextMenus.create({
+          id: 'vm-add',
+          title: 'VocabMaster: Thêm từ này vào từ điển',
+          contexts: ['selection'],
+        });
+        chrome.contextMenus.create({
+          id: 'vm-open-pdf',
+          title: 'VocabMaster: Mở Trình đọc & Dịch PDF',
+          contexts: ['action'],
+        });
+        chrome.contextMenus.create({
+          id: 'vm-open-pdf-link',
+          title: 'VocabMaster: Mở link PDF này trong Trình đọc PDF',
+          contexts: ['link'],
+        });
+      });
+    }
+  } catch (_) {}
 
-  // Configure side panel - must call inside onInstalled (not top-level)
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
+  // Configure side panel safely - must guard for mobile browsers like Orion on iPadOS
+  try {
+    chrome.sidePanel?.setPanelBehavior?.({ openPanelOnActionClick: false })?.catch?.(() => {});
+  } catch (_) {}
+
+  scheduleCloudSync(1500);
 
   // Seamless re-injection into existing tabs on install/update
   try {
@@ -126,7 +198,7 @@ if (typeof chrome !== 'undefined' && chrome.webNavigation?.onBeforeNavigate) {
 }
 
 // Handle context menu clicks
-chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+chrome.contextMenus?.onClicked?.addListener(async (info, tab) => {
   if (info.menuItemId === 'vm-open-pdf') {
     chrome.tabs.create({ url: chrome.runtime.getURL('pdf/reader.html') });
     return;
@@ -155,7 +227,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         // Tab cannot receive content script messages (e.g. Chrome's built-in PDF viewer or chrome:// pages)
         // Fallback: Open Side Panel and display translation card!
         if (tab && tab.windowId) {
-          await chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {});
+          if (chrome.sidePanel?.open) {
+            await chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {});
+          }
           await chrome.storage.local.set({ active_quick_translate: result });
           chrome.runtime.sendMessage({
             type: 'SHOW_QUICK_TRANSLATE',
@@ -195,7 +269,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true, data });
 
       } else if (message.type === 'SAVE_USER_MEANING') {
-        const { word, customMeaning } = message;
+        const word = message.word;
+        const customMeaning = message.customMeaning || message.meaning_vi;
         if (word && customMeaning) {
           const { user_custom_lexicon = {} } = await chrome.storage.local.get('user_custom_lexicon');
           user_custom_lexicon[word.toLowerCase().trim()] = customMeaning.trim();
@@ -206,6 +281,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               memoryCache.delete(k);
             }
           }
+          scheduleCloudSync(1000);
           sendResponse({ success: true });
         } else {
           sendResponse({ success: false, error: 'Dữ liệu không hợp lệ' });
@@ -217,8 +293,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       } else if (message.type === 'OPEN_PANEL') {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (tab) await chrome.sidePanel.open({ windowId: tab.windowId });
+        if (tab && chrome.sidePanel?.open) {
+          await chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {});
+        } else {
+          await chrome.tabs.create({ url: chrome.runtime.getURL('sidepanel/sidepanel.html') }).catch(() => {});
+        }
         sendResponse({ success: true });
+
+      } else if (message.type === 'CLOUD_SYNC_NOW') {
+        const syncRes = await syncCloudNow();
+        sendResponse({ success: true, ...syncRes });
 
       } else if (message.type === 'OPEN_OPTIONS') {
         chrome.runtime.openOptionsPage();
@@ -538,39 +622,34 @@ async function fetchGoogleTranslatePhrase(text, direction = 'auto') {
 }
 
 async function handleAddWord(wordData) {
-  const { vocabulary = [] } = await chrome.storage.local.get('vocabulary');
+  const { vocabulary = [], vocab_tombstones = {} } = await chrome.storage.local.get(['vocabulary', 'vocab_tombstones']);
+  const wordKey = (wordData.word || '').trim().toLowerCase();
+  if (!wordKey) return null;
+
   // Check for duplicate (case-insensitive)
   const existing = vocabulary.find(
-    w => w.word.toLowerCase() === (wordData.word || '').toLowerCase()
+    w => (w.word || '').toLowerCase() === wordKey
   );
   if (existing) return existing.id;
 
-  const id = Date.now();
-  const entry = {
-    id,
-    word: wordData.word || '',
-    ipa: wordData.ipa || wordData.ipa_uk || wordData.ipa_us || '',
-    ipa_uk: wordData.ipa_uk || wordData.ipa || '',
-    ipa_us: wordData.ipa_us || wordData.ipa || '',
-    partOfSpeech: wordData.partOfSpeech || '',
-    meaning_vi: wordData.meaning_vi || wordData.definition_vi || '',
-    definition_vi: wordData.definition_vi || '',
-    definition_en: wordData.definition_en || '',
-    examples: wordData.examples || [],
-    synonyms: wordData.synonyms || [],
-    antonyms: wordData.antonyms || [],
-    collocations: wordData.collocations || [],
-    word_family: wordData.word_family || [],
-    level: wordData.level || '',
-    etymology: wordData.etymology || '',
-    sourceUrl: wordData.sourceUrl || '',
-    addedAt: Date.now(),
+  const now = Date.now();
+  const entry = normalizeVocabEntry({
+    ...wordData,
+    id: now,
+    addedAt: now,
+    updatedAt: now,
     lastReviewed: 0,
     reviewCount: 0,
     correctCount: 0,
-    status: 'new',
-  };
+    status: 'new'
+  });
+
+  if (vocab_tombstones[wordKey]) {
+    delete vocab_tombstones[wordKey];
+  }
+
   vocabulary.push(entry);
-  await chrome.storage.local.set({ vocabulary });
-  return id;
+  await chrome.storage.local.set({ vocabulary, vocab_tombstones });
+  scheduleCloudSync(800);
+  return entry.id;
 }

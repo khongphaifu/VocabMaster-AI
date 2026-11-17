@@ -1299,12 +1299,9 @@ export async function fetchGoogleDictionary(word) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2000);
 
+    // Use CORS-simple GET without forbidden User-Agent header so Safari/iPad PWA never fails preflight
     const res = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'Accept': 'application/json, text/plain, */*',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
-      }
+      signal: controller.signal
     });
     clearTimeout(timeoutId);
 
@@ -1410,17 +1407,15 @@ export async function fetchWiktionary(word) {
   const cleanWord = (word || '').trim().toLowerCase();
   if (!cleanWord) return null;
 
-  const url = `https://vi.wiktionary.org/w/api.php?action=parse&page=${encodeURIComponent(cleanWord)}&format=json&prop=wikitext`;
+  // Add origin=* so MediaWiki returns Access-Control-Allow-Origin: * for Safari/iPad PWA
+  const url = `https://vi.wiktionary.org/w/api.php?action=parse&page=${encodeURIComponent(cleanWord)}&format=json&prop=wikitext&origin=*`;
 
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2000);
 
     const res = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'Accept': 'application/json'
-      }
+      signal: controller.signal
     });
     clearTimeout(timeoutId);
 

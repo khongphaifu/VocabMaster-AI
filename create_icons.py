@@ -1,51 +1,55 @@
 #!/usr/bin/env python3
 """Create VocabMaster icon PNGs using built-in libraries only (no Pillow needed)."""
+import os
 import struct
 import zlib
 
-def create_png(size, bg_color, letter_color):
-    """Create a simple icon PNG with 📚 emoji as base colors."""
-    # bg_color: (r, g, b) background (Catppuccin Mocha purple)
-    # letter_color: (r, g, b) letter color
-    
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def create_png(size, bg_color, letter_color, full_bleed=False):
+    """Create icon PNG with book emblem."""
     w = h = size
-    img_data = []
-    
+    img_data = bytearray()
+
     for y in range(h):
-        row = []
+        img_data.append(0)  # filter byte
+        ny = (y - h / 2) / (h / 2)
+        abs_ny = abs(ny)
         for x in range(w):
-            nx = (x - w/2) / (w/2)  # normalized -1..1
-            ny = (y - h/2) / (h/2)
+            nx = (x - w / 2) / (w / 2)
 
-            # Rounded rect background
-            radius = 0.65
-            corner_r = 0.25
-            # Simple rounded square: Chebyshev-rounded
-            mx = abs(nx) - (radius - corner_r)
-            my = abs(ny) - (radius - corner_r)
-            dist = (max(mx, 0)**2 + max(my, 0)**2) ** 0.5 - corner_r if mx > 0 or my > 0 else -corner_r
-
-            if dist > 0:
-                # Outside — transparent
-                row += [0, 0, 0, 0]
+            if full_bleed:
+                outside = False
             else:
-                # Book shape: two vertical lines in center area
+                radius = 0.85
+                corner_r = 0.25
+                mx = abs(nx) - (radius - corner_r)
+                my = abs_ny - (radius - corner_r)
+                dist = (max(mx, 0) ** 2 + max(my, 0) ** 2) ** 0.5 - corner_r if mx > 0 or my > 0 else -corner_r
+                outside = dist > 0
+
+            if outside:
+                img_data.extend((0, 0, 0, 0))
+            else:
                 bx = abs(nx)
-                in_book = abs(ny) < 0.38 and bx < 0.38
-                center_line = abs(nx) < 0.04 and abs(ny) < 0.42
-                page_lines = abs(ny) < 0.35 and abs(bx - 0.2) < 0.02
+                in_book = abs_ny < 0.36 and bx < 0.38
+                center_line = abs(nx) < 0.035 and abs_ny < 0.40
+                page_lines = abs_ny < 0.32 and abs(bx - 0.19) < 0.022
 
                 if center_line or page_lines:
-                    row += [letter_color[0], letter_color[1], letter_color[2], 255]
+                    img_data.extend((letter_color[0], letter_color[1], letter_color[2], 255))
                 elif in_book:
-                    # Book cover color
-                    lc = [min(255, int(c * 1.15)) for c in bg_color]
-                    row += [lc[0], lc[1], lc[2], 255]
+                    lc = (min(255, int(bg_color[0] * 1.15)), min(255, int(bg_color[1] * 1.15)), min(255, int(bg_color[2] * 1.15)))
+                    img_data.extend((lc[0], lc[1], lc[2], 255))
                 else:
-                    row += [bg_color[0], bg_color[1], bg_color[2], 255]
-        img_data.append(bytes([0] + row))  # filter byte
+                    # Subtle top-left gradient for large iPad Home Screen icon
+                    grad = 1.0 + (0.08 * (-nx - ny) if full_bleed else 0.0)
+                    r = max(0, min(255, int(bg_color[0] * grad)))
+                    g = max(0, min(255, int(bg_color[1] * grad)))
+                    b = max(0, min(255, int(bg_color[2] * grad)))
+                    img_data.extend((r, g, b, 255))
 
-    raw = zlib.compress(b''.join(img_data), 9)
+    raw = zlib.compress(bytes(img_data), 9)
 
     def chunk(name, data):
         c = name + data
@@ -58,13 +62,16 @@ def create_png(size, bg_color, letter_color):
         chunk(b'IEND', b'')
     )
 
-# Catppuccin Mocha purple: #cba6f7 as bg, white letters
-bg = (30, 30, 46)       # #1e1e2e base
-accent = (203, 166, 247) # #cba6f7 purple
+bg = (30, 30, 46)        # #1e1e2e Catppuccin dark
+accent = (203, 166, 247) # #cba6f7 lavender purple
 
-for size in [16, 48, 128]:
-    data = create_png(size, accent, bg)
-    path = f"icons/icon-{size}.png"
+icons_dir = os.path.join(BASE_DIR, "icons")
+os.makedirs(icons_dir, exist_ok=True)
+
+for size in [16, 48, 128, 180, 192, 512]:
+    # Apple Home Screen (180) and PWA splash (192, 512) look crisper full-bleed
+    data = create_png(size, accent, bg, full_bleed=(size >= 180))
+    path = os.path.join(icons_dir, f"icon-{size}.png")
     with open(path, 'wb') as f:
         f.write(data)
     print(f"Created {path} ({len(data)} bytes)")

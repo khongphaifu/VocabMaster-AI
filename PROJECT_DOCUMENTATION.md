@@ -495,7 +495,18 @@ node d:/extension/test_universal_verification.mjs
 
 ## 11. Lịch Sử Phiên Bản & Đóng Góp (Changelog)
 
-### Phiên Bản 1.0.29 (Hiện Tại)
+### Phiên Bản 1.1.0 (Hiện Tại)
+- **Hệ Sinh Thái iPad Hoàn Chỉnh & Đồng Bộ Sổ Từ 2 Chiều PC ↔ iPad:**
+  - **Sửa triệt để lỗi iPad PWA (`ipad/app.js`):** Khắc phục hoàn toàn lỗi lệch schema (`word_root`, `partOfSpeech`, `level`, `collocations[].phrase`), mở khóa tính năng lưu từ & phát âm chuẩn bản xứ trên iPad, loại bỏ `alert()`/`confirm()` thô bằng Toast & Confirm Modal chuẩn iPadOS.
+  - **Vá lỗi CORS cho Safari (`utils/dict-resolver.js`, `utils/cambridge-client.js`):** Loại bỏ header cấm `User-Agent` trong Google Dict fetch, thêm `&origin=*` cho Wiktionary API, tự động điều phối an toàn trên trình duyệt Web/Safari.
+  - **Tích hợp AI & Dịch Câu/Đoạn Văn trên iPad:** Nối trọn vẹn `utils/ai-client.js` (Gemini, Groq, OpenAI, Claude) vào iPad App, hỗ trợ dịch câu/đoạn văn Anh ↔ Việt, trích xuất từ vựng từng câu, **Clipboard Watcher** cho chế độ Slide Over, và URL Scheme `?q=` cho Apple Shortcuts.
+  - **Trình Đọc PDF & Văn Bản Cảm Ứng Tích Hợp (`ipad/pdf-ipad.js`):** Mở PDF từ iPad Files/iCloud Drive hoặc dán bài đọc, bôi đen chữ bằng tay/Apple Pencil để hiện nút nổi `✨ Dịch AI` và Bottom Sheet phân tích từ/câu.
+  - **Nút Dịch Nổi `✨` Ngay Trong Apple Safari iPad (`ipad/vocabmaster.user.js`):** Script build tự động `scripts/build-safari-userscript.mjs` đóng gói `modern-lexicon.js` + CSS + bộ đồng bộ Cloud Sync vào 1 Safari Userscript dùng `GM_xmlhttpRequest` (vượt CORS hoàn toàn).
+  - **Liên Kết Sổ Từ 2 Chiều Real-time (`utils/cloud-sync.js` & `utils/qr-svg.js`):** Thuật toán gộp hai chiều timestamp + tombstone `deletedAt` qua Secret GitHub Gist, kết nối Chrome PC ↔ iPad PWA ↔ Safari Userscript, hỗ trợ **Ghép nối 1 chạm qua Mã QR (`#pair=...`)** và Backup JSON 2 chiều.
+  - **Tương thích Orion Browser trên iPadOS:** Bảo vệ các API riêng của Chrome Desktop (`chrome.sidePanel`, `chrome.contextMenus`) trong `service-worker.js` và tối ưu chạm cảm ứng trong `content/content.js`.
+  - **Tự động Deploy GitHub Pages (`.github/workflows/deploy-pages.yml`):** Tự động đóng gói & xuất bản iPad PWA, Safari Userscript, Orion Zip và bộ icon Retina `180px/192px/512px`.
+
+### Phiên Bản 1.0.29
 - **Khắc Phục Triệt Để Lỗi Không Hiện Nút Dịch ✨ (TDZ ReferenceError Fix):**
   - **Sửa lỗi Temporal Dead Zone (TDZ):** Chuyển toàn bộ các khai báo biến trạng thái (`tooltip`, `floatTrigger`, `activeLibraryModal`, các biến cờ và bộ đếm thời gian) lên dòng đầu tiên của `content.js`. Trước đó, việc gọi `removeAllVocabMasterUI()` trước dòng khai báo `let tooltip` đã kích hoạt ngoại lệ `ReferenceError: Cannot access 'tooltip' before initialization`, khiến toàn bộ content script bị crash ngay khi khởi tạo và không đăng ký được bất kỳ bộ lắng nghe sự kiện bôi đen nào.
   - **Chuẩn hóa hàm `isInsideVocabMaster()`:** Tối ưu hóa việc kiểm tra TextNode, SVG, DocumentFragment và Element để loại trừ hoàn toàn các tương tác bên trong popup dịch mà không bao giờ gặp lỗi thiếu phương thức `.closest()`.

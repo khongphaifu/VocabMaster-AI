@@ -1,7 +1,9 @@
 {
+  "id": "./",
+  "scope": "./",
   "name": "VocabMaster AI - Trợ lý Từ vựng Thông minh",
   "short_name": "VocabMaster",
-  "description": "Ứng dụng tra cứu từ điển học thuật và học từ vựng thông minh đa AI trên iPad",
+  "description": "Tra cứu từ điển Thuần Việt chuẩn Cambridge, dịch câu AI, đọc & bôi đen PDF cảm ứng và đồng bộ 2 chiều với PC trên iPad",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0f172a",
@@ -17,6 +19,40 @@
       "src": "../icons/icon-128.png",
       "sizes": "128x128",
       "type": "image/png"
+    },
+    {
+      "src": "../icons/icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "../icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "../icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Tra & Dịch nhanh",
+      "short_name": "Tra từ",
+      "url": "./index.html?tab=lookup"
+    },
+    {
+      "name": "Đọc & Dịch PDF",
+      "short_name": "Đọc PDF",
+      "url": "./index.html?tab=reader"
+    },
+    {
+      "name": "Luyện Flashcard",
+      "short_name": "Flashcard",
+      "url": "./index.html?tab=flashcard"
     }
   ]
 }

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>VocabMaster AI — Cổng Tải & Sử Dụng Trên iPad</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180.png">
+  <link rel="icon" type="image/png" href="./icons/icon-128.png">
+  <script>
+    // Forward ?q=... or #pair=... directly into ./ipad/
+    if (window.location.search.includes('q=') || window.location.hash.includes('pair=')) {
+      window.location.replace('./ipad/' + window.location.search + window.location.hash);
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; }
+    body {
+      min-height: 100vh;
+      background: radial-gradient(circle at top right, #1e293b, #0f172a 65%);
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .hub {
+      width: 100%;
+      max-width: 640px;
+      background: rgba(30, 41, 59, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 24px;
+      padding: 32px 26px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 99px;
+      background: rgba(56, 189, 248, 0.16);
+      color: #38bdf8;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    h1 { font-size: 28px; font-weight: 800; margin-bottom: 10px; letter-spacing: -0.5px; }
+    p { color: #94a3b8; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
+    .cards { display: flex; flex-direction: column; gap: 14px; }
+    .card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 18px 20px;
+      border-radius: 16px;
+      text-decoration: none;
+      color: inherit;
+      background: #0f172a;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+    .card:hover { transform: translateY(-2px); border-color: #38bdf8; }
+    .card.primary {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(168, 85, 247, 0.16));
+      border-color: rgba(56, 189, 248, 0.45);
+    }
+    .card-title { font-size: 16.5px; font-weight: 700; margin-bottom: 4px; }
+    .card-desc { font-size: 13px; color: #94a3b8; line-height: 1.45; }
+    .arrow { font-size: 20px; color: #38bdf8; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main class="hub">
+    <span class="badge">✨ VocabMaster AI · iPadOS Ecosystem v1.1.0</span>
+    <h1>Học & Dịch Tiếng Anh Thuần Việt Trên iPad</h1>
+    <p>Đồng bộ 2 chiều theo thời gian thực với Chrome Extension trên máy tính PC, đọc PDF cảm ứng và bôi đen dịch nổi ngay trên trình duyệt Safari iPad.</p>
+
+    <div class="cards">
+      <a class="card primary" href="./ipad/">
+        <div>
+          <div class="card-title">📱 1. Mở Ứng Dụng iPad App (PWA + Đọc PDF)</div>
+          <div class="card-desc">Bấm <b>Chia sẻ ➔ Thêm vào MH chính</b> trên Safari iPad để cài thành App độc lập. Hỗ trợ tra từ, dịch câu AI, đọc PDF bôi đen nút ✨, Flashcard & Sync 2 chiều với PC.</div>
+        </div>
+        <span class="arrow">➔</span>
+      </a>
+
+      <a class="card" href="./ipad/vocabmaster.user.js">
+        <div>
+          <div class="card-title">✨ 2. Cài Nút Dịch Nổi Cho Safari iPad (Userscript)</div>
+          <div class="card-desc">Dùng cùng app miễn phí <b>Userscripts</b> trên App Store để bôi đen chữ trên MỌI trang web Safari iPad đều hiện nút ✨ & lưu về sổ chung.</div>
+        </div>
+        <span class="arrow">↓</span>
+      </a>
+
+      <a class="card" href="./ipad/vocabmaster-extension.zip">
+        <div>
+          <div class="card-title">🧩 3. Tải Gói Extension (.zip) Cho Orion Browser</div>
+          <div class="card-desc">Dành cho trình duyệt Orion trên iPad (hỗ trợ cài trực tiếp Chrome Extension gốc).</div>
+        </div>
+        <span class="arrow">↓</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,4 +1,6 @@
 // d:/extension/settings/settings.js
+import { mergeSyncState, normalizeVocabEntry, encodePairingPayload } from '../utils/cloud-sync.js';
+import { generateQrSvg } from '../utils/qr-svg.js';
 
 let selectedProvider = 'gemini';
 
@@ -63,10 +65,22 @@ async function init() {
   // Export/Import
   document.getElementById('btn-csv').addEventListener('click', exportCSV);
   document.getElementById('btn-excel').addEventListener('click', exportExcel);
+  document.getElementById('btn-json-export')?.addEventListener('click', exportJSONBackup);
   document.getElementById('btn-import').addEventListener('click', () =>
     document.getElementById('import-file').click()
   );
   document.getElementById('import-file').addEventListener('change', importCSV);
+  document.getElementById('btn-json-import')?.addEventListener('click', () =>
+    document.getElementById('import-json-file')?.click()
+  );
+  document.getElementById('import-json-file')?.addEventListener('change', importJSONBackup);
+
+  // 2-Way Cloud Sync & iPad Pairing
+  await restoreCloudSync();
+  document.getElementById('btn-cloud-sync')?.addEventListener('click', runCloudSync);
+  document.getElementById('btn-show-pair-qr')?.addEventListener('click', showPairingQR);
+  document.getElementById('btn-copy-pair-url')?.addEventListener('click', copyPairingUrl);
+  document.getElementById('btn-copy-pair-token')?.addEventListener('click', copyPairingCodeOnly);
 
   // Display redirect URI and setup copy button
   const redirectUri = chrome.identity?.getRedirectURL ? chrome.identity.getRedirectURL() : '';
@@ -670,6 +684,175 @@ async function syncSheets() {
     btn.textContent = '🔄 Đồng bộ ngay';
     btn.disabled = false;
   }
+}
+
+// ═══════════════════════════════════════════════
+// JSON BACKUP & 2-WAY CLOUD SYNC (PC ↔ iPad)
+// ═══════════════════════════════════════════════
+async function exportJSONBackup() {
+  const { vocabulary = [], user_custom_lexicon = {}, vocab_tombstones = {} } =
+    await chrome.storage.local.get(['vocabulary', 'user_custom_lexicon', 'vocab_tombstones']);
+  if (!vocabulary.length) {
+    showMsg('msg-export', '⚠️ Chưa có từ nào để xuất', 'err');
+    return;
+  }
+  const payload = {
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    vocabulary: vocabulary.map(normalizeVocabEntry).filter(Boolean),
+    tombstones: vocab_tombstones,
+    customLexicon: user_custom_lexicon
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+  downloadBlob(blob, `VocabMaster_Backup_${new Date().toISOString().slice(0, 10)}.json`);
+  showMsg('msg-export', `✅ Đã xuất ${payload.vocabulary.length} từ ra file JSON (nhập trực tiếp được trên iPad)`, 'ok');
+}
+
+async function importJSONBackup(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  try {
+    const raw = JSON.parse(await file.text());
+    const incomingList = Array.isArray(raw) ? raw : (raw.vocabulary || raw.vocab_list || []);
+    const { vocabulary = [], vocab_tombstones = {}, user_custom_lexicon = {} } =
+      await chrome.storage.local.get(['vocabulary', 'vocab_tombstones', 'user_custom_lexicon']);
+
+    const merged = mergeSyncState(
+      { vocabulary, tombstones: vocab_tombstones, customLexicon: user_custom_lexicon },
+      { vocabulary: incomingList, tombstones: raw.tombstones || {}, customLexicon: raw.customLexicon || {} }
+    );
+    await chrome.storage.local.set({
+      vocabulary: merged.vocabulary,
+      vocab_tombstones: merged.tombstones,
+      user_custom_lexicon: merged.customLexicon
+    });
+    await loadStats();
+    showMsg('msg-export', `✅ Đã gộp thông minh! Sổ từ hiện có ${merged.vocabulary.length} từ.`, 'ok');
+  } catch (err) {
+    showMsg('msg-export', `❌ Lỗi đọc JSON backup: ${err.message}`, 'err');
+  }
+  e.target.value = '';
+}
+
+async function restoreCloudSync() {
+  const { cloudSyncToken = '', cloudSyncGistId = '', cloudSyncEnabled = false, cloudIpadUrl = 'https://khongphaifu.github.io/VocabMaster-AI/ipad/' } =
+    await chrome.storage.sync.get(['cloudSyncToken', 'cloudSyncGistId', 'cloudSyncEnabled', 'cloudIpadUrl']);
+  const { lastCloudSyncAt = '' } = await chrome.storage.local.get('lastCloudSyncAt');
+
+  const tokEl = document.getElementById('cloud-gh-token');
+  const gistEl = document.getElementById('cloud-gist-id');
+  const urlEl = document.getElementById('cloud-ipad-url');
+  const enEl = document.getElementById('cloud-sync-enabled');
+
+  if (tokEl) tokEl.value = cloudSyncToken;
+  if (gistEl) gistEl.value = cloudSyncGistId;
+  if (urlEl && cloudIpadUrl) urlEl.value = cloudIpadUrl;
+  if (enEl) enEl.checked = !!cloudSyncEnabled;
+
+  const statusEl = document.getElementById('cloud-status');
+  if (statusEl && cloudSyncGistId) {
+    const timeText = lastCloudSyncAt ? new Date(lastCloudSyncAt).toLocaleString('vi-VN') : 'Chưa đồng bộ';
+    statusEl.innerHTML = `✅ Gist liên kết: <a href="https://gist.github.com/${escHtml(cloudSyncGistId)}" target="_blank" style="color:#89b4fa">${escHtml(cloudSyncGistId)}</a> · Lần cuối: <b>${escHtml(timeText)}</b>`;
+  }
+}
+
+async function saveCloudInputs(forceEnable = null) {
+  const token = document.getElementById('cloud-gh-token')?.value.trim() || '';
+  const gistId = document.getElementById('cloud-gist-id')?.value.trim() || '';
+  const ipadUrl = document.getElementById('cloud-ipad-url')?.value.trim() || 'https://khongphaifu.github.io/VocabMaster-AI/ipad/';
+  const enabledCheckbox = document.getElementById('cloud-sync-enabled');
+  const enabled = forceEnable !== null ? forceEnable : !!(enabledCheckbox?.checked);
+  if (enabledCheckbox && forceEnable !== null) enabledCheckbox.checked = forceEnable;
+
+  await chrome.storage.sync.set({
+    cloudSyncToken: token,
+    cloudSyncGistId: gistId,
+    cloudIpadUrl: ipadUrl,
+    cloudSyncEnabled: enabled
+  });
+  return { token, gistId, ipadUrl, enabled };
+}
+
+async function runCloudSync() {
+  const btn = document.getElementById('btn-cloud-sync');
+  btn.disabled = true;
+  btn.textContent = '⏳ Đang đồng bộ 2 chiều...';
+  try {
+    const { token } = await saveCloudInputs(true);
+    if (!token) throw new Error('Vui lòng dán GitHub Personal Access Token (quyền gist) trước.');
+    const res = await chrome.runtime.sendMessage({ type: 'CLOUD_SYNC_NOW' });
+    if (!res?.success || res.skipped) {
+      throw new Error(res?.error || res?.reason || 'Không thể đồng bộ.');
+    }
+    const gistEl = document.getElementById('cloud-gist-id');
+    if (gistEl && res.gistId) gistEl.value = res.gistId;
+    await restoreCloudSync();
+    await loadStats();
+    showMsg('msg-cloud', `✅ Đồng bộ thành công! Tổng cộng ${res.vocabulary?.length || 0} từ đã liên kết trên Cloud.`, 'ok');
+  } catch (err) {
+    showMsg('msg-cloud', `❌ ${err.message}`, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '☁️ Lưu & Đồng Bộ Ngay';
+  }
+}
+
+let currentPairingUrl = '';
+let currentPairingCode = '';
+
+async function buildCurrentPairing() {
+  const { token, gistId, ipadUrl } = await saveCloudInputs();
+  const { aiProvider = 'gemini', apiKeys = {} } = await chrome.storage.sync.get(['aiProvider', 'apiKeys']);
+  const includeKeys = document.getElementById('cloud-pair-keys')?.checked !== false;
+
+  const payload = {
+    ghToken: token,
+    gistId,
+    aiProvider
+  };
+  if (includeKeys) {
+    payload.apiKeys = {
+      gemini: document.getElementById('key-gemini')?.value.trim() || apiKeys.gemini || '',
+      groq: document.getElementById('key-groq')?.value.trim() || apiKeys.groq || '',
+      openai: document.getElementById('key-openai')?.value.trim() || apiKeys.openai || '',
+      claude: document.getElementById('key-claude')?.value.trim() || apiKeys.claude || ''
+    };
+  }
+  const encoded = encodePairingPayload(payload);
+  const baseUrl = ipadUrl.split('#')[0];
+  currentPairingCode = encoded;
+  currentPairingUrl = `${baseUrl}#pair=${encoded}`;
+  return { currentPairingUrl, encoded };
+}
+
+async function showPairingQR() {
+  try {
+    const { token, gistId } = await saveCloudInputs();
+    if (!token || !gistId) {
+      showMsg('msg-cloud', '💡 Hãy bấm "☁️ Lưu & Đồng Bộ Ngay" trước 1 lần để tạo Gist đồng bộ rồi mới quét QR sang iPad nhé!', 'err');
+      return;
+    }
+    const { currentPairingUrl: url } = await buildCurrentPairing();
+    const box = document.getElementById('pair-qr-box');
+    const svgWrap = document.getElementById('pair-qr-svg');
+    if (svgWrap) svgWrap.innerHTML = generateQrSvg(url, 220);
+    if (box) box.style.display = 'block';
+    showMsg('msg-cloud', '✅ Đã tạo mã QR! Mở Camera trên iPad để quét và đồng bộ ngay.', 'ok');
+  } catch (err) {
+    showMsg('msg-cloud', `❌ Lỗi tạo QR: ${err.message}`, 'err');
+  }
+}
+
+async function copyPairingUrl() {
+  if (!currentPairingUrl) await buildCurrentPairing();
+  await navigator.clipboard.writeText(currentPairingUrl);
+  showMsg('msg-cloud', '✅ Đã copy Link Ghép Nối iPad!', 'ok');
+}
+
+async function copyPairingCodeOnly() {
+  if (!currentPairingCode) await buildCurrentPairing();
+  await navigator.clipboard.writeText(currentPairingCode);
+  showMsg('msg-cloud', '✅ Đã copy Mã Cấu Hình (dùng để dán vào iPad hoặc Safari Userscript)!', 'ok');
 }
 
 init();

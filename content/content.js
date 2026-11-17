@@ -322,6 +322,11 @@ function handleMouseUp(e) {
   setTimeout(() => evaluateSelection('mouseup', e), 20);
 }
 
+function handleTouchEnd(e) {
+  // iOS/iPadOS WebKit updates selection range asynchronously slightly after touchend
+  setTimeout(() => evaluateSelection('touchend', e), 95);
+}
+
 function handleKeyUp(e) {
   if (['Shift', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
     setTimeout(() => evaluateSelection('keyup', e), 50);
@@ -354,16 +359,18 @@ function handleMouseDown(e) {
 // Attach event listeners using CAPTURE phase (useCapture: true) to bypass e.stopPropagation()
 document.addEventListener('mouseup', handleMouseUp, true);
 document.addEventListener('keyup', handleKeyUp, true);
-document.addEventListener('touchend', handleMouseUp, true);
+document.addEventListener('touchend', handleTouchEnd, true);
 document.addEventListener('selectionchange', handleSelectionChange, false);
 document.addEventListener('mousedown', handleMouseDown, true);
+document.addEventListener('touchstart', handleMouseDown, true);
 
 window.__VOCAB_MASTER_CLEANUP__ = () => {
   document.removeEventListener('mouseup', handleMouseUp, true);
   document.removeEventListener('keyup', handleKeyUp, true);
-  document.removeEventListener('touchend', handleMouseUp, true);
+  document.removeEventListener('touchend', handleTouchEnd, true);
   document.removeEventListener('selectionchange', handleSelectionChange, false);
   document.removeEventListener('mousedown', handleMouseDown, true);
+  document.removeEventListener('touchstart', handleMouseDown, true);
   removeAllVocabMasterUI();
 };
 
@@ -402,6 +409,9 @@ function showFloatTrigger(x, y, text) {
   floatTrigger.title = 'Dịch bằng AI (VocabMaster)';
 
   floatTrigger.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+  }, true);
+  floatTrigger.addEventListener('touchstart', (e) => {
     e.stopPropagation();
   }, true);
 
@@ -1604,10 +1614,14 @@ async function openLibraryModal() {
         if (!confirm(`Bạn có chắc muốn xóa từ "${wordName}" khỏi thư viện?`)) return;
 
         try {
-          const res = await chrome.storage.local.get('vocabulary');
+          const res = await chrome.storage.local.get(['vocabulary', 'vocab_tombstones']);
           const current = res?.vocabulary || [];
+          const tombstones = res?.vocab_tombstones || {};
+          if (wordName) {
+            tombstones[wordName.toLowerCase().trim()] = Date.now();
+          }
           vocabList = current.filter(item => String(item.id) !== String(id));
-          await chrome.storage.local.set({ vocabulary: vocabList });
+          await chrome.storage.local.set({ vocabulary: vocabList, vocab_tombstones: tombstones });
           renderList();
 
           // If current tooltip is displaying this word, reset its button

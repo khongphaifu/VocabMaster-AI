@@ -144,6 +144,7 @@ async function updateWordProgress(id, correct) {
   if (!w) return;
   w.reviewCount = (w.reviewCount || 0) + 1;
   w.lastReviewed = Date.now();
+  w.updatedAt = Date.now();
   if (correct) w.correctCount = (w.correctCount || 0) + 1;
   const acc = w.correctCount / w.reviewCount;
   if (w.reviewCount >= 5 && acc >= 0.8) w.status = 'learned';
@@ -207,8 +208,13 @@ async function renderLibrary() {
   el.querySelectorAll('.sbtn-del').forEach(b =>
     b.addEventListener('click', async () => {
       if (!confirm(`Xóa từ "${b.dataset.word}"?`)) return;
-      const v = await getVocab();
-      await saveVocab(v.filter(w => String(w.id) !== String(b.dataset.id)));
+      const { vocabulary: v = [], vocab_tombstones = {} } = await chrome.storage.local.get(['vocabulary', 'vocab_tombstones']);
+      const wordKey = (b.dataset.word || '').toLowerCase().trim();
+      if (wordKey) vocab_tombstones[wordKey] = Date.now();
+      await chrome.storage.local.set({
+        vocabulary: v.filter(w => String(w.id) !== String(b.dataset.id)),
+        vocab_tombstones
+      });
       renderLibrary();
     })
   );
@@ -217,6 +223,7 @@ async function renderLibrary() {
 document.getElementById('search').addEventListener('input', renderLibrary);
 document.getElementById('filter').addEventListener('change', renderLibrary);
 renderLibrary(); // Initial render
+chrome.runtime?.sendMessage?.({ type: 'CLOUD_SYNC_NOW' })?.catch?.(() => {});
 
 // Re-render library when vocabulary changes (new word added from content script)
 chrome.storage.onChanged.addListener((changes, area) => {

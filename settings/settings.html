@@ -268,10 +268,64 @@ hr { border: none; border-top: 1px solid #313244; margin: 4px 0 12px; }
     <div class="btn-row">
       <button class="btn btn-exp" id="btn-csv">⬇️ Xuất CSV</button>
       <button class="btn btn-exp" id="btn-excel">📊 Xuất Excel (.xlsx)</button>
+      <button class="btn btn-exp" id="btn-json-export">💾 Xuất JSON (Sync PC ↔ iPad)</button>
       <button class="btn btn-exp" id="btn-import">⬆️ Nhập CSV</button>
+      <button class="btn btn-exp" id="btn-json-import">📥 Nhập Backup JSON</button>
       <input type="file" id="import-file" accept=".csv" style="display:none">
+      <input type="file" id="import-json-file" accept=".json,application/json" style="display:none">
     </div>
     <div class="msg" id="msg-export"></div>
+  </div>
+
+  <!-- 2-Way Cloud Sync & iPad Pairing Section -->
+  <div class="sec">
+    <h2>☁️ Liên Kết Đồng Bộ 2 Chiều PC Chrome ↔ iPad</h2>
+    <p style="font-size:13px;color:#bac2de;margin-bottom:14px;line-height:1.5">
+      Liên kết sổ từ vựng hai chiều theo thời gian thực giữa <b>Chrome trên máy tính</b>, <b>Ứng dụng iPad PWA</b> và <b>Safari Userscript</b> bằng <b>Secret GitHub Gist</b> riêng tư của chính bạn (miễn phí 100%, không qua máy chủ trung gian).
+    </p>
+
+    <label>GitHub Personal Access Token (Quyền <code>gist</code>) <a href="https://github.com/settings/tokens/new?description=VocabMasterSync&scopes=gist" target="_blank" class="help">Tạo nhanh Token quyền Gist trong 10 giây →</a></label>
+    <div class="key-row">
+      <input type="password" id="cloud-gh-token" placeholder="ghp_... hoặc github_pat_...">
+      <button class="toggle-pw" data-t="cloud-gh-token">👁 Hiện</button>
+    </div>
+
+    <label>Gist ID Đồng Bộ <span style="color:#6c7086;font-size:11px">(Để trống ở lần đầu tiên để tự động tạo Secret Gist mới)</span></label>
+    <input type="text" id="cloud-gist-id" placeholder="Tự động điền sau khi đồng bộ lần đầu...">
+
+    <label>Địa chỉ iPad App URL <span style="color:#6c7086;font-size:11px">(Mặc định GitHub Pages của bạn)</span></label>
+    <input type="text" id="cloud-ipad-url" value="https://khongphaifu.github.io/VocabMaster-AI/ipad/">
+
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:0">
+        <input type="checkbox" id="cloud-sync-enabled" style="width:17px;height:17px;accent-color:#a6e3a1">
+        <span><b>Bật tự động đồng bộ 2 chiều</b> mỗi khi thêm / xóa / ôn tập từ vựng</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:0">
+        <input type="checkbox" id="cloud-pair-keys" checked style="width:17px;height:17px;accent-color:#89b4fa">
+        <span>Đóng gói kèm <b>API Keys AI</b> vào Mã QR để khỏi cần gõ lại trên iPad</span>
+      </label>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-save" id="btn-cloud-sync" style="margin-top:0;background:#a6e3a1">☁️ Lưu & Đồng Bộ Ngay</button>
+      <button class="btn btn-google" id="btn-show-pair-qr">📱 Hiện Mã QR Ghép Nối iPad</button>
+    </div>
+
+    <div id="cloud-status" style="font-size:12px;color:#bac2de;margin-top:10px;line-height:1.5"></div>
+    <div class="msg" id="msg-cloud"></div>
+
+    <div id="pair-qr-box" style="display:none;margin-top:14px;background:#313244;border-radius:12px;padding:16px;border:1px solid #45475a;text-align:center">
+      <div style="font-size:13px;font-weight:700;color:#cba6f7;margin-bottom:8px">📲 Mở Camera trên iPad quét mã QR dưới đây</div>
+      <div id="pair-qr-svg" style="display:inline-block;background:#fff;padding:10px;border-radius:12px;margin:6px auto"></div>
+      <div style="font-size:11.5px;color:#bac2de;margin:8px 0 10px;line-height:1.5">
+        Mã QR lưu cấu hình bảo mật ở phần <code>#pair=</code> (chỉ xử lý trong trình duyệt iPad, không gửi qua server). Sau khi mở trên Safari iPad, bấm <b>Chia sẻ ➔ Thêm vào MH chính</b> để cài thành app!
+      </div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-exp" id="btn-copy-pair-url" style="background:#45475a">📋 Copy Link Ghép Nối</button>
+        <button class="btn btn-exp" id="btn-copy-pair-token" style="background:#45475a">🔑 Copy Mã Cấu Hình (Cho Safari Userscript)</button>
+      </div>
+    </div>
   </div>
 
   <!-- Danger Zone -->
@@ -281,6 +335,6 @@ hr { border: none; border-top: 1px solid #313244; margin: 4px 0 12px; }
     <button class="btn btn-danger" id="btn-clear">🗑️ Xóa toàn bộ từ vựng</button>
   </div>
 </div>
-<script src="settings.js"></script>
+<script type="module" src="settings.js"></script>
 </body>
 </html>
