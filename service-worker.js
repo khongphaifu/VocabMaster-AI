@@ -145,11 +145,11 @@ chrome.runtime.onInstalled.addListener((details) => {
       for (const tab of tabs) {
         if (tab.id && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('edge://') && !tab.url.startsWith('chrome-extension://')) {
           chrome.scripting.executeScript({
-            target: { tabId: tab.id },
+            target: { tabId: tab.id, allFrames: true },
             files: ['content/content.js']
           }).catch(() => {});
           chrome.scripting.insertCSS({
-            target: { tabId: tab.id },
+            target: { tabId: tab.id, allFrames: true },
             files: ['content/content.css']
           }).catch(() => {});
         }
@@ -171,7 +171,19 @@ function isLikelyPdfUrl(urlStr) {
     }
 
     const pathname = (parsed.pathname || '').toLowerCase();
-    return pathname.endsWith('.pdf');
+    if (pathname.endsWith('.pdf')) return true;
+
+    // Academic & paper preprint PDF endpoints without .pdf extension
+    if ((hostname === 'arxiv.org' || hostname.endsWith('.arxiv.org')) && pathname.startsWith('/pdf/')) {
+      return true;
+    }
+    if ((hostname === 'openreview.net' || hostname.endsWith('.openreview.net')) && pathname === '/pdf') {
+      return true;
+    }
+    const formatParam = (parsed.searchParams?.get('format') || '').toLowerCase();
+    if (formatParam === 'pdf') return true;
+
+    return false;
   } catch (_) {
     return false;
   }
@@ -349,6 +361,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           if (cleanText && !cleanText.includes(' ') && cleanText.length < 35) {
             handleTranslate(cleanText, true, 'auto', contextSentence).catch(() => {});
           }
+        }
+        sendResponse({ success: true });
+
+      } else if (message.type === 'RELAY_TRANSLATE_TO_TOP') {
+        if (sender?.tab?.id) {
+          await chrome.tabs.sendMessage(sender.tab.id, {
+            type: 'RENDER_RELAYED_TOOLTIP',
+            text: message.text,
+            isWord: message.isWord,
+            contextSentence: message.contextSentence || '',
+            anchorRect: message.anchorRect || null
+          }, { frameId: 0 }).catch(() => {});
         }
         sendResponse({ success: true });
 

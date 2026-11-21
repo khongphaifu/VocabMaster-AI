@@ -20,7 +20,16 @@ function isLikelyPdfUrl(urlStr) {
     }
 
     const pathname = (parsed.pathname || '').toLowerCase();
-    return pathname.endsWith('.pdf');
+    if (pathname.endsWith('.pdf')) return true;
+    if ((hostname === 'arxiv.org' || hostname.endsWith('.arxiv.org')) && pathname.startsWith('/pdf/')) {
+      return true;
+    }
+    if ((hostname === 'openreview.net' || hostname.endsWith('.openreview.net')) && pathname === '/pdf') {
+      return true;
+    }
+    const formatParam = (parsed.searchParams?.get('format') || '').toLowerCase();
+    if (formatParam === 'pdf') return true;
+    return false;
   } catch (_) {
     return false;
   }
@@ -28,6 +37,10 @@ function isLikelyPdfUrl(urlStr) {
 
 const testUrls = [
   { url: 'https://arxiv.org/pdf/2301.00001.pdf', expected: true },
+  { url: 'https://arxiv.org/pdf/2401.12345', expected: true },
+  { url: 'https://arxiv.org/abs/2401.12345', expected: false },
+  { url: 'https://openreview.net/pdf?id=abc123XYZ', expected: true },
+  { url: 'https://example.com/paper?id=42&format=pdf', expected: true },
   { url: 'https://example.com/document.PDF', expected: true },
   { url: 'https://example.com/paper.pdf?token=abc123xyz', expected: true },
   { url: 'https://example.com/book.pdf#page=12', expected: true },

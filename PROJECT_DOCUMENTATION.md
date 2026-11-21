@@ -1,6 +1,6 @@
 # 📖 VocabMaster AI — Tài Liệu Kỹ Thuật & Toàn Bộ Kiến Trúc Dự Án (Project Documentation A–Z)
 
-> **Phiên bản:** 1.1.1  
+> **Phiên bản:** 1.1.2  
 > **Cập nhật gần nhất:** Tháng 11/2026  
 > **Nền tảng hỗ trợ:** Google Chrome Extension (Manifest V3), Windows Desktop (Electron), iPad (Progressive Web App - PWA)  
 > **Tác giả:** Đội ngũ Kỹ sư Dự án VocabMaster AI
@@ -495,7 +495,19 @@ node d:/extension/test_universal_verification.mjs
 
 ## 11. Lịch Sử Phiên Bản & Đóng Góp (Changelog)
 
-### Phiên Bản 1.1.1 (Hiện Tại)
+### Phiên Bản 1.1.2 (Hiện Tại)
+- **Hỗ Trợ Toàn Diện Google Docs & 4 Nhóm Trang Web Phổ Biến Trên Chrome Extension (PC):**
+  - **Động cơ bôi đen 3 tầng cho Google Docs / Slides / Sheets & Drive Preview (`content/gdocs-preload.js`, `content/content.js`):**
+    - Tiêm `gdocs-preload.js` tại `document_start` trong `MAIN` world (`manifest.json`) để bật `window._docs_annotate_canvas_by_ext = 'kix'` kèm hook đồng bộ `DataTransfer.prototype.setData`.
+    - Đọc chính xác tọa độ highlight `.kix-canvas-tile-selection rect`, trích xuất văn bản qua `docs-texteventtarget-iframe` (cả bôi đen chuột & phím `Shift + Mũi tên` nhờ cầu nối `bindDocsIframeBridge()`), Google Sheets `#waffle-rich-text-editor`, và fallback SVG `[aria-label]` cho tài liệu Docs chỉ xem bị khóa copy.
+  - **Tối ưu trình soạn thảo Web (Notion, Word Online, Overleaf, Medium, Substack):** Tự động đặt nút `✨` **bên dưới** vùng bôi đen (`isRichEditorHost()`) để né thanh công cụ định dạng phía trên, thêm lá chắn `attachPointerShield()` chặn `pointerdown`/`mousedown` chống mất vùng chọn, và ngừng ép `user-select: text` lên toolbar trình soạn thảo.
+  - **Shadow DOM (`composedPath`) & Code Editors (Reddit, Monaco/LeetCode/GitHub, CodeMirror 6):** Mở rộng `collectShadowRoots(e)` đọc trực tiếp qua `event.composedPath()`, đồng thời neo vị trí `✨` theo `.monaco-editor .selected-text` / `.cm-selectionBackground` thay vì thẻ textarea `1×1px` ẩn.
+  - **Phím tắt `Alt + D`, Relay từ Iframe nhỏ ra Top Frame & Tự bắt ArXiv PDF:**
+    - Nhấn `Alt + D` dịch ngay tại chỗ ở mọi trang web và bên trong Google Docs.
+    - Tự đẩy thẻ dịch ra khung chính (`RELAY_TRANSLATE_TO_TOP` -> `RENDER_RELAYED_TOOLTIP`) khi iframe nhỏ (`< 340px` cao hoặc `< 380px` rộng) trên LMS (Canvas, Moodle, Youpass), kèm nút gợi ý `.vm-embed-pdf-pill` cho PDF nhúng.
+    - Mở rộng `isLikelyPdfUrl()` trong `service-worker.js` tự bắt thêm `arxiv.org/pdf/...`, `openreview.net/pdf`, `format=pdf`, và bật `allFrames: true` khi tự tiêm lại script lúc cập nhật.
+
+### Phiên Bản 1.1.1
 - **Trình Đọc & Bôi Đen File Đa Định Dạng Chuyên Sâu Trên iPad (`📄 Đọc File`):**
   - **Hỗ trợ trọn bộ định dạng tài liệu iPad:** Mở và bôi đen trực tiếp **PDF** (thường + **PDF Scan ảnh qua Vision AI OCR**), **Word `.docx`** (giải nén ZIP + XML thuần trình duyệt `utils/docx-reader.js` không cần thư viện ngoài), **`.txt`, `.md`, `.srt` (phụ đề), `.csv`**, và **Ảnh chụp trang sách (`.png`, `.jpg`, `.jpeg`, `.webp` qua Gemini/OpenAI Vision OCR)**.
   - **Chế độ Chạm 1 Từ Là Dịch (`👆 Chạm 1 từ là dịch`):** Bổ sung tính năng chạm 1 ngón tay hoặc Apple Pencil trực tiếp vào bất kỳ từ tiếng Anh nào trong file để giải nghĩa ngay (sử dụng `caretRangeFromPoint` + `extractWordAtCaret`), song song với chế độ bôi đen cả câu hiện nút `✨ Dịch AI`.

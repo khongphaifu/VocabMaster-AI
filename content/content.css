@@ -1303,3 +1303,53 @@
 .vm-modal-foot-close:hover {
   background: #45475a !important;
 }
+
+/* Floating helper pill when page embeds a locked native PDF (<embed>/<object>/<iframe>) */
+.vm-embed-pdf-pill {
+  all: initial !important;
+  position: fixed !important;
+  right: 18px !important;
+  bottom: 18px !important;
+  z-index: 2147483647 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  background: #1e1e2e !important;
+  color: #cdd6f4 !important;
+  border: 1px solid rgba(137, 180, 250, 0.4) !important;
+  border-radius: 999px !important;
+  padding: 8px 14px !important;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+  pointer-events: auto !important;
+}
+
+.vm-embed-pdf-open {
+  all: initial !important;
+  color: #89b4fa !important;
+  font-family: inherit !important;
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+}
+
+.vm-embed-pdf-open:hover {
+  color: #b4befe !important;
+  text-decoration: underline !important;
+}
+
+.vm-embed-pdf-close {
+  all: initial !important;
+  color: #7f849c !important;
+  font-family: inherit !important;
+  font-size: 13px !important;
+  cursor: pointer !important;
+  padding: 0 2px !important;
+  line-height: 1 !important;
+}
+
+.vm-embed-pdf-close:hover {
+  color: #f38ba8 !important;
+}

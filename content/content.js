@@ -5,9 +5,11 @@
 let tooltip = null;
 let floatTrigger = null;
 let activeLibraryModal = null;
+let embedPdfPill = null;
 let currentSelectionText = '';
 let currentAnchorRect = null;
 let currentContextSentence = '';
+let lastPointerClient = null;
 let isProcessing = false;
 let isExitingTrigger = false;
 let exitTriggerTimer = null;
@@ -15,14 +17,21 @@ let isExitingTooltip = false;
 let exitTooltipTimer = null;
 let activeTypewriterTimer = null;
 let selectionChangeDebounceTimer = null;
+let isCapturingDocsCopy = false;
+let docsCaptureCache = { key: '', text: '', at: 0 };
+let docsBridgeObserver = null;
+let docsBridgeTimer = null;
+const boundDocsIframes = typeof WeakSet !== 'undefined' ? new WeakSet() : null;
+const bridgedIframeDocs = [];
 
 function removeAllVocabMasterUI() {
-  document.querySelectorAll('.vm-tooltip, .vm-float-trigger, .vm-modal-overlay').forEach(el => {
+  safeQueryAll(document, '.vm-tooltip, .vm-float-trigger, .vm-modal-overlay, .vm-embed-pdf-pill').forEach(el => {
     try { el.remove(); } catch (_) {}
   });
   tooltip = null;
   floatTrigger = null;
   activeLibraryModal = null;
+  embedPdfPill = null;
 }
 
 // Unbind any previous orphaned content script instance if re-injected
@@ -41,24 +50,140 @@ function isExtensionValid() {
   }
 }
 
+function safeQueryAll(root, selector) {
+  try {
+    return root && typeof root.querySelectorAll === 'function' ? Array.from(root.querySelectorAll(selector) || []) : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function getSafeHostname() {
+  try {
+    return String(window.location?.hostname || document.location?.hostname || '').toLowerCase();
+  } catch (_) {
+    return '';
+  }
+}
+
+const RICH_EDITOR_HOSTS = [
+  'docs.google.com',
+  'drive.google.com',
+  'notion.so',
+  'notion.site',
+  'office.com',
+  'officeapps.live.com',
+  'sharepoint.com',
+  'onedrive.live.com',
+  'overleaf.com',
+  'medium.com',
+  'substack.com',
+  'figma.com',
+  'canva.com'
+];
+
+function hostMatchesList(hostname, list) {
+  return !!hostname && list.some(h => hostname === h || hostname.endsWith('.' + h));
+}
+
+function isRichEditorHost() {
+  return hostMatchesList(getSafeHostname(), RICH_EDITOR_HOSTS);
+}
+
+function isGoogleWorkspaceHost() {
+  return hostMatchesList(getSafeHostname(), ['docs.google.com', 'drive.google.com']);
+}
+
+function normalizeRectObj(r) {
+  if (!r || (r.width === 0 && r.height === 0)) return null;
+  return {
+    left: r.left,
+    top: r.top,
+    right: r.right,
+    bottom: r.bottom,
+    width: r.width,
+    height: r.height
+  };
+}
+
+function getRangeAnchorRect(range) {
+  if (!range || typeof range.getBoundingClientRect !== 'function') return null;
+  let rect = normalizeRectObj(range.getBoundingClientRect());
+  if (!rect && typeof range.getClientRects === 'function') {
+    const rects = range.getClientRects();
+    if (rects && rects.length > 0) rect = normalizeRectObj(rects[0]);
+  }
+  return rect;
+}
+
+function uniteElementRects(elements) {
+  let minL = Infinity;
+  let minT = Infinity;
+  let maxR = -Infinity;
+  let maxB = -Infinity;
+  const rects = [];
+
+  for (const el of elements) {
+    if (!el || typeof el.getBoundingClientRect !== 'function') continue;
+    const r = el.getBoundingClientRect();
+    if (!r || r.width <= 0 || r.height <= 0) continue;
+    rects.push(r);
+    if (r.left < minL) minL = r.left;
+    if (r.top < minT) minT = r.top;
+    if (r.right > maxR) maxR = r.right;
+    if (r.bottom > maxB) maxB = r.bottom;
+  }
+
+  if (!rects.length) return { unionRect: null, rects };
+  return {
+    unionRect: {
+      left: minL,
+      top: minT,
+      right: maxR,
+      bottom: maxB,
+      width: Math.max(0, maxR - minL),
+      height: Math.max(0, maxB - minT)
+    },
+    rects
+  };
+}
+
+function attachPointerShield(el, preventFocusLoss = false) {
+  if (!el || typeof el.addEventListener !== 'function') return;
+  ['pointerdown', 'mousedown'].forEach(evName => {
+    el.addEventListener(evName, (e) => {
+      e.stopPropagation();
+      if (preventFocusLoss && typeof e.preventDefault === 'function') {
+        e.preventDefault();
+      }
+    }, true);
+  });
+  ['pointerup', 'mouseup', 'touchstart', 'touchend'].forEach(evName => {
+    el.addEventListener(evName, (e) => {
+      e.stopPropagation();
+    }, true);
+  });
+}
+
 function isInsideVocabMaster(node) {
   if (!node) return false;
   const el = node.nodeType === 3 ? (node.parentElement || node.parentNode) : node;
   if (!el || typeof el.closest !== 'function') return false;
-  return !!(el.closest('.vm-tooltip') || el.closest('.vm-float-trigger') || el.closest('.vm-modal-overlay'));
+  return !!(el.closest('.vm-tooltip') || el.closest('.vm-float-trigger') || el.closest('.vm-modal-overlay') || el.closest('.vm-embed-pdf-pill'));
 }
 
 const VIETNAMESE_REGEX = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
 
-// Anti-select and Anti-copy bypass for protected websites (e.g., e-learning platforms, LMS)
+// Anti-select and Anti-copy bypass for protected websites (skip Rich Editors/Canvas so toolbars & drag work)
 async function enableUniversalSelection() {
   try {
+    if (isRichEditorHost()) return;
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
       const { anti_select_enabled = true } = await chrome.storage.local.get('anti_select_enabled').catch(() => ({ anti_select_enabled: true }));
       if (anti_select_enabled === false) return;
     }
     const styleId = 'vm-universal-select-style';
-    if (!document.getElementById(styleId)) {
+    if (typeof document.getElementById === 'function' && !document.getElementById(styleId)) {
       const style = document.createElement('style');
       style.id = styleId;
       style.textContent = `
@@ -81,9 +206,8 @@ function getSurroundingSentence(selection) {
   try {
     const range = selection.getRangeAt(0);
     const container = range.commonAncestorContainer;
-    let block = container.nodeType === Node.TEXT_NODE ? container.parentNode : container;
-    
-    // Look up to nearest block-level element or stop at body
+    let block = container.nodeType === 3 ? container.parentNode : container;
+
     const blockTags = ['P', 'DIV', 'LI', 'BLOCKQUOTE', 'ARTICLE', 'SECTION', 'TD', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
     while (block && block !== document.body && !blockTags.includes(block.nodeName)) {
       block = block.parentNode;
@@ -94,7 +218,6 @@ function getSurroundingSentence(selection) {
     const selectedStr = selection.toString().trim();
     if (!selectedStr) return '';
 
-    // Split text into sentences
     const sentences = text.split(/(?<=[.!?\n])\s+/);
     for (const s of sentences) {
       if (s.includes(selectedStr)) {
@@ -108,10 +231,229 @@ function getSurroundingSentence(selection) {
 }
 
 /**
- * Universal Selection Engine:
- * Traverses standard DOM selection, Shadow DOM (Web Components), and form controls (<input>, <textarea>).
+ * Extracts text from Google Docs hidden iframe.docs-texteventtarget-iframe using selection or copy capture.
  */
-function getDeepActiveSelection() {
+function captureTextFromDocsIframe(iframeDoc, rectKey) {
+  if (!iframeDoc || isCapturingDocsCopy) return '';
+  if (rectKey && docsCaptureCache.key === rectKey && Date.now() - docsCaptureCache.at < 3500) {
+    return docsCaptureCache.text;
+  }
+
+  // First try direct iframe selection without firing copy event
+  try {
+    const iSel = iframeDoc.getSelection?.();
+    const direct = iSel ? iSel.toString().trim() : '';
+    if (direct) {
+      docsCaptureCache = { key: rectKey, text: direct, at: Date.now() };
+      return direct;
+    }
+  } catch (_) {}
+
+  // Temporary copy listener + MAIN-world DataTransfer capture bridge
+  isCapturingDocsCopy = true;
+  let captured = '';
+  const onCopy = (ev) => {
+    try {
+      const txt = ev?.clipboardData?.getData?.('text/plain');
+      if (txt && txt.trim()) {
+        captured = txt.trim();
+        ev.preventDefault?.();
+      }
+    } catch (_) {}
+  };
+
+  try {
+    if (typeof CustomEvent === 'function' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('vm-gdocs-capture-start'));
+    }
+    iframeDoc.addEventListener?.('copy', onCopy, false);
+    if (typeof iframeDoc.execCommand === 'function') {
+      iframeDoc.execCommand('copy');
+    }
+    if (!captured && typeof document.documentElement?.getAttribute === 'function') {
+      const mainCaptured = document.documentElement.getAttribute('data-vm-gdocs-captured');
+      if (mainCaptured && mainCaptured.trim()) captured = mainCaptured.trim();
+    }
+  } catch (_) {
+  } finally {
+    try {
+      iframeDoc.removeEventListener?.('copy', onCopy, false);
+      document.documentElement?.removeAttribute?.('data-vm-gdocs-captured');
+      if (typeof CustomEvent === 'function' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new CustomEvent('vm-gdocs-capture-end'));
+      }
+    } catch (_) {}
+    isCapturingDocsCopy = false;
+  }
+
+  if (captured && rectKey) {
+    docsCaptureCache = { key: rectKey, text: captured, at: Date.now() };
+  }
+  return captured;
+}
+
+function extractGoogleDocsSvgText(selectionRects) {
+  if (!selectionRects || !selectionRects.length) return '';
+  const candidates = safeQueryAll(
+    document,
+    '.kix-canvas-tile-content svg [aria-label], .kix-page-paginated svg [aria-label], .kix-lineview-text-block, .kix-wordhtmlgenerator-word-node'
+  );
+  if (!candidates.length) return '';
+
+  const matched = [];
+  for (const el of candidates) {
+    // Skip container groups whose children also hold aria-label
+    if (el.tagName?.toLowerCase?.() === 'g' && safeQueryAll(el, '[aria-label]').length > 0) continue;
+    const text = (el.getAttribute?.('aria-label') || el.textContent || '').trim();
+    if (!text) continue;
+    const r = el.getBoundingClientRect?.();
+    if (!r || r.width <= 0 || r.height <= 0) continue;
+
+    const overlaps = selectionRects.some(sr => {
+      const overlapX = Math.min(r.right, sr.right) - Math.max(r.left, sr.left);
+      const overlapY = Math.min(r.bottom, sr.bottom) - Math.max(r.top, sr.top);
+      return overlapX > Math.min(3, r.width * 0.25) && overlapY > Math.min(3, r.height * 0.25);
+    });
+    if (overlaps) matched.push({ text, top: r.top, left: r.left });
+  }
+
+  if (!matched.length) return '';
+  matched.sort((a, b) => (Math.abs(a.top - b.top) > 6 ? a.top - b.top : a.left - b.left));
+  return matched.map(m => m.text).join(' ').replace(/\s+/g, ' ').trim();
+}
+
+function extractGoogleDocsSelection(source) {
+  const hasDocsDom = isGoogleWorkspaceHost() ||
+    safeQueryAll(document, 'iframe.docs-texteventtarget-iframe, .kix-appview-editor').length > 0;
+  if (!hasDocsDom) return null;
+
+  // 1. Measure selection highlight rects on Kix Canvas or Docs overlay
+  const selEls = safeQueryAll(
+    document,
+    '.kix-canvas-tile-selection rect, .kix-canvas-tile-selection, .kix-selection-overlay, .docs-gm-selection-overlay'
+  );
+  const { unionRect, rects } = uniteElementRects(selEls);
+  const hasSelectionRect = !!(unionRect && unionRect.width > 2 && unionRect.height > 2);
+
+  // 2. Google Sheets formula bar / active cell input
+  const sheetInputs = safeQueryAll(document, '#waffle-rich-text-editor, .cell-input');
+  for (const cellEl of sheetInputs) {
+    try {
+      const sel = window.getSelection?.();
+      const txt = sel && sel.rangeCount > 0 ? sel.toString().trim() : '';
+      if (txt && typeof cellEl.contains === 'function' && cellEl.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        return {
+          selectedText: txt,
+          selObj: sel,
+          anchorRect: getRangeAnchorRect(sel.getRangeAt(0)) || normalizeRectObj(cellEl.getBoundingClientRect?.()),
+          contextSentence: (cellEl.textContent || '').trim().slice(0, 300)
+        };
+      }
+    } catch (_) {}
+  }
+
+  if (!hasSelectionRect) return null;
+
+  const rectKey = `${Math.round(unionRect.left)}:${Math.round(unionRect.top)}:${Math.round(unionRect.right)}:${Math.round(unionRect.bottom)}`;
+  let selectedText = '';
+
+  // 3. Docs text-event iframe (direct selection or non-destructive copy capture)
+  const iframes = safeQueryAll(document, 'iframe.docs-texteventtarget-iframe');
+  for (const frame of iframes) {
+    try {
+      const fDoc = frame.contentDocument || frame.contentWindow?.document;
+      if (!fDoc) continue;
+      if (source === 'mouseup' || source === 'keyup' || source === 'hotkey' || source === 'pointerup') {
+        selectedText = captureTextFromDocsIframe(fDoc, rectKey);
+      } else if (docsCaptureCache.key === rectKey) {
+        selectedText = docsCaptureCache.text;
+      }
+      if (selectedText) break;
+    } catch (_) {}
+  }
+
+  // 4. Fallback: SVG [aria-label] / accessible word nodes (e.g. Copy-restricted View-only Docs)
+  if (!selectedText) {
+    selectedText = extractGoogleDocsSvgText(rects);
+  }
+
+  if (!selectedText) return null;
+  return {
+    selectedText,
+    selObj: null,
+    anchorRect: unionRect,
+    contextSentence: ''
+  };
+}
+
+/**
+ * Resolve ShadowRoot candidates from both event.composedPath() (Reddit, web components)
+ * and document.activeElement chain.
+ */
+function collectShadowRoots(lastEvent) {
+  const roots = [];
+  const seen = new Set();
+  const pushRoot = (r) => {
+    if (r && !seen.has(r) && typeof r.getSelection === 'function') {
+      seen.add(r);
+      roots.push(r);
+    }
+  };
+
+  try {
+    if (lastEvent && typeof lastEvent.composedPath === 'function') {
+      for (const node of lastEvent.composedPath()) {
+        if (!node) continue;
+        if (node.shadowRoot) pushRoot(node.shadowRoot);
+        const root = typeof node.getRootNode === 'function' ? node.getRootNode() : null;
+        if (root && root.host) pushRoot(root);
+      }
+    }
+  } catch (_) {}
+
+  try {
+    let active = document.activeElement;
+    while (active && active.shadowRoot) {
+      pushRoot(active.shadowRoot);
+      active = active.shadowRoot.activeElement;
+    }
+  } catch (_) {}
+
+  return roots;
+}
+
+function getFormOrCodeEditorAnchor(activeEl) {
+  try {
+    const monaco = activeEl.closest?.('.monaco-editor');
+    if (monaco) {
+      const { unionRect } = uniteElementRects(safeQueryAll(monaco, '.selected-text'));
+      if (unionRect && unionRect.width > 0) return unionRect;
+    }
+    const cm = activeEl.closest?.('.cm-editor');
+    if (cm) {
+      const { unionRect } = uniteElementRects(safeQueryAll(cm, '.cm-selectionBackground'));
+      if (unionRect && unionRect.width > 0) return unionRect;
+    }
+  } catch (_) {}
+
+  if (lastPointerClient) {
+    return {
+      left: lastPointerClient.x - 10,
+      top: Math.max(0, lastPointerClient.y - 20),
+      right: lastPointerClient.x + 10,
+      bottom: lastPointerClient.y + 4,
+      width: 20,
+      height: 24
+    };
+  }
+  return typeof activeEl.getBoundingClientRect === 'function' ? normalizeRectObj(activeEl.getBoundingClientRect()) : null;
+}
+
+/**
+ * Universal Selection Engine:
+ * Standard DOM selection -> Shadow DOM (composedPath + activeElement) -> Inputs/Monaco/CodeMirror -> Google Docs Kix.
+ */
+function getDeepActiveSelection(lastEvent = null, source = '') {
   let selectedText = '';
   let selObj = null;
   let anchorRect = null;
@@ -119,7 +461,7 @@ function getDeepActiveSelection() {
 
   // 1. Standard window selection
   try {
-    const sel = window.getSelection();
+    const sel = window.getSelection?.();
     if (sel && sel.rangeCount > 0 && sel.toString().trim()) {
       const range = sel.getRangeAt(0);
       if (isInsideVocabMaster(range.commonAncestorContainer) ||
@@ -130,71 +472,34 @@ function getDeepActiveSelection() {
 
       selectedText = sel.toString().trim();
       selObj = sel;
-      let rect = range.getBoundingClientRect();
-      if (!rect || (rect.width === 0 && rect.height === 0)) {
-        const rects = range.getClientRects();
-        if (rects && rects.length > 0) {
-          rect = rects[0];
-        }
-      }
-      if (rect && (rect.width > 0 || rect.height > 0)) {
-        anchorRect = {
-          left: rect.left,
-          top: rect.top,
-          right: rect.right,
-          bottom: rect.bottom,
-          width: rect.width,
-          height: rect.height
-        };
-      }
+      anchorRect = getRangeAnchorRect(range);
       contextSentence = getSurroundingSentence(sel);
     }
   } catch (_) {}
 
-  // 2. Shadow DOM traversal if not found or activeElement is inside shadow
+  // 2. Shadow DOM traversal (handles Reddit <shreddit-post> even when activeElement === document.body)
   if (!selectedText) {
-    try {
-      let active = document.activeElement;
-      while (active && active.shadowRoot) {
-        if (typeof active.shadowRoot.getSelection === 'function') {
-          const sSel = active.shadowRoot.getSelection();
-          if (sSel && sSel.rangeCount > 0 && sSel.toString().trim()) {
-            const sRange = sSel.getRangeAt(0);
-            if (isInsideVocabMaster(sRange.commonAncestorContainer) ||
-                isInsideVocabMaster(sRange.startContainer) ||
-                isInsideVocabMaster(sRange.endContainer)) {
-              return { selectedText: '', selObj: null, anchorRect: null, contextSentence: '' };
-            }
-
-            selectedText = sSel.toString().trim();
-            selObj = sSel;
-            let sRect = sRange.getBoundingClientRect();
-            if (!sRect || (sRect.width === 0 && sRect.height === 0)) {
-              const sRects = sRange.getClientRects();
-              if (sRects && sRects.length > 0) {
-                sRect = sRects[0];
-              }
-            }
-            if (sRect && (sRect.width > 0 || sRect.height > 0)) {
-              anchorRect = {
-                left: sRect.left,
-                top: sRect.top,
-                right: sRect.right,
-                bottom: sRect.bottom,
-                width: sRect.width,
-                height: sRect.height
-              };
-            }
-            contextSentence = getSurroundingSentence(sSel);
-            break;
+    for (const root of collectShadowRoots(lastEvent)) {
+      try {
+        const sSel = root.getSelection();
+        if (sSel && sSel.rangeCount > 0 && sSel.toString().trim()) {
+          const sRange = sSel.getRangeAt(0);
+          if (isInsideVocabMaster(sRange.commonAncestorContainer) ||
+              isInsideVocabMaster(sRange.startContainer) ||
+              isInsideVocabMaster(sRange.endContainer)) {
+            return { selectedText: '', selObj: null, anchorRect: null, contextSentence: '' };
           }
+          selectedText = sSel.toString().trim();
+          selObj = sSel;
+          anchorRect = getRangeAnchorRect(sRange);
+          contextSentence = getSurroundingSentence(sSel);
+          break;
         }
-        active = active.shadowRoot.activeElement;
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
   }
 
-  // 3. Form controls (<input>, <textarea>)
+  // 3. Form controls (<input>, <textarea>) & Code Editors (Monaco, CodeMirror)
   if (!selectedText) {
     try {
       const active = document.activeElement;
@@ -207,15 +512,7 @@ function getDeepActiveSelection() {
         if (typeof start === 'number' && typeof end === 'number' && start < end) {
           selectedText = active.value.substring(start, end).trim();
           if (selectedText) {
-            const rect = active.getBoundingClientRect();
-            anchorRect = {
-              left: rect.left,
-              top: rect.top,
-              right: rect.right,
-              bottom: rect.bottom,
-              width: rect.width,
-              height: rect.height
-            };
+            anchorRect = getFormOrCodeEditorAnchor(active);
             contextSentence = active.value.slice(0, 300);
           }
         }
@@ -223,12 +520,24 @@ function getDeepActiveSelection() {
     } catch (_) {}
   }
 
+  // 4. Google Docs / Slides / Sheets Canvas Kix Engine
+  if (!selectedText) {
+    const gdocs = extractGoogleDocsSelection(source);
+    if (gdocs && gdocs.selectedText) {
+      return gdocs;
+    }
+  }
+
   return { selectedText, selObj, anchorRect, contextSentence };
 }
 
 function evaluateSelection(source, e) {
+  if (e && typeof e.clientX === 'number' && typeof e.clientY === 'number') {
+    lastPointerClient = { x: e.clientX, y: e.clientY };
+  }
+
   // 1. Mutual exclusion: If any tooltip or library modal is currently open, NEVER show floatTrigger
-  const activeTooltip = document.querySelector('.vm-tooltip:not(.vm-tooltip-exit)');
+  const activeTooltip = safeQueryAll(document, '.vm-tooltip:not(.vm-tooltip-exit)')[0];
   if (activeTooltip || (tooltip && !isExitingTooltip && document.body.contains(tooltip)) || activeLibraryModal) {
     hideFloatTrigger(true);
     return;
@@ -239,7 +548,7 @@ function evaluateSelection(source, e) {
     return;
   }
 
-  const { selectedText, anchorRect, contextSentence } = getDeepActiveSelection();
+  const { selectedText, anchorRect, contextSentence } = getDeepActiveSelection(e, source);
 
   if (!selectedText || selectedText.length < 1 || selectedText.length > 2500) {
     hideFloatTrigger();
@@ -258,17 +567,28 @@ function evaluateSelection(source, e) {
   let triggerY = 0;
   const scrollX = window.scrollX || window.pageXOffset || 0;
   const scrollY = window.scrollY || window.pageYOffset || 0;
+  const viewW = window.innerWidth || 300;
+  const viewH = window.innerHeight || 400;
+  const richEditor = isRichEditorHost();
 
   if (anchorRect && (anchorRect.width > 0 || anchorRect.height > 0)) {
     currentAnchorRect = anchorRect;
     triggerX = scrollX + anchorRect.right + 4;
-    triggerY = scrollY + anchorRect.top - 36;
-    if (triggerY < scrollY + 5) {
-      triggerY = scrollY + anchorRect.bottom + 6;
+    if (richEditor) {
+      // Place BELOW selection on Rich Editors (Google Docs, Notion, Word, Medium) to dodge top formatting toolbars
+      triggerY = scrollY + anchorRect.bottom + 8;
+      if (triggerY > scrollY + viewH - 44) {
+        triggerY = scrollY + anchorRect.top - 36;
+      }
+    } else {
+      triggerY = scrollY + anchorRect.top - 36;
+      if (triggerY < scrollY + 5) {
+        triggerY = scrollY + anchorRect.bottom + 6;
+      }
     }
   } else if (e && typeof e.pageX === 'number' && typeof e.pageY === 'number') {
     triggerX = e.pageX + 6;
-    triggerY = e.pageY - 34;
+    triggerY = richEditor ? (e.pageY + 14) : (e.pageY - 34);
     currentAnchorRect = {
       left: e.clientX,
       top: Math.max(0, e.clientY - 20),
@@ -278,12 +598,12 @@ function evaluateSelection(source, e) {
       height: 20
     };
   } else {
-    triggerX = scrollX + ((window.innerWidth || 300) / 2);
+    triggerX = scrollX + (viewW / 2);
     triggerY = scrollY + 40;
     currentAnchorRect = {
-      left: (window.innerWidth || 300) / 2,
+      left: viewW / 2,
       top: 40,
-      right: (window.innerWidth || 300) / 2,
+      right: viewW / 2,
       bottom: 60,
       width: 0,
       height: 20
@@ -291,8 +611,6 @@ function evaluateSelection(source, e) {
   }
 
   // Viewport & iframe boundaries clamping (ensures button never overflows outside frame)
-  const viewW = window.innerWidth || 300;
-  const viewH = window.innerHeight || 400;
   const minX = scrollX + 4;
   const maxX = scrollX + Math.max(minX + 10, viewW - 40);
   triggerX = Math.max(minX, Math.min(triggerX, maxX));
@@ -304,7 +622,6 @@ function evaluateSelection(source, e) {
   showFloatTrigger(triggerX, triggerY, selectedText);
 
   // Speculative Selection Prefetching:
-  // Resolves the word in background memory while the user is moving the cursor to click ✨
   const cleanPrefetch = selectedText.trim();
   const isSingleWord = !cleanPrefetch.includes(' ') && cleanPrefetch.length < 35;
   if (isSingleWord && isExtensionValid()) {
@@ -344,7 +661,9 @@ function handleSelectionChange() {
 }
 
 function handleMouseDown(e) {
-  // Do not dismiss when clicking inside our own UI elements
+  if (e && typeof e.clientX === 'number' && typeof e.clientY === 'number') {
+    lastPointerClient = { x: e.clientX, y: e.clientY };
+  }
   if (e.target && isInsideVocabMaster(e.target)) {
     return;
   }
@@ -356,6 +675,123 @@ function handleMouseDown(e) {
   }
 }
 
+function handleShortcutKeyDown(e) {
+  if (e.key === 'Escape') {
+    if (activeLibraryModal) {
+      closeLibraryModal();
+      return;
+    }
+    hideTooltip();
+    hideFloatTrigger();
+    return;
+  }
+
+  // Alt+D shortcut for instant lookup/translation inside any webpage, Docs, Notion, or input
+  if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.key === 'd' || e.key === 'D' || e.code === 'KeyD')) {
+    const deep = getDeepActiveSelection(e, 'hotkey');
+    const text = (deep.selectedText || currentSelectionText || '').trim();
+    if (!text || text.length > 2500) return;
+
+    e.preventDefault?.();
+    e.stopPropagation?.();
+    const anchor = deep.anchorRect || currentAnchorRect || (lastPointerClient ? {
+      left: lastPointerClient.x,
+      top: Math.max(0, lastPointerClient.y - 18),
+      right: lastPointerClient.x + 12,
+      bottom: lastPointerClient.y + 4,
+      width: 12,
+      height: 22
+    } : null);
+    const ctx = deep.contextSentence || currentContextSentence || '';
+    hideFloatTrigger(true);
+    doTranslate(text, anchor, ctx);
+  }
+}
+
+function bindDocsIframeBridge() {
+  if (!isGoogleWorkspaceHost() && safeQueryAll(document, 'iframe.docs-texteventtarget-iframe').length === 0) {
+    return;
+  }
+  const attach = () => {
+    let boundCount = 0;
+    for (const frame of safeQueryAll(document, 'iframe.docs-texteventtarget-iframe')) {
+      try {
+        if (boundDocsIframes && boundDocsIframes.has(frame)) {
+          boundCount++;
+          continue;
+        }
+        const fDoc = frame.contentDocument || frame.contentWindow?.document;
+        if (!fDoc || typeof fDoc.addEventListener !== 'function') continue;
+        boundDocsIframes?.add(frame);
+        bridgedIframeDocs.push(fDoc);
+        fDoc.addEventListener('keyup', handleKeyUp, true);
+        fDoc.addEventListener('keydown', handleShortcutKeyDown, true);
+        boundCount++;
+      } catch (_) {}
+    }
+    if (boundCount > 0 && docsBridgeTimer) {
+      clearInterval(docsBridgeTimer);
+      docsBridgeTimer = null;
+    }
+  };
+  attach();
+  if (typeof MutationObserver === 'function' && document.body && !docsBridgeObserver) {
+    try {
+      docsBridgeObserver = new MutationObserver(() => attach());
+      docsBridgeObserver.observe(document.body, { childList: true, subtree: true });
+    } catch (_) {}
+  }
+  if (typeof setInterval === 'function' && !docsBridgeTimer && bridgedIframeDocs.length === 0) {
+    let attempts = 0;
+    docsBridgeTimer = setInterval(() => {
+      attempts++;
+      attach();
+      if (attempts >= 8 && docsBridgeTimer) {
+        clearInterval(docsBridgeTimer);
+        docsBridgeTimer = null;
+      }
+    }, 2000);
+    docsBridgeTimer?.unref?.();
+  }
+}
+
+function detectEmbeddedPdfFrames() {
+  try {
+    if ((window.top || window) !== window) return;
+    if (!isExtensionValid() || typeof chrome.runtime.getURL !== 'function') return;
+    const embeds = safeQueryAll(document, 'embed[type*="pdf"], object[type*="pdf"], iframe[src*=".pdf"]');
+    let pdfSrc = '';
+    for (const el of embeds) {
+      const r = el.getBoundingClientRect?.();
+      if (r && (r.width < 180 || r.height < 180)) continue;
+      const candidate = el.src || el.data || '';
+      if (candidate && /^(https?|file):/i.test(candidate) && !candidate.startsWith('chrome-extension://')) {
+        pdfSrc = candidate;
+        break;
+      }
+    }
+    if (!pdfSrc || safeQueryAll(document, '.vm-embed-pdf-pill').length > 0) return;
+
+    const pill = document.createElement('div');
+    pill.className = 'vm-embed-pdf-pill';
+    pill.innerHTML = `
+      <button type="button" class="vm-embed-pdf-open" title="Mở file PDF này trong trình đọc hỗ trợ bôi đen dịch">📄 Mở trong VocabMaster PDF</button>
+      <button type="button" class="vm-embed-pdf-close" title="Ẩn">✕</button>
+    `;
+    attachPointerShield(pill, false);
+    pill.querySelector?.('.vm-embed-pdf-open')?.addEventListener?.('click', () => {
+      const targetUrl = chrome.runtime.getURL(`pdf/reader.html?file=${encodeURIComponent(pdfSrc)}`);
+      window.open?.(targetUrl, '_blank');
+    });
+    pill.querySelector?.('.vm-embed-pdf-close')?.addEventListener?.('click', () => {
+      pill.remove();
+      embedPdfPill = null;
+    });
+    (document.body || document.documentElement).appendChild(pill);
+    embedPdfPill = pill;
+  } catch (_) {}
+}
+
 // Attach event listeners using CAPTURE phase (useCapture: true) to bypass e.stopPropagation()
 document.addEventListener('mouseup', handleMouseUp, true);
 document.addEventListener('keyup', handleKeyUp, true);
@@ -363,6 +799,12 @@ document.addEventListener('touchend', handleTouchEnd, true);
 document.addEventListener('selectionchange', handleSelectionChange, false);
 document.addEventListener('mousedown', handleMouseDown, true);
 document.addEventListener('touchstart', handleMouseDown, true);
+document.addEventListener('keydown', handleShortcutKeyDown, true);
+bindDocsIframeBridge();
+if (typeof setTimeout === 'function') {
+  const pdfTimer = setTimeout(detectEmbeddedPdfFrames, 1400);
+  pdfTimer?.unref?.();
+}
 
 window.__VOCAB_MASTER_CLEANUP__ = () => {
   document.removeEventListener('mouseup', handleMouseUp, true);
@@ -371,24 +813,25 @@ window.__VOCAB_MASTER_CLEANUP__ = () => {
   document.removeEventListener('selectionchange', handleSelectionChange, false);
   document.removeEventListener('mousedown', handleMouseDown, true);
   document.removeEventListener('touchstart', handleMouseDown, true);
+  document.removeEventListener('keydown', handleShortcutKeyDown, true);
+  for (const fDoc of bridgedIframeDocs) {
+    try {
+      fDoc.removeEventListener?.('keyup', handleKeyUp, true);
+      fDoc.removeEventListener?.('keydown', handleShortcutKeyDown, true);
+    } catch (_) {}
+  }
+  docsBridgeObserver?.disconnect?.();
+  docsBridgeObserver = null;
+  if (docsBridgeTimer) {
+    clearInterval(docsBridgeTimer);
+    docsBridgeTimer = null;
+  }
   removeAllVocabMasterUI();
 };
 
-// Close on Escape key
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    if (activeLibraryModal) {
-      closeLibraryModal();
-      return;
-    }
-    hideTooltip();
-    hideFloatTrigger();
-  }
-}, true);
-
 function showFloatTrigger(x, y, text) {
   // Mutual exclusion: never spawn float trigger if any tooltip or modal is open
-  const activeTooltip = document.querySelector('.vm-tooltip:not(.vm-tooltip-exit)');
+  const activeTooltip = safeQueryAll(document, '.vm-tooltip:not(.vm-tooltip-exit)')[0];
   if (activeTooltip || (tooltip && !isExitingTooltip && document.body.contains(tooltip)) || activeLibraryModal) {
     hideFloatTrigger(true);
     return;
@@ -406,14 +849,10 @@ function showFloatTrigger(x, y, text) {
   floatTrigger.style.setProperty('pointer-events', 'auto', 'important');
   floatTrigger.style.setProperty('z-index', '2147483647', 'important');
   floatTrigger.innerHTML = '✨';
-  floatTrigger.title = 'Dịch bằng AI (VocabMaster)';
+  floatTrigger.title = 'Dịch bằng AI (VocabMaster · Alt+D)';
 
-  floatTrigger.addEventListener('mousedown', (e) => {
-    e.stopPropagation();
-  }, true);
-  floatTrigger.addEventListener('touchstart', (e) => {
-    e.stopPropagation();
-  }, true);
+  // Prevent editor focus loss / selection clearing when clicking ✨
+  attachPointerShield(floatTrigger, true);
 
   floatTrigger.addEventListener('click', async (e) => {
     e.stopPropagation();
@@ -477,6 +916,27 @@ async function doTranslate(text, anchorRect, contextSentence = null) {
 
   const ctxSentence = contextSentence !== null ? contextSentence : currentContextSentence;
 
+  // Top-Frame Tooltip Relay: push card out of tiny iframes (e.g. Canvas/Moodle/Youpass embeds)
+  let isTinyIframe = false;
+  try {
+    isTinyIframe = (window.top || window) !== window && ((window.innerHeight || 0) < 340 || (window.innerWidth || 0) < 380);
+  } catch (_) {}
+
+  if (isTinyIframe && isExtensionValid()) {
+    hideFloatTrigger(true);
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'RELAY_TRANSLATE_TO_TOP',
+        text: cleanText,
+        isWord,
+        contextSentence: ctxSentence,
+        anchorRect: anchor
+      });
+    } catch (_) {}
+    isProcessing = false;
+    return;
+  }
+
   if (!isExtensionValid()) {
     showExtensionReloadedTooltip(anchor);
     isProcessing = false;
@@ -486,6 +946,7 @@ async function doTranslate(text, anchorRect, contextSentence = null) {
   // Instant Shell (0ms): render card shell immediately with word header and AI shimmer skeleton
   showStreamingTooltip(cleanText, isWord, anchor);
 
+  let timeoutId = null;
   try {
     const sendPromise = chrome.runtime.sendMessage({
       type: 'TRANSLATE',
@@ -494,9 +955,13 @@ async function doTranslate(text, anchorRect, contextSentence = null) {
       contextSentence: ctxSentence,
     });
 
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Thời gian chờ phản hồi quá lâu (15s). Vui lòng kiểm tra lại mạng hoặc thử lại.')), 15000)
-    );
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(
+        () => reject(new Error('Thời gian chờ phản hồi quá lâu (15s). Vui lòng kiểm tra lại mạng hoặc thử lại.')),
+        15000
+      );
+      timeoutId?.unref?.();
+    });
 
     const response = await Promise.race([sendPromise, timeoutPromise]);
     if (response?.success) {
@@ -517,12 +982,13 @@ async function doTranslate(text, anchorRect, contextSentence = null) {
       showErrorTooltip(err.message, anchor, () => doTranslate(text, anchor, ctxSentence));
     }
   } finally {
+    if (timeoutId) clearTimeout(timeoutId);
     isProcessing = false;
   }
 }
 
-// Listen for messages from background (context menu results or open library)
-if (isExtensionValid()) {
+// Listen for messages from background (context menu results, top-frame relay, or open library)
+if (isExtensionValid() && chrome.runtime.onMessage?.addListener) {
   try {
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg.type === 'SHOW_RESULT') {
@@ -531,6 +997,32 @@ if (isExtensionValid()) {
         showErrorTooltip(msg.error, currentAnchorRect);
       } else if (msg.type === 'OPEN_LIBRARY_MODAL') {
         openLibraryModal();
+      } else if (msg.type === 'RENDER_RELAYED_TOOLTIP') {
+        let isTopFrame = true;
+        try { isTopFrame = (window.top || window) === window; } catch (_) {}
+        if (!isTopFrame || !msg.text) return;
+
+        let topAnchor = null;
+        try {
+          const activeEl = document.activeElement;
+          if (activeEl && activeEl.tagName === 'IFRAME' && typeof activeEl.getBoundingClientRect === 'function') {
+            const fRect = activeEl.getBoundingClientRect();
+            const rel = msg.anchorRect || { left: 20, top: 20, right: 80, bottom: 40, width: 60, height: 20 };
+            topAnchor = {
+              left: fRect.left + (rel.left || 0),
+              top: fRect.top + (rel.top || 0),
+              right: fRect.left + (rel.right || 60),
+              bottom: fRect.top + (rel.bottom || 30),
+              width: rel.width || 60,
+              height: rel.height || 20
+            };
+          }
+        } catch (_) {}
+        if (!topAnchor) {
+          const vw = window.innerWidth || 900;
+          topAnchor = { left: Math.max(20, vw / 2 - 140), top: 90, right: vw / 2 + 40, bottom: 112, width: 180, height: 22 };
+        }
+        doTranslate(msg.text, topAnchor, msg.contextSentence || '');
       }
     });
   } catch (_) {}
@@ -572,7 +1064,7 @@ function hideTooltip(immediate = false) {
 
 function createTooltipBase() {
   hideFloatTrigger(true);
-  document.querySelectorAll('.vm-tooltip').forEach(el => {
+  safeQueryAll(document, '.vm-tooltip').forEach(el => {
     try { el.remove(); } catch (_) {}
   });
   const el = document.createElement('div');
@@ -580,6 +1072,7 @@ function createTooltipBase() {
   el.style.visibility = 'hidden';
   el.style.left = '0px';
   el.style.top = '0px';
+  attachPointerShield(el, false);
   return el;
 }
 
