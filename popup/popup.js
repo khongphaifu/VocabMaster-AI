@@ -5,10 +5,48 @@ let lastResultData = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   await checkConfig();
+  await checkActivePdfTab();
   await loadStats();
   setupEventListeners();
   setupSpeechSynthesis();
 });
+
+async function checkActivePdfTab() {
+  try {
+    const banner = document.getElementById('active-pdf-banner');
+    if (!banner) return;
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const url = tab?.url || '';
+    const title = String(tab?.title || '').trim().toLowerCase();
+    if (!url || url.startsWith('chrome-extension://') || url.startsWith('chrome://') || url.startsWith('edge://')) {
+      return;
+    }
+
+    const parsed = new URL(url);
+    const host = (parsed.hostname || '').toLowerCase();
+    const path = (parsed.pathname || '').toLowerCase();
+    const looksPdf = path.endsWith('.pdf') ||
+      (host.includes('arxiv.org') && path.startsWith('/pdf/')) ||
+      (host.includes('openreview.net') && path === '/pdf') ||
+      (host === 'dl.acm.org' && path.startsWith('/doi/pdf/')) ||
+      (host === 'ieeexplore.ieee.org' && path.startsWith('/stamppdf/')) ||
+      ((host.includes('biorxiv.org') || host.includes('medrxiv.org')) && path.includes('.full.pdf')) ||
+      parsed.searchParams?.get('format')?.toLowerCase() === 'pdf' ||
+      title.endsWith('.pdf');
+
+    if (!looksPdf) return;
+    banner.style.display = 'block';
+    banner.addEventListener('click', async () => {
+      await chrome.runtime.sendMessage({
+        type: 'OPEN_IN_PDF_READER',
+        url: url.split('#')[0],
+        tabId: tab.id,
+        replaceCurrentTab: true
+      });
+      window.close();
+    });
+  } catch (_) {}
+}
 
 async function checkConfig() {
   const { apiKey = '', aiProvider = 'groq' } =

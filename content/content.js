@@ -108,12 +108,41 @@ function normalizeRectObj(r) {
 
 function getRangeAnchorRect(range) {
   if (!range || typeof range.getBoundingClientRect !== 'function') return null;
-  let rect = normalizeRectObj(range.getBoundingClientRect());
-  if (!rect && typeof range.getClientRects === 'function') {
-    const rects = range.getClientRects();
-    if (rects && rects.length > 0) rect = normalizeRectObj(rects[0]);
+  if (typeof range.getClientRects === 'function') {
+    const clientRects = Array.from(range.getClientRects() || []).filter(r => r && r.width > 1 && r.height > 1);
+    if (clientRects.length > 1) {
+      const minLeft = Math.min(...clientRects.map(r => r.left));
+      const lastRect = clientRects[clientRects.length - 1];
+      return {
+        left: minLeft,
+        top: lastRect.top,
+        right: lastRect.right,
+        bottom: lastRect.bottom,
+        width: lastRect.width,
+        height: lastRect.height
+      };
+    }
+    if (clientRects.length === 1) {
+      return normalizeRectObj(clientRects[0]);
+    }
   }
-  return rect;
+  return normalizeRectObj(range.getBoundingClientRect());
+}
+
+function isPdfSelectionNode(node) {
+  if (!node) return false;
+  const el = node.nodeType === 3 ? (node.parentElement || node.parentNode) : node;
+  if (!el || typeof el.closest !== 'function') return false;
+  return !!(el.closest('.textLayer') || el.closest('.pdf-ocr-result-box') || el.closest('.scanned-text-box'));
+}
+
+function normalizeSelectedPdfText(rawText, node) {
+  if (!rawText) return '';
+  if (!isPdfSelectionNode(node)) return String(rawText).trim();
+  return String(rawText)
+    .replace(/([A-Za-z])-\s*\r?\n\s*([a-z])/g, '$1$2')
+    .replace(/[\s\u00A0]+/g, ' ')
+    .trim();
 }
 
 function uniteElementRects(elements) {
@@ -470,7 +499,7 @@ function getDeepActiveSelection(lastEvent = null, source = '') {
         return { selectedText: '', selObj: null, anchorRect: null, contextSentence: '' };
       }
 
-      selectedText = sel.toString().trim();
+      selectedText = normalizeSelectedPdfText(sel.toString(), range.commonAncestorContainer);
       selObj = sel;
       anchorRect = getRangeAnchorRect(range);
       contextSentence = getSurroundingSentence(sel);
@@ -755,19 +784,48 @@ function bindDocsIframeBridge() {
   }
 }
 
-function detectEmbeddedPdfFrames() {
+async function detectEmbeddedPdfFrames() {
   try {
     if ((window.top || window) !== window) return;
     if (!isExtensionValid() || typeof chrome.runtime.getURL !== 'function') return;
-    const embeds = safeQueryAll(document, 'embed[type*="pdf"], object[type*="pdf"], iframe[src*=".pdf"]');
+
+    const curHref = (() => {
+      try { return String(window.location?.href || document.location?.href || ''); } catch (_) { return ''; }
+    })();
+    const isTopNativePdf = document.contentType === 'application/pdf' ||
+      safeQueryAll(document, 'embed[type="application/x-google-chrome-pdf"]').length > 0;
+
     let pdfSrc = '';
-    for (const el of embeds) {
-      const r = el.getBoundingClientRect?.();
-      if (r && (r.width < 180 || r.height < 180)) continue;
-      const candidate = el.src || el.data || '';
-      if (candidate && /^(https?|file):/i.test(candidate) && !candidate.startsWith('chrome-extension://')) {
-        pdfSrc = candidate;
-        break;
+    if (isTopNativePdf && curHref && /^(https?|file):/i.test(curHref) && !curHref.includes('#vm_native_pdf=1')) {
+      let autoIntercept = true;
+      try {
+        if (chrome.storage?.local?.get) {
+          const cfg = await chrome.storage.local.get('pdf_auto_intercept');
+          autoIntercept = cfg?.pdf_auto_intercept !== false;
+        }
+      } catch (_) {}
+
+      if (autoIntercept) {
+        chrome.runtime.sendMessage({
+          type: 'OPEN_IN_PDF_READER',
+          url: curHref,
+          replaceCurrentTab: true
+        }).catch(() => {});
+        return;
+      }
+      pdfSrc = curHref;
+    }
+
+    if (!pdfSrc) {
+      const embeds = safeQueryAll(document, 'embed[type*="pdf"], object[type*="pdf"], iframe[src*=".pdf"]');
+      for (const el of embeds) {
+        const r = el.getBoundingClientRect?.();
+        if (r && (r.width < 180 || r.height < 180)) continue;
+        const candidate = el.src || el.data || '';
+        if (candidate && /^(https?|file):/i.test(candidate) && !candidate.startsWith('chrome-extension://')) {
+          pdfSrc = candidate;
+          break;
+        }
       }
     }
     if (!pdfSrc || safeQueryAll(document, '.vm-embed-pdf-pill').length > 0) return;
@@ -801,6 +859,7 @@ document.addEventListener('mousedown', handleMouseDown, true);
 document.addEventListener('touchstart', handleMouseDown, true);
 document.addEventListener('keydown', handleShortcutKeyDown, true);
 bindDocsIframeBridge();
+detectEmbeddedPdfFrames();
 if (typeof setTimeout === 'function') {
   const pdfTimer = setTimeout(detectEmbeddedPdfFrames, 1400);
   pdfTimer?.unref?.();
@@ -986,6 +1045,8 @@ async function doTranslate(text, anchorRect, contextSentence = null) {
     isProcessing = false;
   }
 }
+
+window.__VM_TRANSLATE_SELECTION__ = (text, rect = null, ctx = null) => doTranslate(text, rect, ctx);
 
 // Listen for messages from background (context menu results, top-frame relay, or open library)
 if (isExtensionValid() && chrome.runtime.onMessage?.addListener) {

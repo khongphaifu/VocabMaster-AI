@@ -493,6 +493,76 @@ function createDomSandbox({
   console.log('✓ Tiny iframe Top-Frame Relay (RELAY_TRANSLATE_TO_TOP) passed');
 }
 
+// TEST 8: Chrome Native PDF Wrapper Auto-Redirect (document.contentType === 'application/pdf')
+{
+  const sb = createDomSandbox({ hostname: 'arxiv.org', winSelectionText: '' });
+  sb.sWin.location.href = 'https://arxiv.org/pdf/2104.08821';
+  sb.sDoc.contentType = 'application/pdf';
+  sb.sChrome.runtime.getURL = (p) => `chrome-extension://test-ext-id/${p}`;
+
+  const runPdfDetect = new Function('window', 'document', 'chrome', contentJsCode);
+  runPdfDetect(sb.sWin, sb.sDoc, sb.sChrome);
+  await new Promise(r => setTimeout(r, 25));
+
+  assert(
+    sb.sentMessages.some(m => m.type === 'OPEN_IN_PDF_READER' && m.url === 'https://arxiv.org/pdf/2104.08821' && m.replaceCurrentTab === true),
+    'Native Chrome PDF document must trigger OPEN_IN_PDF_READER replacement'
+  );
+  console.log('✓ Native Chrome PDF wrapper auto-redirect (OPEN_IN_PDF_READER) passed');
+}
+
+// TEST 9: PDF .textLayer LaTeX De-hyphenation & Multi-Rect getClientRects Anchoring
+{
+  const sb = createDomSandbox({ hostname: 'example.com', winSelectionText: '' });
+  const textLayer = new sb.RichMockNode('DIV', 1);
+  textLayer.className = 'textLayer';
+  const spanNode = new sb.RichMockNode('SPAN', 1);
+  const textLeaf = new sb.RichMockNode('#text', 3);
+  spanNode.appendChild(textLeaf);
+  textLayer.appendChild(spanNode);
+  sb.sBody.appendChild(textLayer);
+
+  sb.sWin.getSelection = () => ({
+    rangeCount: 1,
+    toString: () => 'premise-\nhypothesis dropout\nmasks',
+    getRangeAt: () => ({
+      commonAncestorContainer: textLeaf,
+      startContainer: textLeaf,
+      endContainer: textLeaf,
+      getBoundingClientRect: () => ({ left: 80, top: 150, right: 300, bottom: 192, width: 220, height: 42 }),
+      getClientRects: () => [
+        { left: 80, top: 150, right: 140, bottom: 168, width: 60, height: 18 },
+        { left: 80, top: 174, right: 210, bottom: 192, width: 130, height: 18 }
+      ]
+    })
+  });
+
+  const runPdfSelection = new Function('window', 'document', 'chrome', contentJsCode);
+  runPdfSelection(sb.sWin, sb.sDoc, sb.sChrome);
+
+  sb.sDoc.dispatchEvent('mouseup', { clientX: 205, clientY: 182 });
+  await new Promise(r => setTimeout(r, 45));
+
+  const triggers = sb.sDoc.querySelectorAll('.vm-float-trigger');
+  assert.strictEqual(triggers.length, 1, 'PDF .textLayer multi-line selection must spawn ✨ trigger');
+  assert.strictEqual(triggers[0].style.left, '214px', 'Trigger must anchor to last client rect right edge (210 + 4 = 214px)');
+  assert.strictEqual(triggers[0].style.top, '138px', 'Trigger must anchor above last client rect (174 - 36 = 138px)');
+
+  sb.sDoc.dispatchEvent('keydown', {
+    altKey: true,
+    key: 'd',
+    code: 'KeyD',
+    preventDefault() {},
+    stopPropagation() {}
+  });
+  await new Promise(r => setTimeout(r, 20));
+  assert(
+    sb.sentMessages.some(m => m.type === 'TRANSLATE' && m.text === 'premisehypothesis dropout masks'),
+    'PDF selection must merge line-break hyphenated words cleanly'
+  );
+  console.log('✓ PDF .textLayer LaTeX de-hyphenation & multi-rect anchoring passed');
+}
+
 console.log('======================================================');
-console.log('🎉 ALL v1.1.2 UNIVERSAL SITE ENGINE TESTS PASSED 100%!');
+console.log('🎉 ALL v1.1.3 UNIVERSAL & PDF ENGINE TESTS PASSED 100%!');
 console.log('======================================================');

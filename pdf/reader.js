@@ -12,6 +12,8 @@ let currentScale = 1.25;
 let pageCount = 0;
 let currentPageNum = 1;
 let currentFileName = '';
+let currentSourceUrl = '';
+let currentPdfBytes = null;
 let renderedPages = new Set();
 let pageViewports = new Map();
 let isRendering = false;
@@ -101,10 +103,18 @@ function setupEventListeners() {
     if (p >= 1 && p <= pageCount) scrollToPage(p);
   });
 
-  // Zoom
+  // Zoom & Actions
   document.getElementById('btn-zoom-in')?.addEventListener('click', () => changeZoom(0.15));
   document.getElementById('btn-zoom-out')?.addEventListener('click', () => changeZoom(-0.15));
   document.getElementById('btn-fit-width')?.addEventListener('click', fitWidth);
+  document.getElementById('btn-ocr-page')?.addEventListener('click', (e) => {
+    runOcrForPage(currentPageNum, e.currentTarget);
+  });
+  document.getElementById('btn-download-pdf')?.addEventListener('click', downloadCurrentPdf);
+  document.getElementById('btn-raw-pdf')?.addEventListener('click', openRawPdfInBrowser);
+
+  // 1-Tap Word Translator inside PDF TextLayer & OCR Boxes
+  pdfViewer?.addEventListener('click', handlePdfTapWord);
 
   // Themes
   document.querySelectorAll('.theme-btn').forEach(btn => {
@@ -155,32 +165,49 @@ function handleFileSelect(e) {
 async function loadPdfFromFile(file) {
   showLoading(`Đang mở: ${file.name}...`);
   currentFileName = file.name;
+  currentSourceUrl = '';
 
   try {
     const arrayBuffer = await file.arrayBuffer();
-    await loadPdfData(arrayBuffer);
+    currentPdfBytes = new Uint8Array(arrayBuffer);
+    await loadPdfData(currentPdfBytes);
   } catch (err) {
     alert(`Lỗi khi mở file PDF: ${err.message}`);
     hideLoading();
   }
 }
 
+async function openPdfTask(sourceOpts) {
+  try {
+    const task = pdfjsLib.getDocument({
+      ...sourceOpts,
+      cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
+      cMapPacked: true
+    });
+    return await task.promise;
+  } catch (err) {
+    if (sourceOpts.data) {
+      return await pdfjsLib.getDocument({ data: sourceOpts.data }).promise;
+    }
+    throw err;
+  }
+}
+
 async function loadPdfFromUrl(url) {
   showLoading('Đang tải PDF từ liên kết...');
+  currentSourceUrl = url;
+  currentPdfBytes = null;
   try {
     const parts = url.split('/');
-    currentFileName = decodeURIComponent(parts[parts.length - 1].split('?')[0]) || 'TaiLieu.pdf';
+    const rawTail = decodeURIComponent(parts[parts.length - 1].split('?')[0].split('#')[0]) || 'TaiLieu.pdf';
+    currentFileName = rawTail.toLowerCase().endsWith('.pdf') ? rawTail : `${rawTail}.pdf`;
 
     // First attempt: direct fetch via PDF.js
-    let directSuccess = false;
     try {
-      const loadingTask = pdfjsLib.getDocument({
-        url,
-        cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
-        cMapPacked: true
-      });
-      pdfDoc = await loadingTask.promise;
-      directSuccess = true;
+      pdfDoc = await openPdfTask({ url });
+      try {
+        currentPdfBytes = new Uint8Array(await pdfDoc.getData());
+      } catch (_) {}
       await onPdfLoaded();
       return;
     } catch (directErr) {
@@ -201,6 +228,7 @@ async function loadPdfFromUrl(url) {
         for (let i = 0; i < len; i++) {
           bytes[i] = binaryStr.charCodeAt(i);
         }
+        currentPdfBytes = bytes;
         await loadPdfData(bytes);
         return;
       } else {
@@ -217,12 +245,8 @@ async function loadPdfFromUrl(url) {
 
 async function loadPdfData(data) {
   try {
-    const loadingTask = pdfjsLib.getDocument({
-      data,
-      cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
-      cMapPacked: true
-    });
-    pdfDoc = await loadingTask.promise;
+    currentPdfBytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+    pdfDoc = await openPdfTask({ data: currentPdfBytes });
     await onPdfLoaded();
   } catch (err) {
     alert(`Lỗi phân tích tài liệu PDF: ${err.message}`);
@@ -237,12 +261,30 @@ async function onPdfLoaded() {
   pageNumInput.value = 1;
   currentPageNum = 1;
 
+  // Smart initial fit scale
+  try {
+    const viewport = document.getElementById('reader-viewport');
+    const availableWidth = (viewport?.clientWidth || window.innerWidth) - 80;
+    const firstPage = await pdfDoc.getPage(1);
+    const unscaledVp = firstPage.getViewport({ scale: 1.0 });
+    if (availableWidth > 300 && unscaledVp.width > 0) {
+      currentScale = parseFloat(Math.max(0.95, Math.min(1.5, availableWidth / unscaledVp.width)).toFixed(2));
+    }
+  } catch (_) {}
+
   docTitle.textContent = currentFileName;
   docTitle.title = currentFileName;
   docInfo.style.display = 'flex';
   navControls.style.display = 'flex';
   dropZone.style.display = 'none';
   pdfViewer.style.display = 'flex';
+
+  const ocrBtn = document.getElementById('btn-ocr-page');
+  const dlBtn = document.getElementById('btn-download-pdf');
+  const rawBtn = document.getElementById('btn-raw-pdf');
+  if (ocrBtn) ocrBtn.style.display = 'inline-flex';
+  if (dlBtn) dlBtn.style.display = currentPdfBytes ? 'inline-flex' : 'none';
+  if (rawBtn) rawBtn.style.display = currentSourceUrl && /^https?:/i.test(currentSourceUrl) ? 'inline-flex' : 'none';
 
   // Build skeleton shells for all pages
   pdfViewer.innerHTML = '';
@@ -342,9 +384,173 @@ async function renderPage(pageNum) {
     await textLayerRenderTask.promise;
     wrapper.appendChild(textLayerDiv);
 
+    // If page has no selectable text items (scanned PDF / image-only page), show 1-click OCR prompt bar
+    const hasText = Array.isArray(textContent?.items) && textContent.items.some(it => String(it.str || '').trim().length > 0);
+    const existingOcrBar = document.getElementById(`ocr-bar-${pageNum}`);
+    if (!hasText && !existingOcrBar && !document.getElementById(`ocr-box-${pageNum}`)) {
+      const bar = document.createElement('div');
+      bar.className = 'pdf-ocr-bar';
+      bar.id = `ocr-bar-${pageNum}`;
+      bar.innerHTML = `
+        <span>📷 Trang ${pageNum} là <b>PDF Scan (dạng ảnh)</b> chưa có lớp chữ để bôi đen.</span>
+        <button type="button" class="btn-tool">🔍 Quét chữ AI (OCR) trang này</button>
+      `;
+      const barBtn = bar.querySelector('button');
+      barBtn?.addEventListener('click', () => runOcrForPage(pageNum, barBtn));
+      wrapper.insertAdjacentElement('afterend', bar);
+    }
+
   } catch (err) {
     console.error(`Error rendering page ${pageNum}:`, err);
     renderedPages.delete(pageNum);
+  }
+}
+
+async function runOcrForPage(pageNum, btnEl = null) {
+  if (!pdfDoc) return;
+  const targetPage = Math.max(1, Math.min(pageCount, pageNum || currentPageNum || 1));
+  if (!renderedPages.has(targetPage)) {
+    await renderPage(targetPage);
+  }
+  const wrapper = document.getElementById(`page-${targetPage}`);
+  const canvas = wrapper?.querySelector('canvas');
+  if (!canvas) {
+    alert('Không tìm thấy hình ảnh trang PDF để quét chữ.');
+    return;
+  }
+
+  const origHtml = btnEl ? btnEl.innerHTML : '';
+  if (btnEl) {
+    btnEl.disabled = true;
+    btnEl.textContent = '⏳ Đang quét chữ AI...';
+  }
+
+  try {
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+    const res = await chrome.runtime.sendMessage({
+      type: 'OCR_PDF_PAGE',
+      dataUrl
+    });
+    if (!res?.success) {
+      throw new Error(res?.error || 'Không thể tách chữ từ trang PDF này.');
+    }
+
+    document.getElementById(`ocr-bar-${targetPage}`)?.remove();
+    let box = document.getElementById(`ocr-box-${targetPage}`);
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'pdf-ocr-result-box';
+      box.id = `ocr-box-${targetPage}`;
+      wrapper.insertAdjacentElement('afterend', box);
+    }
+
+    box.innerHTML = `
+      <div class="pdf-ocr-result-header">
+        <span>📷 Văn bản trích xuất AI từ hình vẽ / Trang ${targetPage} (Bôi đen hoặc chạm từ để dịch)</span>
+        <button type="button" class="btn-nav" title="Đóng">✕</button>
+      </div>
+      <div class="pdf-ocr-text"></div>
+    `;
+    box.querySelector('.pdf-ocr-text').textContent = res.text || '(Không tìm thấy chữ trong trang này)';
+    box.querySelector('button')?.addEventListener('click', () => box.remove());
+    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch (err) {
+    alert(`❌ Lỗi quét chữ AI (OCR): ${err.message}`);
+  } finally {
+    if (btnEl) {
+      btnEl.disabled = false;
+      btnEl.innerHTML = origHtml;
+    }
+  }
+}
+
+function downloadCurrentPdf() {
+  if (!currentPdfBytes) return;
+  const blob = new Blob([currentPdfBytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = currentFileName || 'document.pdf';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function openRawPdfInBrowser() {
+  if (!currentSourceUrl) return;
+  const base = currentSourceUrl.split('#')[0];
+  window.open(`${base}#vm_native_pdf=1`, '_blank');
+}
+
+function extractPdfWordAtCaret(text, offset) {
+  if (!text || typeof offset !== 'number' || offset < 0 || offset > text.length) return '';
+  const isWordChar = (ch) => /[A-Za-z0-9'’-]/.test(ch);
+  let start = offset;
+  let end = offset;
+  if (start === text.length && start > 0) start--;
+  if (start > 0 && !isWordChar(text[start]) && isWordChar(text[start - 1])) {
+    start--;
+    end = start;
+  }
+  if (!isWordChar(text[start])) return '';
+  while (start > 0 && isWordChar(text[start - 1])) start--;
+  while (end < text.length && isWordChar(text[end])) end++;
+  const word = text.slice(start, end).replace(/^['’-]+|['’-]+$/g, '');
+  return /[A-Za-z]/.test(word) ? word : '';
+}
+
+function handlePdfTapWord(e) {
+  const toggle = document.getElementById('toggle-pdf-tap-word');
+  if (!toggle?.checked) return;
+  if (e.detail > 1) return;
+  if (e.target.closest('button, a, input, label, .vm-tooltip, .vm-float-trigger')) return;
+
+  const sel = window.getSelection();
+  if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) return;
+
+  let textNode = null;
+  let offset = 0;
+  if (typeof document.caretRangeFromPoint === 'function') {
+    const r = document.caretRangeFromPoint(e.clientX, e.clientY);
+    if (r) {
+      textNode = r.startContainer;
+      offset = r.startOffset;
+    }
+  } else if (typeof document.caretPositionFromPoint === 'function') {
+    const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+    if (pos) {
+      textNode = pos.offsetNode;
+      offset = pos.offset;
+    }
+  }
+
+  if (!textNode || textNode.nodeType !== 3) return;
+  const parentEl = textNode.parentElement;
+  if (!parentEl || (!parentEl.closest('.textLayer') && !parentEl.closest('.pdf-ocr-result-box'))) return;
+
+  const fullText = textNode.textContent || '';
+  const word = extractPdfWordAtCaret(fullText, offset);
+  if (!word || word.length < 2) return;
+
+  let anchorRect = null;
+  const startIdx = Math.max(0, fullText.lastIndexOf(word, offset));
+  if (startIdx <= offset && startIdx + word.length >= offset) {
+    const checkRange = document.createRange();
+    checkRange.setStart(textNode, startIdx);
+    checkRange.setEnd(textNode, startIdx + word.length);
+    const rect = checkRange.getBoundingClientRect();
+    if (!rect || rect.width === 0 ||
+        e.clientX < rect.left - 18 || e.clientX > rect.right + 18 ||
+        e.clientY < rect.top - 14 || e.clientY > rect.bottom + 14) {
+      return;
+    }
+    anchorRect = { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height };
+  }
+
+  if (typeof window.__VM_TRANSLATE_SELECTION__ === 'function') {
+    const ctx = fullText.slice(Math.max(0, offset - 80), Math.min(fullText.length, offset + 120)).trim();
+    window.__VM_TRANSLATE_SELECTION__(word, anchorRect, ctx);
   }
 }
 
@@ -358,6 +564,9 @@ async function changeZoom(delta) {
 
   currentScale = parseFloat(newScale.toFixed(2));
   updateZoomDisplay();
+
+  // Clear cached page shells so zoom/fitWidth clean up old OCR prompt bars
+  document.querySelectorAll('.pdf-ocr-bar').forEach(el => el.remove());
 
   // Re-render all loaded pages with new scale
   renderedPages.clear();

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         VocabMaster AI — Dịch Thuần Việt & Lưu Sổ Chung (Safari iPad)
 // @namespace    https://github.com/khongphaifu/VocabMaster-AI
-// @version      1.1.2
+// @version      1.1.3
 // @description  Bôi đen từ/câu bất kỳ trên mọi website ở Safari iPad -> hiện nút ✨ dịch AI Thuần Việt + đồng bộ 2 chiều thẳng về Sổ Chrome PC & iPad PWA!
 // @author       VocabMaster AI
 // @match        *://*/*

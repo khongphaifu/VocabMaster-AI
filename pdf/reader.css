@@ -612,3 +612,74 @@ body {
   font-weight: 600;
   box-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
+
+.tap-mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tap-mode-pill input {
+  accent-color: var(--accent-blue);
+  cursor: pointer;
+}
+
+.pdf-ocr-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(137, 180, 250, 0.1);
+  border: 1px dashed rgba(137, 180, 250, 0.45);
+  border-radius: 10px;
+  padding: 10px 14px;
+  max-width: 760px;
+  width: 100%;
+  font-size: 12.5px;
+  color: var(--text-main);
+}
+
+.pdf-ocr-result-box {
+  background: var(--bg-card);
+  border: 1px solid rgba(203, 166, 247, 0.35);
+  border-radius: 12px;
+  padding: 14px 18px;
+  max-width: 780px;
+  width: 100%;
+  color: var(--text-main);
+  font-size: 14px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  box-shadow: var(--page-shadow);
+}
+
+.pdf-ocr-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-purple);
+  user-select: none;
+}
+
+@media (max-width: 1220px) {
+  .btn-label {
+    display: none;
+  }
+}

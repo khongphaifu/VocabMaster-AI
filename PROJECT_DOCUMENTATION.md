@@ -1,6 +1,6 @@
 # 📖 VocabMaster AI — Tài Liệu Kỹ Thuật & Toàn Bộ Kiến Trúc Dự Án (Project Documentation A–Z)
 
-> **Phiên bản:** 1.1.2  
+> **Phiên bản:** 1.1.3  
 > **Cập nhật gần nhất:** Tháng 11/2026  
 > **Nền tảng hỗ trợ:** Google Chrome Extension (Manifest V3), Windows Desktop (Electron), iPad (Progressive Web App - PWA)  
 > **Tác giả:** Đội ngũ Kỹ sư Dự án VocabMaster AI
@@ -495,7 +495,20 @@ node d:/extension/test_universal_verification.mjs
 
 ## 11. Lịch Sử Phiên Bản & Đóng Góp (Changelog)
 
-### Phiên Bản 1.1.2 (Hiện Tại)
+### Phiên Bản 1.1.3 (Hiện Tại)
+- **Giải Quyết Triệt Để Lỗi Không Dịch Được Trên PDF Chrome Mặc Định (`arxiv.org/pdf/2104.08821`, Tài Liệu Khoa Học & Sơ Đồ Hình Vẽ):**
+  - **Tự động chuyển đổi mọi tab PDF mở sẵn lẫn mở mới ([service-worker.js](file:///d:/extension/service-worker.js), [content/content.js](file:///d:/extension/content/content.js)):**
+    - Mở rộng `isLikelyPdfUrl()` nhận diện trọn bộ `arxiv.org/pdf/*`, `openreview.net/pdf`, `dl.acm.org/doi/pdf/*`, `ieeexplore.ieee.org/stampPDF/*`, `biorxiv.org/medrxiv.org`, `format=pdf`, đồng thời kiểm tra cả tiêu đề `.pdf` ở `chrome.tabs.onUpdated`, `chrome.runtime.onInstalled` và `chrome.runtime.onStartup` để tự động mở sang trình đọc hỗ trợ bôi đen dịch.
+    - Thêm cơ chế dự phòng ở `content.js`: nhận diện trực tiếp wrapper PDF gốc của Chrome (`document.contentType === 'application/pdf'` hoặc `embed[type="application/x-google-chrome-pdf"]`) để gửi `OPEN_IN_PDF_READER` chuyển thẳng sang `pdf/reader.html`, và giữ escape hatch `#vm_native_pdf=1` khi muốn xem bản gốc Chrome.
+  - **Nối từ bị gạch nối xuống dòng & Neo tọa độ đa dòng PDF/LaTeX (`content/content.js`):**
+    - `normalizeSelectedPdfText()` tự nối các từ bị ngắt dấu gạch ngang cuối dòng trong bài báo 2 cột (ví dụ `"premise-\nhypothesis"` ➔ `"premisehypothesis"`), và `getRangeAnchorRect()` dùng `getClientRects()` neo nút `✨` ngay cuối cụm bôi đen trong `.textLayer`.
+  - **Nâng cấp Trình đọc PDF PC ([pdf/reader.html](file:///d:/extension/pdf/reader.html), [pdf/reader.js](file:///d:/extension/pdf/reader.js), [pdf/reader.css](file:///d:/extension/pdf/reader.css)):**
+    - Bổ sung nút **📷 Quét chữ hình/Scan (`OCR_PDF_PAGE`)** dùng Gemini / OpenAI Vision OCR để tách chữ trong hình vẽ minh họa (như *Figure 1* trên ArXiv) hoặc trang PDF Scan ảnh ra hộp văn bản cho phép chạm/bôi đen dịch ngay dưới trang sách.
+    - Thêm công tắc **👆 Chạm 1 từ** (`#toggle-pdf-tap-word`), nút **⬇️ Tải PDF** và **🌐 Xem bản gốc** (`#vm_native_pdf=1`).
+  - **Nút chuyển nhanh trên Popup & Side Panel đa năng ([popup/popup.html](file:///d:/extension/popup/popup.html), [popup/popup.js](file:///d:/extension/popup/popup.js), [sidepanel/sidepanel.js](file:///d:/extension/sidepanel/sidepanel.js)):**
+    - Popup tự hiện banner chuyển đổi tab PDF đang xem sang VocabMaster PDF Reader chỉ với 1 click; Side Panel mở đồng bộ ngay khi bấm chuột phải trên PDF và hiển thị đầy đủ giải nghĩa câu cùng nút `+ Lưu` từng từ vựng.
+
+### Phiên Bản 1.1.2
 - **Hỗ Trợ Toàn Diện Google Docs & 4 Nhóm Trang Web Phổ Biến Trên Chrome Extension (PC):**
   - **Động cơ bôi đen 3 tầng cho Google Docs / Slides / Sheets & Drive Preview (`content/gdocs-preload.js`, `content/content.js`):**
     - Tiêm `gdocs-preload.js` tại `document_start` trong `MAIN` world (`manifest.json`) để bật `window._docs_annotate_canvas_by_ext = 'kix'` kèm hook đồng bộ `DataTransfer.prototype.setData`.

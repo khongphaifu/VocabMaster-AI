@@ -2,7 +2,7 @@
 // Service Worker (MV3) - routes messages, calls AI, manages vocabulary storage
 // Static import is required - dynamic import() is NOT allowed in service workers
 
-import { callAI, testDirectAI, isPlaceholderText, findFallbackData, buildFallbackWordResponse } from './utils/ai-client.js';
+import { callAI, testDirectAI, isPlaceholderText, findFallbackData, buildFallbackWordResponse, extractTextFromImageAI } from './utils/ai-client.js';
 import { fetchFromCambridge } from './utils/cambridge-client.js';
 import { resolveDictionaryWord } from './utils/dict-resolver.js';
 import { syncWithGitHubGist, normalizeVocabEntry } from './utils/cloud-sync.js';
@@ -58,6 +58,11 @@ async function syncCloudNow() {
 
 chrome.runtime.onStartup?.addListener(() => {
   scheduleCloudSync(1200);
+  chrome.tabs?.query?.({}).then((tabs) => {
+    for (const tab of tabs) {
+      redirectTabToPdfReaderIfEligible(tab.id, tab.url, tab.title).catch(() => {});
+    }
+  }).catch(() => {});
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -139,11 +144,15 @@ chrome.runtime.onInstalled.addListener((details) => {
 
   scheduleCloudSync(1500);
 
-  // Seamless re-injection into existing tabs on install/update
+  // Seamless re-injection into existing tabs on install/update + convert open PDF tabs if enabled
   try {
     chrome.tabs.query({}).then((tabs) => {
       for (const tab of tabs) {
-        if (tab.id && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('edge://') && !tab.url.startsWith('chrome-extension://')) {
+        if (!tab.id || !tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('chrome-extension://')) {
+          continue;
+        }
+        redirectTabToPdfReaderIfEligible(tab.id, tab.url, tab.title).then((redirected) => {
+          if (redirected) return;
           chrome.scripting.executeScript({
             target: { tabId: tab.id, allFrames: true },
             files: ['content/content.js']
@@ -152,7 +161,7 @@ chrome.runtime.onInstalled.addListener((details) => {
             target: { tabId: tab.id, allFrames: true },
             files: ['content/content.css']
           }).catch(() => {});
-        }
+        }).catch(() => {});
       }
     }).catch(() => {});
   } catch (_) {}
@@ -162,6 +171,7 @@ chrome.runtime.onInstalled.addListener((details) => {
 function isLikelyPdfUrl(urlStr) {
   try {
     if (!urlStr || typeof urlStr !== 'string') return false;
+    if (urlStr.includes('#vm_native_pdf=1')) return false;
     if (urlStr.startsWith('chrome-extension://') || urlStr.startsWith('chrome://') || urlStr.startsWith('edge://')) return false;
 
     const parsed = new URL(urlStr);
@@ -180,6 +190,16 @@ function isLikelyPdfUrl(urlStr) {
     if ((hostname === 'openreview.net' || hostname.endsWith('.openreview.net')) && pathname === '/pdf') {
       return true;
     }
+    if (hostname === 'dl.acm.org' && pathname.startsWith('/doi/pdf/')) {
+      return true;
+    }
+    if (hostname === 'ieeexplore.ieee.org' && pathname.startsWith('/stamppdf/')) {
+      return true;
+    }
+    if ((hostname === 'biorxiv.org' || hostname.endsWith('.biorxiv.org') || hostname === 'medrxiv.org' || hostname.endsWith('.medrxiv.org')) &&
+        pathname.includes('.full.pdf')) {
+      return true;
+    }
     const formatParam = (parsed.searchParams?.get('format') || '').toLowerCase();
     if (formatParam === 'pdf') return true;
 
@@ -189,23 +209,40 @@ function isLikelyPdfUrl(urlStr) {
   }
 }
 
-if (typeof chrome !== 'undefined' && chrome.webNavigation?.onBeforeNavigate) {
-  chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
-    // Only intercept top-level navigations
-    if (details.frameId !== 0) return;
-    const url = details.url;
-    if (!url) return;
+async function redirectTabToPdfReaderIfEligible(tabId, url, title = '') {
+  try {
+    if (!tabId || !url || typeof url !== 'string') return false;
+    if (url.includes('#vm_native_pdf=1')) return false;
+    if (url.startsWith('chrome-extension://') || url.startsWith('chrome://') || url.startsWith('edge://')) return false;
 
-    if (!isLikelyPdfUrl(url)) return;
+    const titleIsPdf = /^https?:/i.test(url) && String(title || '').trim().toLowerCase().endsWith('.pdf');
+    if (!isLikelyPdfUrl(url) && !titleIsPdf) return false;
 
-    // Check user preference toggle (default: true)
-    try {
-      const { pdf_auto_intercept = true } = await chrome.storage.local.get('pdf_auto_intercept');
-      if (!pdf_auto_intercept) return;
-    } catch (_) {}
+    const { pdf_auto_intercept = true } = await chrome.storage.local.get('pdf_auto_intercept');
+    if (!pdf_auto_intercept) return false;
 
     const readerUrl = chrome.runtime.getURL(`pdf/reader.html?file=${encodeURIComponent(url)}`);
-    chrome.tabs.update(details.tabId, { url: readerUrl }).catch(() => {});
+    await chrome.tabs.update(tabId, { url: readerUrl });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+if (typeof chrome !== 'undefined' && chrome.webNavigation?.onBeforeNavigate) {
+  chrome.webNavigation.onBeforeNavigate.addListener((details) => {
+    if (details.frameId !== 0 || !details.url) return;
+    redirectTabToPdfReaderIfEligible(details.tabId, details.url);
+  });
+}
+
+if (typeof chrome !== 'undefined' && chrome.tabs?.onUpdated) {
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    const candidateUrl = changeInfo.url || tab?.url || '';
+    const candidateTitle = changeInfo.title || tab?.title || '';
+    if (changeInfo.url || changeInfo.title || changeInfo.status === 'complete') {
+      redirectTabToPdfReaderIfEligible(tabId, candidateUrl, candidateTitle);
+    }
   });
 }
 
@@ -223,21 +260,42 @@ chrome.contextMenus?.onClicked?.addListener(async (info, tab) => {
   }
 
   if (!info.selectionText) return;
-  const text = info.selectionText.trim();
+  const text = info.selectionText
+    .replace(/([A-Za-z])-\s*\r?\n\s*([a-z])/g, '$1$2')
+    .replace(/[\s\u00A0]+/g, ' ')
+    .trim();
+  if (!text) return;
   const isWord = !text.includes(' ') && text.length < 35;
 
   if (info.menuItemId === 'vm-translate') {
+    const isRestrictedOrPdf = !tab?.url ||
+      tab.url.startsWith('chrome://') ||
+      tab.url.startsWith('edge://') ||
+      isLikelyPdfUrl(tab.url) ||
+      String(tab.title || '').trim().toLowerCase().endsWith('.pdf');
+
+    // Open side panel synchronously during user gesture before awaiting async translation
+    if (isRestrictedOrPdf && tab?.windowId && chrome.sidePanel?.open) {
+      chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {});
+    }
+
     try {
       const result = await handleTranslate(text, isWord);
-      // Try sending to content script in active tab
+      if (isRestrictedOrPdf) {
+        await chrome.storage.local.set({ active_quick_translate: result });
+        chrome.runtime.sendMessage({
+          type: 'SHOW_QUICK_TRANSLATE',
+          data: result
+        }).catch(() => {});
+        return;
+      }
+
       try {
         await chrome.tabs.sendMessage(tab.id, {
           type: 'SHOW_RESULT',
           data: result,
         });
       } catch (tabErr) {
-        // Tab cannot receive content script messages (e.g. Chrome's built-in PDF viewer or chrome:// pages)
-        // Fallback: Open Side Panel and display translation card!
         if (tab && tab.windowId) {
           if (chrome.sidePanel?.open) {
             await chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {});
@@ -375,6 +433,43 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }, { frameId: 0 }).catch(() => {});
         }
         sendResponse({ success: true });
+
+      } else if (message.type === 'OPEN_IN_PDF_READER') {
+        const targetUrl = message.url;
+        if (!targetUrl) {
+          sendResponse({ success: false, error: 'Thiếu đường dẫn PDF' });
+        } else {
+          const readerUrl = chrome.runtime.getURL(`pdf/reader.html?file=${encodeURIComponent(targetUrl)}`);
+          const tabId = message.tabId || sender?.tab?.id;
+          if (message.replaceCurrentTab !== false && tabId) {
+            await chrome.tabs.update(tabId, { url: readerUrl });
+          } else {
+            await chrome.tabs.create({ url: readerUrl });
+          }
+          sendResponse({ success: true });
+        }
+
+      } else if (message.type === 'OCR_PDF_PAGE') {
+        const { aiProvider = 'gemini', apiKey = '', apiKeys = {} } =
+          await chrome.storage.sync.get(['aiProvider', 'apiKey', 'apiKeys']);
+        const geminiKey = (apiKeys?.gemini || (aiProvider === 'gemini' ? apiKey : '') || '').trim();
+        const openaiKey = (apiKeys?.openai || (aiProvider === 'openai' ? apiKey : '') || '').trim();
+        const visionProvider = geminiKey ? 'gemini' : (openaiKey ? 'openai' : '');
+        const visionKey = visionProvider === 'gemini' ? geminiKey : openaiKey;
+
+        if (!visionKey) {
+          sendResponse({
+            success: false,
+            error: 'Cần nhập Gemini hoặc OpenAI API Key trong Cài đặt để AI quét chữ từ hình ảnh / PDF scan.'
+          });
+        } else {
+          const extracted = await extractTextFromImageAI({
+            provider: visionProvider,
+            apiKey: visionKey,
+            dataUrl: message.dataUrl || ''
+          });
+          sendResponse({ success: true, text: extracted });
+        }
 
       } else {
         sendResponse({ success: false, error: 'Unknown message type' });

@@ -30,6 +30,14 @@
           <span>🔗</span>
           <span class="btn-label">Mở từ Link</span>
         </button>
+        <button type="button" class="btn-tool" id="btn-download-pdf" style="display: none;" title="Tải file PDF về máy">
+          <span>⬇️</span>
+          <span class="btn-label">Tải PDF</span>
+        </button>
+        <button type="button" class="btn-tool" id="btn-raw-pdf" style="display: none;" title="Mở lại bằng trình xem PDF mặc định của Chrome">
+          <span>🌐</span>
+          <span class="btn-label">Xem bản gốc</span>
+        </button>
         <input type="file" id="file-input" accept="application/pdf" style="display: none;">
       </div>
 
@@ -62,6 +70,16 @@
 
     <!-- RIGHT: THEMES & TOOLS -->
     <div class="header-right">
+      <label class="tap-mode-pill" title="Bật để click 1 cái vào từ bất kỳ trên PDF là dịch ngay không cần kéo bôi đen">
+        <input type="checkbox" id="toggle-pdf-tap-word">
+        <span>👆 Chạm 1 từ</span>
+      </label>
+
+      <button type="button" class="btn-tool" id="btn-ocr-page" style="display: none;" title="Dùng AI quét chữ trong hình vẽ / sơ đồ (Figure) hoặc trang PDF Scan">
+        <span>📷</span>
+        <span class="btn-label">Quét chữ hình/Scan</span>
+      </button>
+
       <div class="theme-picker">
         <button type="button" class="theme-btn active" data-theme="dark" title="Giao diện nền tối (Dark mode)">🌙</button>
         <button type="button" class="theme-btn" data-theme="sepia" title="Giao diện giấy vàng ấm (Sepia - chống mỏi mắt)">📖</button>

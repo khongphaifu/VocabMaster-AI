@@ -11,6 +11,7 @@ console.log('\n[TEST 1] PDF URL Interceptor');
 function isLikelyPdfUrl(urlStr) {
   try {
     if (!urlStr || typeof urlStr !== 'string') return false;
+    if (urlStr.includes('#vm_native_pdf=1')) return false;
     if (urlStr.startsWith('chrome-extension://') || urlStr.startsWith('chrome://') || urlStr.startsWith('edge://')) return false;
 
     const parsed = new URL(urlStr);
@@ -27,6 +28,16 @@ function isLikelyPdfUrl(urlStr) {
     if ((hostname === 'openreview.net' || hostname.endsWith('.openreview.net')) && pathname === '/pdf') {
       return true;
     }
+    if (hostname === 'dl.acm.org' && pathname.startsWith('/doi/pdf/')) {
+      return true;
+    }
+    if (hostname === 'ieeexplore.ieee.org' && pathname.startsWith('/stamppdf/')) {
+      return true;
+    }
+    if ((hostname === 'biorxiv.org' || hostname.endsWith('.biorxiv.org') || hostname === 'medrxiv.org' || hostname.endsWith('.medrxiv.org')) &&
+        pathname.includes('.full.pdf')) {
+      return true;
+    }
     const formatParam = (parsed.searchParams?.get('format') || '').toLowerCase();
     if (formatParam === 'pdf') return true;
     return false;
@@ -37,9 +48,13 @@ function isLikelyPdfUrl(urlStr) {
 
 const testUrls = [
   { url: 'https://arxiv.org/pdf/2301.00001.pdf', expected: true },
-  { url: 'https://arxiv.org/pdf/2401.12345', expected: true },
+  { url: 'https://arxiv.org/pdf/2104.08821', expected: true },
+  { url: 'https://arxiv.org/pdf/2104.08821#vm_native_pdf=1', expected: false },
   { url: 'https://arxiv.org/abs/2401.12345', expected: false },
   { url: 'https://openreview.net/pdf?id=abc123XYZ', expected: true },
+  { url: 'https://dl.acm.org/doi/pdf/10.1145/1234567', expected: true },
+  { url: 'https://ieeexplore.ieee.org/stampPDF/getPDF.jsp?arnumber=999', expected: true },
+  { url: 'https://www.biorxiv.org/content/10.1101/2024.01.01v1.full.pdf', expected: true },
   { url: 'https://example.com/paper?id=42&format=pdf', expected: true },
   { url: 'https://example.com/document.PDF', expected: true },
   { url: 'https://example.com/paper.pdf?token=abc123xyz', expected: true },

@@ -40,7 +40,10 @@ function renderQuickTranslate(data) {
   const orig = data.original || '';
   const meaning = isWord ? (data.word.meaning_vi || data.word.definition_vi) : (data.translation || '');
   const ipa = isWord ? (data.word.ipa_uk || data.word.ipa_us || data.word.ipa || '') : '';
-  const pos = isWord ? (data.word.partOfSpeech || '') : 'phrase';
+  const pos = isWord ? (data.word.partOfSpeech || '') : 'câu / đoạn';
+  const altTrans = !isWord && data.alternative_translation ? data.alternative_translation : '';
+  const explanation = !isWord && data.explanation ? data.explanation : '';
+  const vocabList = !isWord && Array.isArray(data.vocabulary) ? data.vocabulary.filter(v => v && v.word) : [];
 
   container.style.display = 'block';
   container.innerHTML = `
@@ -51,21 +54,40 @@ function renderQuickTranslate(data) {
         </span>
         <button type="button" id="btn-close-quick" style="border: none; background: transparent; color: #a6adc8; cursor: pointer; font-size: 14px;">✕</button>
       </div>
-      <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px;">
-        <span style="font-size: 16px; font-weight: 700; color: #89b4fa;">${esc(orig)}</span>
+      <div style="display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px;">
+        <span style="font-size: 15px; font-weight: 700; color: #89b4fa; word-break: break-word;">${esc(orig)}</span>
         ${ipa ? `<span style="font-size: 12px; font-style: italic; color: #bac2de;">${esc(ipa)}</span>` : ''}
         ${pos ? `<span style="font-size: 10px; background: #313244; color: #89dceb; padding: 1px 6px; border-radius: 8px;">${esc(pos)}</span>` : ''}
       </div>
-      <div style="font-size: 13.5px; font-weight: 700; color: #a6e3a1; margin-bottom: 8px;">
+      <div style="font-size: 13.5px; font-weight: 700; color: #a6e3a1; margin-bottom: 6px; line-height: 1.45;">
         ${esc(meaning)}
       </div>
-      <div style="display: flex; gap: 8px;">
+      ${altTrans ? `<div style="font-size: 12px; color: #89dceb; margin-bottom: 6px;">✨ Cách diễn đạt khác: ${esc(altTrans)}</div>` : ''}
+      ${explanation ? `<div style="font-size: 11.5px; color: #bac2de; margin-bottom: 8px; line-height: 1.45;">💡 ${esc(explanation)}</div>` : ''}
+      ${vocabList.length ? `
+        <div style="margin-top: 8px; margin-bottom: 8px; padding-top: 8px; border-top: 1px solid rgba(166, 173, 200, 0.16); display: flex; flex-direction: column; gap: 6px;">
+          <div style="font-size: 11px; font-weight: 700; color: #f9e2af;">🔑 Từ vựng quan trọng trong câu:</div>
+          ${vocabList.slice(0, 5).map((v, idx) => `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#1e1e2e;border:1px solid #313244;border-radius:6px;padding:5px 8px;">
+              <div style="min-width:0;">
+                <span style="font-size:12px;font-weight:700;color:#89b4fa;">${esc(v.word)}</span>
+                ${v.pos ? `<span style="font-size:10px;color:#cba6f7;margin-left:4px;">(${esc(v.pos)})</span>` : ''}
+                <div style="font-size:11px;color:#a6adc8;">${esc(v.meaning || v.meaning_vi || '')}</div>
+              </div>
+              <button type="button" class="btn-quick-item-save" data-idx="${idx}" style="flex-shrink:0;border:none;background:#313244;color:#a6e3a1;border-radius:5px;padding:3px 7px;font-size:10.5px;font-weight:700;cursor:pointer;">+ Lưu</button>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+      <div style="display: flex; gap: 8px; margin-top: 4px;">
         <button type="button" id="btn-quick-speak" style="border: 1px solid #45475a; background: #313244; color: #cdd6f4; border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 600; cursor: pointer;">
           🔊 Nghe đọc
         </button>
-        <button type="button" id="btn-quick-save" style="border: none; background: #89b4fa; color: #11111b; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; cursor: pointer;">
-          + Lưu vào sổ từ
-        </button>
+        ${isWord ? `
+          <button type="button" id="btn-quick-save" style="border: none; background: #89b4fa; color: #11111b; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; cursor: pointer;">
+            + Lưu vào sổ từ
+          </button>
+        ` : ''}
       </div>
     </div>
   `;
@@ -75,6 +97,35 @@ function renderQuickTranslate(data) {
   });
   document.getElementById('btn-quick-speak')?.addEventListener('click', () => {
     speak(orig);
+  });
+  container.querySelectorAll('.btn-quick-item-save').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const idx = parseInt(btn.getAttribute('data-idx'), 10);
+      const item = vocabList[idx];
+      if (!item) return;
+      btn.disabled = true;
+      btn.textContent = '...';
+      try {
+        const res = await chrome.runtime.sendMessage({
+          type: 'ADD_WORD',
+          wordData: {
+            word: item.word,
+            ipa: item.ipa || '',
+            partOfSpeech: item.pos || '',
+            meaning_vi: item.meaning || item.meaning_vi || '',
+            definition_vi: item.meaning || item.meaning_vi || '',
+            examples: [orig],
+            sourceUrl: 'PDF/Web Quick Translate'
+          }
+        });
+        if (res?.success) {
+          btn.textContent = '✓ Đã lưu';
+          renderLibrary();
+        }
+      } catch (_) {
+        btn.textContent = 'Lỗi';
+      }
+    });
   });
   document.getElementById('btn-quick-save')?.addEventListener('click', async () => {
     const saveBtn = document.getElementById('btn-quick-save');
